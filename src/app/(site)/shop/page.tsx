@@ -55,6 +55,16 @@ export default async function ShopPage() {
     getAllProducts(),
     getCategories(),
   ]);
+  const normalizedProducts = products.map((item) => ({
+    ...item,
+    shortDescription: item.shortDescription ?? "",
+    productVariants: item.productVariants.map((variant) => ({
+      ...variant,
+      color: variant.color ?? "",
+      image: variant.image ?? "",
+      size: variant.size ?? "",
+    })),
+  }));
 
   return (
     <section className="overflow-hidden py-10 pb-20">
@@ -84,9 +94,9 @@ export default async function ShopPage() {
 
           <div className="flex-1 min-w-0">
             <h1 className="mb-6 text-2xl font-semibold text-dark">Shop</h1>
-            {products.length > 0 ? (
+            {normalizedProducts.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-x-7.5 gap-y-9">
-                {products.map((item) => (
+                {normalizedProducts.map((item) => (
                   <ProductItem item={item} key={item.id} />
                 ))}
               </div>

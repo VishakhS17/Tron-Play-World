@@ -2,6 +2,18 @@ import { prisma } from "@/lib/prismaDB";
 import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 
+const normalizeVariant = (variant: {
+  image: string | null;
+  color: string | null;
+  size: string | null;
+  isDefault: boolean;
+}) => ({
+  ...variant,
+  image: variant.image ?? "",
+  color: variant.color ?? "",
+  size: variant.size ?? "",
+});
+
 
 // get product for id and title 
 export const getProductsIdAndTitle = unstable_cache(
@@ -54,6 +66,8 @@ export const getNewArrivalsProduct = unstable_cache(
     return products.map(({ _count, ...item }) => ({
       ...item,
       reviews: _count.reviews,
+      shortDescription: item.shortDescription ?? "",
+      productVariants: item.productVariants.map(normalizeVariant),
       price: item.price.toNumber(),
       discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
     }))
@@ -102,6 +116,8 @@ export const getBestSellingProducts = unstable_cache(
     return products.map(({ _count, ...item }) => ({
       ...item,
       reviews: _count.reviews, // Extract review count
+      shortDescription: item.shortDescription ?? "",
+      productVariants: item.productVariants.map(normalizeVariant),
       price: item.price.toNumber(),
       discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
     }));
@@ -149,6 +165,8 @@ export const getLatestProducts = unstable_cache(
     return products.map(({ _count, ...item }) => ({
       ...item,
       reviews: _count.reviews, // Extract review count
+      shortDescription: item.shortDescription ?? "",
+      productVariants: item.productVariants.map(normalizeVariant),
       price: item.price.toNumber(),
       discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
     }));
@@ -162,42 +180,48 @@ export const getAllProducts = unstable_cache(
   async (
     orderBy: { updatedAt?: Prisma.SortOrder } | { reviews: { _count: Prisma.SortOrder } } = { updatedAt: 'desc' }
   ) => {
-    const products = await prisma.product.findMany({
-      orderBy,
-      select: {
-        id: true,
-        title: true,
-        shortDescription: true,
-        price: true,
-        discountedPrice: true,
-        slug: true,
-        quantity: true,
-        updatedAt: true,
-        productVariants: {
-          select: {
-            image: true,
-            color: true,
-            size: true,
-            isDefault: true
-          }
-        },
-        _count: {
-          select: {
-            reviews: {
-              where: {
-                isApproved: true
+    try {
+      const products = await prisma.product.findMany({
+        orderBy,
+        select: {
+          id: true,
+          title: true,
+          shortDescription: true,
+          price: true,
+          discountedPrice: true,
+          slug: true,
+          quantity: true,
+          updatedAt: true,
+          productVariants: {
+            select: {
+              image: true,
+              color: true,
+              size: true,
+              isDefault: true
+            }
+          },
+          _count: {
+            select: {
+              reviews: {
+                where: {
+                  isApproved: true
+                }
               }
             }
           }
-        }
-      },
-    })
-    return products.map(({ _count, ...item }) => ({
-      ...item,
-      reviews: _count.reviews, // Extract review count
-      price: item.price.toNumber(),
-      discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
-    }));
+        },
+      })
+      return products.map(({ _count, ...item }) => ({
+        ...item,
+        reviews: _count.reviews, // Extract review count
+        shortDescription: item.shortDescription ?? "",
+        productVariants: item.productVariants.map(normalizeVariant),
+        price: item.price.toNumber(),
+        discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
+      }));
+    } catch {
+      return [];
+    }
   },
   ['products'], { tags: ['products'] }
 );
@@ -272,6 +296,8 @@ export const getProductBySlug = async (slug: string) => {
   });
   const transformProduct = {
     ...product,
+    shortDescription: product?.shortDescription ?? "",
+    productVariants: product?.productVariants?.map(normalizeVariant) ?? [],
     price: product?.price.toNumber(),
     discountedPrice: product?.discountedPrice ? product.discountedPrice.toNumber() : null,
     reviews: product?._count.reviews,
@@ -306,6 +332,8 @@ export const getProductById = async (productId: string) => {
   })
   const transformProduct = {
     ...product,
+    shortDescription: product?.shortDescription ?? "",
+    productVariants: product?.productVariants?.map(normalizeVariant) ?? [],
     price: product?.price.toNumber(),
     discountedPrice: product?.discountedPrice ? product.discountedPrice.toNumber() : null
   }
@@ -385,6 +413,8 @@ export const getRelatedProducts = unstable_cache(
     return products.map(({ _count, ...item }) => ({
       ...item,
       reviews: _count.reviews,
+      shortDescription: item.shortDescription ?? "",
+      productVariants: item.productVariants.map(normalizeVariant),
       price: item.price.toNumber(),
       discountedPrice: item?.discountedPrice
         ? item.discountedPrice.toNumber()

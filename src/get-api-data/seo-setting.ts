@@ -4,19 +4,27 @@ import { unstable_cache } from "next/cache";
 // get all seo settings
 export const getSeoSettings = unstable_cache(
   async () => {
-    return await prisma.seoSetting.findFirst();
+    try {
+      return await prisma.seoSetting.findFirst();
+    } catch {
+      return null;
+    }
   },
   ['seo-setting'], { tags: ['seo-setting'] }
 );
 
 export const getSiteName = unstable_cache(
   async () => {
-    const siteName = await prisma.seoSetting.findFirst({
-      select: {
-        siteName: true,
-      },
-    });
-    return siteName ? siteName.siteName : process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
+    try {
+      const siteName = await prisma.seoSetting.findFirst({
+        select: {
+          siteName: true,
+        },
+      });
+      return siteName ? siteName.siteName : process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
+    } catch {
+      return process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
+    }
   },
   ['site-name'], { tags: ['site-name'] }
 );

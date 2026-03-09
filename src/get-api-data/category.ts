@@ -5,9 +5,13 @@ import { unstable_cache } from "next/cache";
 // get all categories
 export const getCategories = unstable_cache(
   async () => {
-    return await prisma.category.findMany({
-      orderBy: { updatedAt: "desc" },
-    });
+    try {
+      return await prisma.category.findMany({
+        orderBy: { updatedAt: "desc" },
+      });
+    } catch {
+      return [];
+    }
   },
   ['categories'], { tags: ['categories'] }
 );

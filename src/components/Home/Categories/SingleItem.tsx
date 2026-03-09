@@ -3,15 +3,19 @@ import React from "react";
 import Image from "next/image";
 import { Category } from "@prisma/client";
 
-const SingleItem = ({ item }: { item: Category }) => {
+type CategoryItem = Category & { img?: string | null };
+
+const SingleItem = ({ item }: { item: CategoryItem }) => {
+  const categoryImage = item.img ?? null;
+
   return (
     <Link
       href={`/categories/${item.slug}`}
       className="flex flex-col items-center group"
     >
       <div className="w-[130px] h-[130px] bg-[#F2F3F8]  rounded-full flex items-center justify-center mb-4">
-        {item.img && (
-          <Image src={item.img} alt="Category" width={80} height={80} />
+        {categoryImage && (
+          <Image src={categoryImage} alt="Category" width={80} height={80} />
         )}
       </div>
 
