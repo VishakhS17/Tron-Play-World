@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model SeoSetting {
+  id              Int      @id @default(autoincrement())
+  siteTitle       String?
+  metadescription String?
+  metaKeywords    String?
+  metaImage       String?
+  favicon         String?
+  gtmId           String?
+  siteName        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model HeaderSetting {
+  id         Int      @id @default(autoincrement())
+  headerText String?
+  headerLogo String?
+  emailLogo  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  title     String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+}
+
+model Product {
+  id                    String                 @id @default(uuid())
+  title                 String
+  shortDescription      String?
+  description           String?
+  body                  String?
+  price                 Decimal
+  discountedPrice       Decimal?
+  slug                  String                 @unique
+  quantity              Int                    @default(0)
+  sku                   String?
+  tags                  String[]
+  offers                String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  categoryId            Int?
+  category              Category?              @relation(fields: [categoryId], references: [id])
+
+  productVariants       ProductVariant[]
+  additionalInformation AdditionalInformation[]
+  customAttributes      CustomAttribute[]
+  reviews               Review[]
+  countdowns            Countdown[]
+  heroBanners           HeroBanner[]
+  heroSliders           HeroSlider[]
+}
+
+model ProductVariant {
+  id        Int     @id @default(autoincrement())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  image     String?
+  color     String?
+  size      String?
+  isDefault Boolean @default(false)
+}
+
+model AdditionalInformation {
+  id        Int     @id @default(autoincrement())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  name      String
+  description String
+}
+
+model CustomAttribute {
+  id             Int             @id @default(autoincrement())
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id])
+
+  attributeName  String
+  attributeValues AttributeValue[]
+}
+
+model AttributeValue {
+  id               Int             @id @default(autoincrement())
+  title            String
+
+  customAttributeId Int
+  customAttribute  CustomAttribute @relation(fields: [customAttributeId], references: [id])
+}
+
+model Review {
+  id          Int      @id @default(autoincrement())
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+
+  productSlug String
+  name        String
+  email       String
+  comment     String
+  ratings     Int
+  isApproved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productSlug])
+}
+
+model Countdown {
+  id        Int      @id @default(autoincrement())
+  title     String?
+  endDate   DateTime
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HeroBanner {
+  id          Int      @id @default(autoincrement())
+  bannerName  String?
+  bannerImage String
+  slug        String   @unique
+
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model HeroSlider {
+  id           Int      @id @default(autoincrement())
+  sliderName   String
+  sliderImage  String
+  discountRate Int
+  slug         String   @unique
+
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
