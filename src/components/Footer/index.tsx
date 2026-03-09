@@ -8,7 +8,6 @@ import {
 import Link from "next/link";
 import AccountLinks from "./AccountLinks";
 import FooterBottom from "./FooterBottom";
-import { AppStoreIcon, GooglePlayIcon } from "./icons";
 import QuickLinks from "./QuickLinks";
 
 const Footer = () => {
@@ -93,51 +92,6 @@ const Footer = () => {
           <AccountLinks />
 
           <QuickLinks />
-
-          <div className="w-full sm:w-auto">
-            <h2 className="mb-7.5 text-xl font-semibold text-dark lg:text-right">
-              Download App
-            </h2>
-
-            <p className="mb-4 lg:text-right text-custom-sm">
-              Get started in seconds – it&apos;s fast, free, and easy!
-            </p>
-
-            <ul className="flex flex-col gap-3 lg:items-end">
-              <li>
-                <Link
-                  className="inline-flex items-center gap-3 py-[9px] pl-4 pr-7.5 hover:bg-gray-3 text-white rounded-lg border border-gray-3  ease-out duration-200 hover:bg-opacity-95"
-                  href="#"
-                >
-                  <AppStoreIcon />
-
-                  <div>
-                    <span className="block text-custom-xs text-dark-3">
-                      Download on the
-                    </span>
-                    <p className="font-semibold text-dark">App Store</p>
-                  </div>
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  className="inline-flex items-center gap-3 py-[9px] pl-4 pr-8.5 text-white hover:bg-gray-3 rounded-lg border border-gray-3 ease-out duration-200 hover:bg-opacity-95"
-                  href="#"
-                >
-                  <GooglePlayIcon />
-
-                  <div>
-                    <span className="block text-custom-xs text-dark-3">
-                      {" "}
-                      Get in On{" "}
-                    </span>
-                    <p className="font-semibold text-dark">Google Play</p>
-                  </div>
-                </Link>
-              </li>
-            </ul>
-          </div>
         </div>
         {/* <!-- footer menu end --> */}
       </div>
