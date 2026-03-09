@@ -10,7 +10,7 @@ const aboutData = [
   {
     id: 2,
     icon: CallIcon,
-    text: '(+099) 532-786-9843',
+    text: '+91 98447 16214',
   },
   {
     id: 3,

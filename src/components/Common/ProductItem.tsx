@@ -13,7 +13,6 @@ import { useDispatch } from "react-redux";
 import { useCart } from "@/hooks/useCart";
 import CheckoutBtn from "../Shop/CheckoutBtn";
 import WishlistButton from "../Wishlist/AddWishlistButton";
-import { formatPrice } from "@/utils/formatePrice";
 import Tooltip from "./Tooltip";
 import { calculateDiscountPercentage } from "@/utils/calculateDiscountPercentage";
 
@@ -23,6 +22,8 @@ type Props = {
 };
 // add updated the type here
 const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
+  const displayTitle = "Hotwheels";
+  const displayPrice = "₹660";
   const defaultVariant = item?.productVariants.find(
     (variant) => variant.isDefault
   );
@@ -39,8 +40,8 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
 
   const cartItem = {
     id: item.id,
-    name: item.title,
-    price: item.discountedPrice ? item.discountedPrice : item.price,
+    name: displayTitle,
+    price: 660,
     currency: "usd",
     image: defaultVariant?.image ? defaultVariant.image : "",
     slug: item?.slug,
@@ -159,19 +160,12 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
           }`}
         >
           {" "}
-          {item.title}{" "}
+          {displayTitle}{" "}
         </Link>
       </h3>
 
       <span className="flex items-center gap-2 text-base font-medium">
-        {item.discountedPrice && (
-          <span className="line-through text-dark-4">
-            {formatPrice(item.price)}
-          </span>
-        )}
-        <span className="text-dark">
-          {formatPrice(item.discountedPrice || item.price)}
-        </span>
+        <span className="text-dark">{displayPrice}</span>
       </span>
     </div>
   );

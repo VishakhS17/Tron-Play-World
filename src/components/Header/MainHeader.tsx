@@ -76,7 +76,7 @@ const MainHeader = ({ headerData }: IProps) => {
               <div className="hidden lg:block">
                 <p className="text-sm font-medium text-white">
                   {headerData?.headerText ||
-                    "Free delivery on orders over $50 – toys for every age!"}
+                    "Free delivery on orders over ₹2000 – toys for every age!"}
                 </p>
               </div>
               <div className="flex divide-x divide-white/20">

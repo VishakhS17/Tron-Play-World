@@ -6,41 +6,35 @@ import Link from "next/link";
 
 const DEMO_CARDS = [
   {
-    title: "Starter Garage Set",
-    subtitle: "Performance toy set with modular display slots.",
-    price: "$24.99",
+    title: "Hotwheels",
+    price: "₹660",
     href: "/shop/starter-garage-set",
     image: "/images/products/2e9757bf-25f8-4dcf-bc3f-9a13dd51ad61.webp",
   },
   {
-    title: "Collector Display Case",
-    subtitle: "Compact showcase case for premium mini models.",
-    price: "$39.99",
+    title: "Hotwheels",
+    price: "₹660",
     href: "/shop/collector-display-case",
     image: "/images/products/6bbee6b4-64ce-4fc0-b70b-5d6bd4160657.webp",
   },
   {
-    title: "Track Builder Bundle",
-    subtitle: "Expandable track kit with stunt-ready connectors.",
-    price: "$54.99",
+    title: "Hotwheels",
+    price: "₹660",
     image: "/images/products/94f47974-409b-40f2-ba61-9994d6b1da57.webp",
   },
   {
-    title: "Turbo Pit Stop Pack",
-    subtitle: "Mini accessory set with cones, signs and garage parts.",
-    price: "$19.99",
+    title: "Hotwheels",
+    price: "₹660",
     image: "/images/products/a6265a80-6b7f-49e0-8dc4-a781c908ba55.webp",
   },
   {
-    title: "Neon Drift Duo",
-    subtitle: "Two-car combo focused on drift and street styling.",
-    price: "$29.99",
+    title: "Hotwheels",
+    price: "₹660",
     image: "/images/products/c4496e7b-112c-4b92-b7c5-c5db5c5e5500.webp",
   },
   {
-    title: "Race Day Starter Box",
-    subtitle: "Entry-level box for collectors getting started.",
-    price: "$34.99",
+    title: "Hotwheels",
+    price: "₹660",
     image: "/images/products/ff72e74e-6398-47ea-8f3c-4508cb3d72cf.webp",
   },
 ];
@@ -102,10 +96,12 @@ export default async function ShopPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {DEMO_CARDS.map((card) =>
+                {DEMO_CARDS.map((card, index) => {
+                  const cardKey = card.href ?? `${card.title}-${index}`;
+                  return (
                   card.href ? (
                     <Link
-                      key={card.title}
+                      key={cardKey}
                       href={card.href}
                       className="rounded-xl border border-gray-3 bg-white p-5 transition hover:shadow-md block"
                     >
@@ -119,12 +115,11 @@ export default async function ShopPage() {
                         />
                       </div>
                       <h3 className="text-base font-semibold text-dark">{card.title}</h3>
-                      <p className="mt-1 text-sm text-meta-3">{card.subtitle}</p>
                       <p className="mt-3 text-sm font-semibold text-dark">{card.price}</p>
                     </Link>
                   ) : (
                     <article
-                      key={card.title}
+                      key={cardKey}
                       className="rounded-xl border border-gray-3 bg-white p-5"
                     >
                       <div className="relative aspect-square rounded-lg bg-gray-1 mb-4 overflow-hidden border border-gray-3">
@@ -137,14 +132,14 @@ export default async function ShopPage() {
                         />
                       </div>
                       <h3 className="text-base font-semibold text-dark">{card.title}</h3>
-                      <p className="mt-1 text-sm text-meta-3">{card.subtitle}</p>
                       <p className="mt-3 text-sm font-semibold text-dark">{card.price}</p>
                       <span className="mt-3 inline-flex text-sm text-meta-4">
                         Details coming soon
                       </span>
                     </article>
                   )
-                )}
+                  );
+                })}
               </div>
             )}
           </div>

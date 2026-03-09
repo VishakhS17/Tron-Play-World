@@ -1,6 +1,6 @@
 import "./css/style.css";
 import { Metadata } from "next";
-import { getSeoSettings, getSiteName } from "@/get-api-data/seo-setting";
+import { getSeoSettings } from "@/get-api-data/seo-setting";
 import { GoogleTagManager } from '@next/third-parties/google';
 import { DM_Sans } from 'next/font/google'
 
@@ -13,9 +13,8 @@ const defaultFavicon = "/ChatGPT Image Mar 3, 2026, 09_17_53 PM.png";
 
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await getSeoSettings();
-  const site_name = await getSiteName();
   return {
-    title: `${seoSettings?.siteTitle || "Home"} | ${site_name}`,
+    title: `${seoSettings?.siteTitle || "Home"} | i-Robox`,
     description: seoSettings?.metadescription || "i-Robox – toys, games & play for every kid. Shop the best toys online.",
     keywords: seoSettings?.metaKeywords || "toys, toy store, kids toys, games, i-Robox",
     openGraph: {

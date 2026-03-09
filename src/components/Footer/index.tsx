@@ -33,11 +33,11 @@ const Footer = () => {
 
               <li>
                 <Link
-                  href="tel:+099 532-786-9843"
+                  href="tel:+919844716214"
                   className="flex items-center gap-4.5 text-base"
                 >
                   <CallIcon className="fill-blue" width={24} height={24} />
-                  (+099) 532-786-9843
+                  +91 98447 16214
                 </Link>
               </li>
 
