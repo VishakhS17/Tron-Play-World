@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useCart } from "@/hooks/useCart";
 import { menuData } from "./menuData";
 import MobileMenu from "./MobileMenu";
@@ -31,6 +32,7 @@ type MeResponse = {
 };
 
 const MainHeader = ({ headerData }: IProps) => {
+  const pathname = usePathname();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [stickyMenu, setStickyMenu] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -73,25 +75,37 @@ const MainHeader = ({ headerData }: IProps) => {
     };
   }, []);
 
-  // Read current customer session for greeting text
+  async function loadMe(signal?: AbortSignal) {
+    const res = await fetch("/api/auth/me", { cache: "no-store", signal });
+    const data = (await res.json().catch(() => null)) as MeResponse | null;
+    const rawName = data?.user?.name?.trim();
+    const fallback = data?.user?.email?.split("@")[0] ?? null;
+    setUserName(rawName || fallback);
+  }
+
+  // Read current customer session for greeting text.
+  // Re-check on route changes and auth-change events (login/logout/verify).
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    const controller = new AbortController();
+    const run = async () => {
       try {
-        const res = await fetch("/api/auth/me", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as MeResponse | null;
-        if (!mounted) return;
-        const rawName = data?.user?.name?.trim();
-        const fallback = data?.user?.email?.split("@")[0] ?? null;
-        setUserName(rawName || fallback);
+        await loadMe(controller.signal);
       } catch {
-        if (mounted) setUserName(null);
+        setUserName(null);
       }
-    })();
-    return () => {
-      mounted = false;
     };
-  }, []);
+    run();
+
+    const handleAuthChange = () => {
+      void run();
+    };
+    window.addEventListener("tpw-auth-changed", handleAuthChange);
+
+    return () => {
+      controller.abort();
+      window.removeEventListener("tpw-auth-changed", handleAuthChange);
+    };
+  }, [pathname]);
 
   return (
     <>

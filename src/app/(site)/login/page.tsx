@@ -13,6 +13,9 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [otp, setOtp] = useState("");
+  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -30,9 +33,80 @@ export default function LoginPage() {
       if (!res.ok) {
         throw new Error(data?.error || "Request failed");
       }
-      toast.success(mode === "signup" ? "Account created!" : "Welcome back!");
+      if (mode === "signup") {
+        if (data?.requiresOtp && typeof data?.userId === "string") {
+          setPendingUserId(data.userId);
+          setOtp("");
+          setDevOtpHint(typeof data?.devOtp === "string" ? data.devOtp : null);
+          toast.success(
+            data?.emailSent
+              ? "OTP sent to your email. Please verify to continue."
+              : "Email is not configured. Use the dev OTP shown on screen."
+          );
+          return;
+        }
+        toast.success("Account created!");
+      } else {
+        toast.success("Welcome back!");
+        window.dispatchEvent(new Event("tpw-auth-changed"));
+      }
       router.push("/");
       router.refresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pendingUserId) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: pendingUserId, otp }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "OTP verification failed");
+      }
+      toast.success("Welcome to i-Robox!");
+      setPendingUserId(null);
+      setOtp("");
+      setDevOtpHint(null);
+      window.dispatchEvent(new Event("tpw-auth-changed"));
+      router.push("/");
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendOtp() {
+    if (!pendingUserId && !email) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/resend-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: pendingUserId, email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Could not resend OTP");
+      }
+      setPendingUserId(typeof data?.userId === "string" ? data.userId : pendingUserId);
+      setDevOtpHint(typeof data?.devOtp === "string" ? data.devOtp : null);
+      toast.success(
+        data?.emailSent
+          ? "OTP resent successfully."
+          : "Email is not configured. Use the dev OTP shown on screen."
+      );
     } catch (err: any) {
       toast.error(err?.message || "Something went wrong");
     } finally {
@@ -53,90 +127,148 @@ export default function LoginPage() {
               : "Create an account for faster checkout and order tracking."}
           </p>
 
-          <div className="mt-6 flex gap-2 rounded-xl bg-gray-1 p-1">
-            <button
-              type="button"
-              onClick={() => setMode("login")}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                mode === "login"
-                  ? "bg-white text-dark shadow-sm border border-gray-3"
-                  : "text-meta-3 hover:text-dark"
-              }`}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("signup")}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                mode === "signup"
-                  ? "bg-white text-dark shadow-sm border border-gray-3"
-                  : "text-meta-3 hover:text-dark"
-              }`}
-            >
-              Sign up
-            </button>
-          </div>
+          {!pendingUserId ? (
+            <>
+              <div className="mt-6 flex gap-2 rounded-xl bg-gray-1 p-1">
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    mode === "login"
+                      ? "bg-white text-dark shadow-sm border border-gray-3"
+                      : "text-meta-3 hover:text-dark"
+                  }`}
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("signup")}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    mode === "signup"
+                      ? "bg-white text-dark shadow-sm border border-gray-3"
+                      : "text-meta-3 hover:text-dark"
+                  }`}
+                >
+                  Sign up
+                </button>
+              </div>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {mode === "signup" && (
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                {mode === "signup" && (
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-dark">
+                      Name
+                    </span>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+                      autoComplete="name"
+                    />
+                  </label>
+                )}
+
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-dark">
+                    Email
+                  </span>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    required
+                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+                    autoComplete="email"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-dark">
+                    Password
+                  </span>
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type="password"
+                    required
+                    minLength={8}
+                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+                    autoComplete={
+                      mode === "signup" ? "new-password" : "current-password"
+                    }
+                  />
+                  <span className="mt-1 block text-xs text-meta-4">
+                    Minimum 8 characters.
+                  </span>
+                </label>
+
+                <button
+                  disabled={loading}
+                  className="w-full rounded-lg bg-blue px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-dark disabled:opacity-60"
+                  type="submit"
+                >
+                  {loading
+                    ? "Please wait…"
+                    : mode === "login"
+                    ? "Sign in"
+                    : "Create account"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
+              <h2 className="text-xl font-semibold text-dark">Verify OTP</h2>
+              <p className="text-sm text-meta-3">
+                Enter the 6-digit code sent to your email.
+              </p>
+              {devOtpHint ? (
+                <p className="rounded-md bg-yellow-light-4 px-3 py-2 text-xs text-dark">
+                  Dev OTP (email not configured): <b>{devOtpHint}</b>
+                </p>
+              ) : null}
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-dark">
-                  Name
+                  OTP
                 </span>
                 <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  inputMode="numeric"
                   className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                  autoComplete="name"
+                  placeholder="123456"
+                  required
                 />
               </label>
-            )}
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-dark">
-                Email
-              </span>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                required
-                className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                autoComplete="email"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-dark">
-                Password
-              </span>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                required
-                minLength={8}
-                className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              />
-              <span className="mt-1 block text-xs text-meta-4">
-                Minimum 8 characters.
-              </span>
-            </label>
-
-            <button
-              disabled={loading}
-              className="w-full rounded-lg bg-blue px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-dark disabled:opacity-60"
-              type="submit"
-            >
-              {loading
-                ? "Please wait…"
-                : mode === "login"
-                ? "Sign in"
-                : "Create account"}
-            </button>
-          </form>
+              <button
+                disabled={loading}
+                className="w-full rounded-lg bg-blue px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-dark disabled:opacity-60"
+                type="submit"
+              >
+                {loading ? "Verifying…" : "Verify"}
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleResendOtp}
+                className="w-full rounded-lg border border-gray-3 bg-white px-4 py-2.5 text-sm font-medium text-meta-3 hover:text-dark transition disabled:opacity-60"
+              >
+                Resend OTP
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setPendingUserId(null);
+                  setOtp("");
+                  setDevOtpHint(null);
+                }}
+                className="w-full rounded-lg border border-gray-3 bg-white px-4 py-2.5 text-sm font-medium text-meta-3 hover:text-dark transition disabled:opacity-60"
+              >
+                Back
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </section>

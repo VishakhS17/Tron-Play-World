@@ -1,6 +1,27 @@
 import { CartItem } from "@/redux/features/cart-slice";
 
 const CART_STORAGE_KEY = "tron-play-world-cart";
+const STORAGE_SCOPE_KEY = "tpw_storage_scope";
+
+function getCurrentScope(): string {
+    try {
+        return localStorage.getItem(STORAGE_SCOPE_KEY) || "guest";
+    } catch {
+        return "guest";
+    }
+}
+
+function getScopedCartStorageKey() {
+    return `${CART_STORAGE_KEY}:${getCurrentScope()}`;
+}
+
+export const setStorageScope = (scope: string): void => {
+    try {
+        localStorage.setItem(STORAGE_SCOPE_KEY, scope || "guest");
+    } catch {
+        // ignore storage write failures
+    }
+};
 
 /**
  * Save cart items to localStorage
@@ -8,7 +29,7 @@ const CART_STORAGE_KEY = "tron-play-world-cart";
 export const saveCartToStorage = (items: CartItem[]): void => {
     try {
         const serializedCart = JSON.stringify(items);
-        localStorage.setItem(CART_STORAGE_KEY, serializedCart);
+        localStorage.setItem(getScopedCartStorageKey(), serializedCart);
     } catch (error) {
         // Handle quota exceeded or other localStorage errors
         if (error instanceof Error) {
@@ -28,7 +49,7 @@ export const saveCartToStorage = (items: CartItem[]): void => {
  */
 export const loadCartFromStorage = (): CartItem[] => {
     try {
-        const serializedCart = localStorage.getItem(CART_STORAGE_KEY);
+        const serializedCart = localStorage.getItem(getScopedCartStorageKey());
         if (serializedCart === null) {
             return [];
         }
@@ -47,7 +68,7 @@ export const loadCartFromStorage = (): CartItem[] => {
  */
 export const clearCartStorage = (): void => {
     try {
-        localStorage.removeItem(CART_STORAGE_KEY);
+        localStorage.removeItem(getScopedCartStorageKey());
     } catch (error) {
         if (error instanceof Error) {
             console.error("Failed to clear cart from localStorage:", error.message);

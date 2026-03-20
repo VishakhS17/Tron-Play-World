@@ -2,6 +2,7 @@ import { TrashIcon } from "@/assets/icons";
 import Image from "next/image";
 import { useCart } from "@/hooks/useCart";
 import { useRouter } from "next/navigation";
+import { formatPrice } from "@/utils/formatePrice";
 
 const SingleItem = ({ item }: any) => {
   const { removeItem, handleCartClick } = useCart();
@@ -30,7 +31,7 @@ const SingleItem = ({ item }: any) => {
               {item.name} ({item.quantity})
             </button>
           </h3>
-          <p className="font-normal text-custom-sm">Price: ${item.price}</p>
+          <p className="font-normal text-custom-sm">Price: {formatPrice(item.price)}</p>
         </div>
       </div>
 

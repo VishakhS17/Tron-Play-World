@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
+import LogoutButton from "@/components/Auth/LogoutButton";
 
 export const metadata = {
   title: "Account | Tron Play World",
@@ -39,9 +40,12 @@ export default async function AccountPage() {
       <div className="w-full px-4 mx-auto max-w-5xl sm:px-8 xl:px-0">
         <div className="flex items-center justify-between gap-4 mb-8">
           <h1 className="text-2xl font-semibold text-dark">Account</h1>
-          <Link href="/orders" className="text-sm font-medium text-blue hover:underline">
-            View orders
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/orders" className="text-sm font-medium text-blue hover:underline">
+              View orders
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_1fr)_360px]">

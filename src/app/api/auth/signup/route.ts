@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { cookies } from "next/headers";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prismaDB";
 import { signJwt } from "@/lib/auth/jwt";
-import { setSessionCookie, getAuthSecret } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { sendEmail } from "@/lib/email";
+import { getAuthSecret } from "@/lib/auth/session";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const OTP_TTL_SECONDS = 60 * 10; // 10 minutes
+const OTP_COOKIE_NAME = "tpw_signup_otp";
+
+function generateOtpCode() {
+  // 6-digit numeric OTP
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,10 +45,55 @@ export async function POST(req: NextRequest) {
 
   const existing = await prisma.users.findUnique({ where: { email } });
   if (existing) {
-    return NextResponse.json({ error: "Email is already registered" }, { status: 409 });
+    if (existing.is_active) {
+      return NextResponse.json({ error: "Email is already registered" }, { status: 409 });
+    }
+
+    // Existing but unverified account: issue a fresh OTP instead of hard failing.
+    const otpCode = generateOtpCode();
+    const otpCodeHash = await bcrypt.hash(otpCode, 12);
+    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await prisma.signup_email_otps.create({
+      data: {
+        user_id: existing.id,
+        email,
+        code_hash: otpCodeHash,
+        expires_at: otpExpiresAt,
+      },
+    });
+
+    const emailResult = await sendEmail({
+      to: existing.email,
+      subject: "Your i-Robox OTP verification code",
+      html: `
+        <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+          <h2>Verify your email</h2>
+          <p>Your OTP code is:</p>
+          <p style="font-size:24px;font-weight:700;letter-spacing:2px;">${otpCode}</p>
+          <p>This code expires in 10 minutes.</p>
+        </div>
+      `,
+    }).catch(() => ({ ok: false, skipped: true }));
+
+    return NextResponse.json(
+      {
+        ok: true,
+        requiresOtp: true,
+        userId: existing.id,
+        emailSent: !emailResult?.skipped,
+        ...(process.env.NODE_ENV !== "production" && emailResult?.skipped
+          ? { devOtp: otpCode }
+          : {}),
+      },
+      { status: 200 }
+    );
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
+  const otpCode = generateOtpCode();
+  const otpCodeHash = await bcrypt.hash(otpCode, 12);
+  const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   // Create user and default role assignment in a transaction.
   const user = await prisma.$transaction(async (tx) => {
@@ -47,7 +102,7 @@ export async function POST(req: NextRequest) {
         email,
         password_hash: passwordHash,
         name: name || null,
-        is_active: true,
+        is_active: false, // Activated after OTP verification
       },
       select: { id: true, email: true },
     });
@@ -63,16 +118,39 @@ export async function POST(req: NextRequest) {
       data: { user_id: created.id, role_id: customerRole.id },
     });
 
+    await tx.signup_email_otps.create({
+      data: {
+        user_id: created.id,
+        email,
+        code_hash: otpCodeHash,
+        expires_at: otpExpiresAt,
+      },
+    });
+
     return created;
   });
 
-  const token = signJwt(
-    { sub: user.id, email: user.email, roles: ["CUSTOMER"] },
-    getAuthSecret(),
-    SESSION_TTL_SECONDS
-  );
-  await setSessionCookie(token, SESSION_TTL_SECONDS);
+  const emailResult = await sendEmail({
+    to: user.email,
+    subject: "Your i-Robox OTP verification code",
+    html: `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+        <h2>Verify your email</h2>
+        <p>Your OTP code is:</p>
+        <p style="font-size:24px;font-weight:700;letter-spacing:2px;">${otpCode}</p>
+        <p>This code expires in 10 minutes.</p>
+      </div>
+    `,
+  }).catch(() => ({ ok: false, skipped: true }));
 
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json({
+    ok: true,
+    requiresOtp: true,
+    userId: user.id,
+    emailSent: !emailResult?.skipped,
+    ...(process.env.NODE_ENV !== "production" && emailResult?.skipped
+      ? { devOtp: otpCode }
+      : {}),
+  }, { status: 201 });
 }
 

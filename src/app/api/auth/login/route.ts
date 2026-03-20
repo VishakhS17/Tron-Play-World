@@ -40,8 +40,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (!user || !user.is_active) {
+  if (!user) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+
+  if (!user.is_active) {
+    return NextResponse.json(
+      { error: "Please verify your email with OTP before signing in." },
+      { status: 403 }
+    );
   }
 
   const ok = await bcrypt.compare(password, user.password_hash);

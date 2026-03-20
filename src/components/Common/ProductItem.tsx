@@ -47,7 +47,7 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
   const cartItem = {
     id: item.id,
     name: displayTitle,
-    price: 660,
+    price: item.discountedPrice ? item.discountedPrice : item.price,
     currency: "usd",
     image: cardImage,
     slug: item?.slug,

@@ -4,6 +4,16 @@ import toast from 'react-hot-toast';
 
 // Load wishlist items from local storage if available
 let initialItemsState: WishlistItem[] = [];
+const STORAGE_SCOPE_KEY = "tpw_storage_scope";
+
+export const getWishlistStorageKey = () => {
+  try {
+    const scope = localStorage.getItem(STORAGE_SCOPE_KEY) || "guest";
+    return `wishlistItems:${scope}`;
+  } catch {
+    return "wishlistItems:guest";
+  }
+};
 
 export const wishlist = createSlice({
   name: 'wishlist',
@@ -40,7 +50,7 @@ export const wishlist = createSlice({
         });
 
         if (typeof window !== 'undefined' && window.localStorage) {
-          localStorage.setItem('wishlistItems', JSON.stringify(state.items));
+          localStorage.setItem(getWishlistStorageKey(), JSON.stringify(state.items));
         }
         toast.success('Product added to wishlist!');
       }
@@ -49,13 +59,13 @@ export const wishlist = createSlice({
       const itemId = action.payload;
       state.items = state.items.filter((item) => item.id !== itemId);
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('wishlistItems', JSON.stringify(state.items));
+        localStorage.setItem(getWishlistStorageKey(), JSON.stringify(state.items));
       }
     },
     removeAllItemsFromWishlist: (state) => {
       state.items = [];
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('wishlistItems', JSON.stringify(state.items));
+        localStorage.setItem(getWishlistStorageKey(), JSON.stringify(state.items));
       }
     },
   },

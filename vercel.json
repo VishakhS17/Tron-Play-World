@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-signup-otps",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
+
