@@ -121,7 +121,7 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
           ) : null}
         </div>
 
-        <div className="absolute left-0 bottom-0 translate-y-full w-full flex items-center justify-center gap-2.5 pb-5 ease-linear duration-200 group-hover:translate-y-0">
+        <div className="absolute left-0 bottom-0 translate-y-0 lg:translate-y-full w-full flex items-center justify-center gap-2.5 pb-5 ease-linear duration-200 lg:group-hover:translate-y-0">
           <Tooltip content="Quick View" placement="top">
             <button
               className="border border-gray-3 h-[38px] w-[38px] rounded-lg flex items-center justify-center text-dark bg-white hover:text-blue"

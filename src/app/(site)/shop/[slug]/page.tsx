@@ -5,6 +5,7 @@ import DemoProductGallery from "./DemoProductGallery";
 import { getProductBySlug } from "@/get-api-data/product";
 import { formatPrice } from "@/utils/formatePrice";
 import ReviewForm from "@/components/Shop/ReviewForm";
+import ProductActions from "@/components/Shop/ProductActions";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prismaDB";
 
@@ -96,12 +97,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
               </>
             ) : null}
 
-            <button
-              type="button"
-              className="mt-8 inline-flex rounded-lg bg-blue px-6 py-3 text-sm font-medium text-white hover:bg-blue-dark transition-colors"
-            >
-              Add to cart
-            </button>
+            <ProductActions
+              id={product.id}
+              title={product.title}
+              slug={product.slug}
+              image={galleryImages[0] || "/images/products/placeholder.png"}
+              price={product.price}
+              discountedPrice={product.discountedPrice}
+              quantity={product.quantity}
+              color={product.productVariants?.find((v) => v.isDefault)?.color || ""}
+              size={product.productVariants?.find((v) => v.isDefault)?.size || ""}
+            />
 
             <div className="mt-10 border-t border-gray-3 pt-8">
               <h2 className="text-lg font-semibold text-dark">Reviews</h2>
