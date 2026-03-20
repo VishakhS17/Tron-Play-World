@@ -29,7 +29,10 @@ export default function AdminCsvPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-dark">CSV Upload</h1>
+      <h1 className="text-2xl font-semibold text-dark">
+        CSV Upload{" "}
+        <span className="text-sm font-medium text-meta-3">(Not implemented)</span>
+      </h1>
 
       <div className="rounded-2xl border border-gray-3 bg-white p-6 space-y-3">
         <h2 className="text-lg font-semibold text-dark">Products CSV</h2>
