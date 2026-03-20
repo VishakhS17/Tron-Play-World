@@ -18,6 +18,13 @@ function generateOtpCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+function canExposeOtpForDebug() {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.OTP_DEBUG_EXPOSE === "true"
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest) {
         requiresOtp: true,
         userId: existing.id,
         emailSent: !emailResult?.skipped,
-        ...(process.env.NODE_ENV !== "production" && emailResult?.skipped
+        ...(canExposeOtpForDebug() && emailResult?.skipped
           ? { devOtp: otpCode }
           : {}),
       },
@@ -148,7 +155,7 @@ export async function POST(req: NextRequest) {
     requiresOtp: true,
     userId: user.id,
     emailSent: !emailResult?.skipped,
-    ...(process.env.NODE_ENV !== "production" && emailResult?.skipped
+    ...(canExposeOtpForDebug() && emailResult?.skipped
       ? { devOtp: otpCode }
       : {}),
   }, { status: 201 });
