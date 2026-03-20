@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -15,7 +16,17 @@ const NAV = [
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  const roleLabel = session?.roles?.[0] ?? "ADMIN";
+  const roles = (session?.roles ?? []) as string[];
+  const isAllowed =
+    roles.includes("SUPER_ADMIN") ||
+    roles.includes("MANAGER") ||
+    roles.includes("STAFF") ||
+    roles.includes("SUPPORT");
+
+  // Middleware is disabled for Vercel stability; enforce auth here.
+  if (!isAllowed) redirect("/admin/login");
+
+  const roleLabel = roles[0] ?? "ADMIN";
 
   return (
     <div className="min-h-screen bg-gray-1">
