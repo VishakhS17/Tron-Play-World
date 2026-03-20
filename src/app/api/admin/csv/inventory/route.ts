@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prismaDB";
+import { requireAdminWrite } from "@/lib/admin/rbac";
+import { assertSameOrigin } from "@/lib/security/origin";
+import { rateLimitStrict } from "@/lib/security/rateLimit";
+
+function parseCsv(csv: string) {
+  const lines = csv
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return [];
+  const header = lines[0].split(",").map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const cols = line.split(",").map((c) => c.trim());
+    const row: any = {};
+    header.forEach((h, i) => (row[h] = cols[i] ?? ""));
+    return row;
+  });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    assertSameOrigin(req);
+    await rateLimitStrict(`admin_csv_inventory_post:${req.ip ?? "unknown"}`, 1);
+  } catch (e: any) {
+    if (e?.message === "BAD_ORIGIN") {
+      return NextResponse.json({ error: "Bad origin" }, { status: 403 });
+    }
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
+  const auth = await requireAdminWrite();
+  if (!auth.ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => null);
+  if (!body?.csv) return NextResponse.json({ error: "csv is required" }, { status: 400 });
+
+  const rows = parseCsv(String(body.csv));
+  let count = 0;
+
+  for (const r of rows) {
+    const slug = String(r.product_slug ?? "").trim();
+    const available = Number(r.available_quantity);
+    const threshold = Number(r.low_stock_threshold ?? 0);
+    if (!slug || !Number.isInteger(available) || available < 0 || !Number.isInteger(threshold) || threshold < 0) continue;
+
+    const product = await prisma.products.findUnique({ where: { slug }, select: { id: true } });
+    if (!product) continue;
+
+    await prisma.inventory.upsert({
+      where: { product_id_product_variant_id: { product_id: product.id, product_variant_id: null } } as any,
+      update: { available_quantity: available, low_stock_threshold: threshold },
+      create: {
+        product_id: product.id,
+        product_variant_id: null,
+        available_quantity: available,
+        reserved_quantity: 0,
+        sold_quantity: 0,
+        low_stock_threshold: threshold,
+      },
+    });
+
+    count++;
+  }
+
+  return NextResponse.json({ ok: true, count }, { status: 200 });
+}
+

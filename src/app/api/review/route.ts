@@ -1,22 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
+import { assertSameOrigin } from "@/lib/security/origin";
+import { rateLimit } from "@/lib/security/rateLimit";
 
 export async function POST(req: NextRequest) {
+  try {
+    assertSameOrigin(req);
+    await rateLimit(`review_legacy_post:${req.ip ?? "unknown"}`, 1);
+  } catch (e: any) {
+    if (e?.message === "BAD_ORIGIN") {
+      return NextResponse.json({ error: "Bad origin" }, { status: 403 });
+    }
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const body = await req.json();
 
-  const { productSlug } = body;
+  const { productId } = body;
 
   try {
-    const reviews = await prisma.review.findMany({
+    const reviews = await prisma.reviews.findMany({
       where: {
-        AND: [
-          {
-            productSlug: productSlug,
-          },
-          {
-            isApproved: true,
-          },
-        ]
+        product_id: productId,
+        is_approved: true,
       },
     });
 
@@ -36,5 +42,5 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-};
+}
 

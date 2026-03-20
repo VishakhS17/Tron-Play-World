@@ -1,37 +1,35 @@
 import Footer from "../../components/Footer";
 import ScrollToTop from "@/components/Common/ScrollToTop";
-import PreLoader from "@/components/Common/PreLoader";
 import { Toaster } from "react-hot-toast";
 import Providers from "./Providers";
 import NextTopLoader from "nextjs-toploader";
 import MainHeader from "@/components/Header/MainHeader";
-import { getHeaderSettings } from "@/get-api-data/header-setting";
 import Breadcrumb from "@/components/Common/Breadcrumb";
+import WhatsAppFloatingButton from "@/components/Common/WhatsAppFloatingButton";
 
 export default async function SiteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const headerSettingData = await getHeaderSettings();
   return (
     <div>
-      <PreLoader />
       <>
         <Providers>
           <NextTopLoader
-            color="#c41e3a"
+            color="#2563eb"
             crawlSpeed={300}
             showSpinner={false}
             shadow="none"
           />
-          <MainHeader headerData={headerSettingData} />
+          <MainHeader headerData={null} />
           <Breadcrumb />
           <Toaster position="top-center" reverseOrder={false} />
           {children}
         </Providers>
 
         <ScrollToTop />
+        <WhatsAppFloatingButton />
         <Footer />
       </>
     </div>

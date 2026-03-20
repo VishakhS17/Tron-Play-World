@@ -68,8 +68,8 @@ const MobileMenu = ({ isOpen, onClose, menuData, headerLogo }: MobileMenuProps) 
 
       {/* Offcanvas Menu */}
       <div
-        className={`fixed top-0 right-0 h-full w-[300px] max-w-full bg-white z-50 shadow-xl transform transition-transform duration-300 ease-in-out mobile-menu-container ${
-          isOpen ? "translate-x-0" : "translate-x-full"
+        className={`fixed top-0 left-0 h-full w-[300px] max-w-full bg-white z-50 shadow-xl transform transition-transform duration-300 ease-in-out mobile-menu-container ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex flex-col h-full">
@@ -168,18 +168,11 @@ const MobileMenu = ({ isOpen, onClose, menuData, headerLogo }: MobileMenuProps) 
           <div className="p-4 border-t border-gray-3">
             <div className="flex items-center gap-3">
               <Link
-                href="/"
+                href="/login"
                 className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800"
                 onClick={onClose}
               >
                 Sign In
-              </Link>
-              <Link
-                href="/"
-                className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800"
-                onClick={onClose}
-              >
-                Create an account
               </Link>
             </div>
           </div>

@@ -5,7 +5,18 @@ import { unstable_cache } from "next/cache";
 export const getSeoSettings = unstable_cache(
   async () => {
     try {
-      return await prisma.seoSetting.findFirst();
+      // Step 3 DB schema does not include persisted SEO settings yet.
+      // We return a minimal shape consumed by `src/app/layout.tsx`.
+      return {
+        siteTitle: process.env.SITE_NAME ?? "Tron Play World",
+        metadescription:
+          "Tron Play World – toys, games & play for every kid. Shop the best toys online.",
+        metaKeywords: "toys, toy store, kids toys, games",
+        metaImage: null as string | null,
+        favicon: null as string | null,
+        gtmId: null as string | null,
+        siteName: process.env.SITE_NAME ?? "Tron Play World",
+      };
     } catch {
       return null;
     }
@@ -16,14 +27,9 @@ export const getSeoSettings = unstable_cache(
 export const getSiteName = unstable_cache(
   async () => {
     try {
-      const siteName = await prisma.seoSetting.findFirst({
-        select: {
-          siteName: true,
-        },
-      });
-      return siteName ? siteName.siteName : process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
+      return process.env.SITE_NAME ? process.env.SITE_NAME : "Tron Play World";
     } catch {
-      return process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
+      return process.env.SITE_NAME ? process.env.SITE_NAME : "Tron Play World";
     }
   },
   ['site-name'], { tags: ['site-name'] }
@@ -32,13 +38,8 @@ export const getSiteName = unstable_cache(
 // get logo 
 export const getLogo = unstable_cache(
   async () => {
-    const headerLogo = await prisma.headerSetting.findFirst({
-      select: {
-        headerLogo: true,
-      },
-    });
-    const logo = headerLogo ? headerLogo.headerLogo : "https://res.cloudinary.com/dc6svbdh9/image/upload/v1746335068/header/tsvfm6pvfwpbpyqdtxwn.svg";
-    return logo;
+    // Step 3 DB schema does not include persisted header settings yet.
+    return "/images/logo/logo.svg";
   },
   ['header-logo'], { tags: ['header-logo'] }
 );
@@ -46,13 +47,7 @@ export const getLogo = unstable_cache(
 // get email logo
 export const getEmailLogo = unstable_cache(
   async () => {
-    const emailLogo = await prisma.headerSetting.findFirst({
-      select: {
-        emailLogo: true,
-      },
-    });
-    const logo = emailLogo ? emailLogo.emailLogo : "https://res.cloudinary.com/dc6svbdh9/image/upload/v1746693785/logo_ouegg7.png";
-    return logo;
+    return "/images/logo/logo.svg";
   },
   ['email-logo'], { tags: ['email-logo'] }
 );

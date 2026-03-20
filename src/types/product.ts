@@ -16,6 +16,10 @@ export type Product = {
     size: string;
     isDefault: boolean;
   }[];
+  product_images?: {
+    url: string;
+    sort_order: number;
+  }[];
 };
 
 

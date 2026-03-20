@@ -6,8 +6,8 @@ import { unstable_cache } from "next/cache";
 export const getCategories = unstable_cache(
   async () => {
     try {
-      return await prisma.category.findMany({
-        orderBy: { updatedAt: "desc" },
+      return await prisma.categories.findMany({
+        orderBy: { updated_at: "desc" },
       });
     } catch {
       return [];
@@ -19,7 +19,7 @@ export const getCategories = unstable_cache(
 // GET CATEGORY BY SLUG
 export const getCategoryBySlug = unstable_cache(
   async (slug: string) => {
-    return await prisma.category.findUnique({
+    return await prisma.categories.findUnique({
       where: {
         slug: slug
       }
@@ -30,10 +30,10 @@ export const getCategoryBySlug = unstable_cache(
 
 // GET CATEGORY BY ID
 export const getCategoryById = unstable_cache(
-  async (id: number) => {
-    return await prisma.category.findUnique({
+  async (id: string) => {
+    return await prisma.categories.findUnique({
       where: {
-        id: id
+        id,
       }
     });
   },

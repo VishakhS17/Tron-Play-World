@@ -47,7 +47,7 @@ export default function FooterBottom() {
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div>
             <p className="text-sm font-normal text-dark">
-              &copy; {year} i-Robox. All rights reserved.
+              &copy; {year} Robox. All rights reserved.
             </p>
             <p className="text-sm font-normal text-dark mt-1">
               Designed by{" "}

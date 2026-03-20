@@ -1,0 +1,245 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prismaDB";
+import { getSession } from "@/lib/auth/session";
+import { writeAuditLog } from "@/lib/audit";
+import { sendEmail, orderEmailTemplate } from "@/lib/email";
+import { assertSameOrigin } from "@/lib/security/origin";
+import { rateLimit } from "@/lib/security/rateLimit";
+import { createOrderAccessToken } from "@/lib/security/orderAccess";
+
+type CheckoutItem = {
+  productId: string;
+  quantity: number;
+};
+
+export async function POST(req: NextRequest) {
+  try {
+    assertSameOrigin(req);
+    await rateLimit(`checkout:${req.ip ?? "unknown"}`, 1);
+  } catch (e: any) {
+    if (e?.message === "BAD_ORIGIN") {
+      return NextResponse.json({ error: "Bad origin" }, { status: 403 });
+    }
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
+  const session = await getSession();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+
+  const items = (Array.isArray(body.items) ? body.items : []) as CheckoutItem[];
+  const address = body.address as any;
+  const isGift = Boolean(body.isGift);
+  const giftMessage = typeof body.giftMessage === "string" ? body.giftMessage.slice(0, 500) : null;
+  const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
+
+  if (items.length === 0) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+
+  const full_name = String(address?.full_name ?? "").trim();
+  const phone = String(address?.phone ?? "").trim();
+  const line1 = String(address?.line1 ?? "").trim();
+  const city = String(address?.city ?? "").trim();
+  const state = String(address?.state ?? "").trim();
+  const postal_code = String(address?.postal_code ?? "").trim();
+  const country = String(address?.country ?? "India").trim();
+
+  if (!full_name || !phone || !line1 || !city || !state || !postal_code || !country) {
+    return NextResponse.json({ error: "Address is incomplete" }, { status: 400 });
+  }
+
+  const productIds = items.map((i) => i.productId);
+  const dbProducts = await prisma.products.findMany({
+    where: { id: { in: productIds }, is_active: true },
+    select: { id: true, name: true, sku: true, base_price: true, discounted_price: true },
+  });
+  const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+
+  for (const item of items) {
+    if (!productMap.has(item.productId)) {
+      return NextResponse.json({ error: "One or more items are invalid" }, { status: 400 });
+    }
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
+    }
+  }
+
+  const coupon = couponCode
+    ? await prisma.coupons.findFirst({
+        where: { code: couponCode, is_active: true },
+        select: {
+          id: true,
+          discount_type: true,
+          discount_value: true,
+          min_cart_value: true,
+          starts_at: true,
+          ends_at: true,
+          max_uses: true,
+          max_uses_per_user: true,
+        },
+      })
+    : null;
+
+  const lineItems = items.map((i) => {
+    const p = productMap.get(i.productId)!;
+    const unit = Number(p.discounted_price ?? p.base_price);
+    return {
+      productId: p.id,
+      productName: p.name,
+      sku: p.sku ?? null,
+      unitPrice: unit,
+      quantity: i.quantity,
+      subtotal: unit * i.quantity,
+    };
+  });
+
+  const subtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
+  let discount = 0;
+  if (coupon) {
+    const now = new Date();
+    if (coupon.starts_at && coupon.starts_at > now) {
+      return NextResponse.json({ error: "Coupon is not active yet" }, { status: 400 });
+    }
+    if (coupon.ends_at && coupon.ends_at < now) {
+      return NextResponse.json({ error: "Coupon has expired" }, { status: 400 });
+    }
+    const minOk = coupon.min_cart_value ? subtotal >= Number(coupon.min_cart_value) : true;
+    if (!minOk) return NextResponse.json({ error: "Coupon minimum not met" }, { status: 400 });
+
+    if (coupon.max_uses) {
+      const used = await prisma.coupon_usages.count({ where: { coupon_id: coupon.id } });
+      if (used >= coupon.max_uses) {
+        return NextResponse.json({ error: "Coupon usage limit reached" }, { status: 400 });
+      }
+    }
+    if (coupon.max_uses_per_user && session?.sub) {
+      const usedByUser = await prisma.coupon_usages.count({
+        where: { coupon_id: coupon.id, user_id: session.sub },
+      });
+      if (usedByUser >= coupon.max_uses_per_user) {
+        return NextResponse.json(
+          { error: "Coupon usage limit reached for your account" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (coupon.discount_type === "PERCENTAGE") {
+      discount = Math.round((subtotal * Number(coupon.discount_value)) / 100);
+    } else {
+      discount = Math.min(subtotal, Number(coupon.discount_value));
+    }
+  }
+  const total = Math.max(0, subtotal - discount);
+
+  // Transaction: create address, order, items, reserve inventory.
+  const order = await prisma.$transaction(async (tx) => {
+    const addr = await tx.addresses.create({
+      data: {
+        user_id: session?.sub ?? null,
+        full_name,
+        phone,
+        line1,
+        line2: address?.line2 ? String(address.line2) : null,
+        city,
+        state,
+        postal_code,
+        country,
+        is_default_billing: false,
+        is_default_shipping: false,
+      },
+      select: { id: true },
+    });
+
+    const createdOrder = await tx.orders.create({
+      data: {
+        user_id: session?.sub ?? null,
+        status: "PENDING",
+        payment_status: "PENDING",
+        subtotal_amount: subtotal,
+        discount_amount: discount,
+        shipping_amount: subtotal >= 2000 ? 0 : 99,
+        tax_amount: 0,
+        total_amount: Math.max(0, total + (subtotal >= 2000 ? 0 : 99)),
+        currency: "INR",
+        coupon_id: coupon?.id ?? null,
+        shipping_address_id: addr.id,
+        billing_address_id: addr.id,
+        payment_provider: "placeholder",
+        is_gift: isGift,
+        gift_message: giftMessage,
+      },
+      select: { id: true },
+    });
+
+    for (const li of lineItems) {
+      const oi = await tx.order_items.create({
+        data: {
+          order_id: createdOrder.id,
+          product_id: li.productId,
+          product_variant_id: null,
+          product_name: li.productName,
+          sku: li.sku,
+          unit_price: li.unitPrice,
+          quantity: li.quantity,
+          subtotal_amount: li.subtotal,
+        },
+        select: { id: true },
+      });
+
+      // Reserve stock (product-level inventory row where variant is null)
+      const updated = await tx.inventory.updateMany({
+        where: {
+          product_id: li.productId,
+          product_variant_id: null,
+          available_quantity: { gte: li.quantity },
+        },
+        data: {
+          available_quantity: { decrement: li.quantity },
+          reserved_quantity: { increment: li.quantity },
+        },
+      });
+      if (updated.count !== 1) {
+        throw new Error("OUT_OF_STOCK");
+      }
+
+      await tx.inventory_reservations.create({
+        data: {
+          order_id: createdOrder.id,
+          order_item_id: oi.id,
+          product_id: li.productId,
+          product_variant_id: null,
+          quantity: li.quantity,
+        },
+      });
+    }
+
+    return createdOrder;
+  });
+
+  await writeAuditLog({
+    userId: session?.sub ?? null,
+    entityType: "ORDER",
+    entityId: order.id,
+    action: "ORDER_CREATED_PENDING",
+    newValues: { status: "PENDING" },
+    ipAddress: req.ip ?? null,
+    userAgent: req.headers.get("user-agent"),
+  });
+
+  if (session?.email) {
+    await sendEmail({
+      to: session.email,
+      subject: "Order created (pending payment)",
+      html: orderEmailTemplate({
+        heading: "We received your order",
+        message:
+          "Your order has been created in a pending state. Please complete payment to confirm it.",
+        orderId: order.id,
+      }),
+    });
+  }
+
+  const accessToken = createOrderAccessToken(order.id);
+  return NextResponse.json({ ok: true, orderId: order.id, accessToken }, { status: 201 });
+}
+

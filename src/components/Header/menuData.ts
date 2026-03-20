@@ -23,11 +23,7 @@ export const menuData: MenuItem[] = [
       },
       {
         title: "Sign in",
-        path: "/signin",
-      },
-      {
-        title: "Sign up",
-        path: "/signup",
+        path: "/login",
       },
       {
         title:"Privacy Policy",
@@ -36,6 +32,10 @@ export const menuData: MenuItem[] = [
       {
         title:"Terms & Conditions",
         path:"/terms-conditions"
+      },
+      {
+        title: "FAQ",
+        path: "/faq",
       }
     ],
   },

@@ -1,174 +1,182 @@
 import { prisma } from "@/lib/prismaDB";
-import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 
-const normalizeVariant = (variant: {
-  image: string | null;
-  color: string | null;
-  size: string | null;
-  isDefault: boolean;
-}) => ({
-  ...variant,
-  image: variant.image ?? "",
-  color: variant.color ?? "",
-  size: variant.size ?? "",
-});
+const pickDefaultImage = (product: {
+  product_images?: { url: string; sort_order: number }[];
+}) => {
+  const images = product.product_images ?? [];
+  if (images.length === 0) return "";
+  return images.slice().sort((a, b) => a.sort_order - b.sort_order)[0]?.url ?? "";
+};
 
-
-// get product for id and title 
+// get product for id and title
 export const getProductsIdAndTitle = unstable_cache(
   async () => {
-    return await prisma.product.findMany({
-      orderBy: { updatedAt: "desc" },
+    return await prisma.products.findMany({
+      orderBy: { updated_at: "desc" },
       select: {
         id: true,
-        title: true,
+        name: true,
       },
     });
   },
   ['products'], { tags: ['products'] }
 );
 
-// get new arrival product
+// get new arrival products (homepage)
 export const getNewArrivalsProduct = unstable_cache(
   async () => {
-    const products = await prisma.product.findMany({
-      orderBy: { updatedAt: "desc" },
+    const products = await prisma.products.findMany({
+      orderBy: { updated_at: "desc" },
       select: {
         id: true,
-        title: true,
-        shortDescription: true,
-        price: true,
-        discountedPrice: true,
+        name: true,
+        short_description: true,
+        base_price: true,
+        discounted_price: true,
         slug: true,
-        quantity: true,
-        updatedAt: true,
-        productVariants: {
+        updated_at: true,
+        product_variants: {
           select: {
-            image: true,
             color: true,
             size: true,
-            isDefault: true
+            is_default: true,
           }
         },
-        _count: {
-          select: {
-            reviews: {
-              where:{
-                isApproved: true
-              }
-            },
-          }
-        }
+        product_images: { select: { url: true, sort_order: true } },
       },
       take: 8
     });
-    return products.map(({ _count, ...item }) => ({
-      ...item,
-      reviews: _count.reviews,
-      shortDescription: item.shortDescription ?? "",
-      productVariants: item.productVariants.map(normalizeVariant),
-      price: item.price.toNumber(),
-      discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
-    }))
-  },
-  ['products'], { tags: ['products'] }
-);
-
-// get best selling product
-export const getBestSellingProducts = unstable_cache(
-  async () => {
-    const products = await prisma.product.findMany({
-      select: {
-        id: true,
-        title: true,
-        shortDescription: true,
-        price: true,
-        discountedPrice: true,
-        slug: true,
-        quantity: true,
-        updatedAt: true,
-        productVariants: {
-          select: {
-            image: true,
-            color: true,
-            size: true,
-            isDefault: true
-          }
-        },
-        _count: {
-          select: {
-            reviews: {
-              where: {
-                isApproved: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        reviews: {
-          _count: "desc",
-        },
-      },
-      take: 6
-    });
-    return products.map(({ _count, ...item }) => ({
-      ...item,
-      reviews: _count.reviews, // Extract review count
-      shortDescription: item.shortDescription ?? "",
-      productVariants: item.productVariants.map(normalizeVariant),
-      price: item.price.toNumber(),
-      discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
+    return products.map((item) => ({
+      id: item.id,
+      title: item.name,
+      shortDescription: item.short_description ?? "",
+      description: "",
+      body: "",
+      price: Number(item.base_price),
+      discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
+      slug: item.slug,
+      quantity: 0,
+      sku: item.sku ?? "",
+      tags: [],
+      offers: "",
+      updatedAt: item.updated_at,
+      product_images: item.product_images,
+      productVariants: item.product_variants.map((v) => ({
+        id: 0,
+        productId: item.id,
+        image: pickDefaultImage(item),
+        color: v.color ?? "",
+        size: v.size ?? "",
+        isDefault: v.is_default,
+      })),
+      reviews: 0,
     }));
   },
   ['products'], { tags: ['products'] }
 );
 
-// get latest product
-export const getLatestProducts = unstable_cache(
+// get best selling products (placeholder ordering)
+export const getBestSellingProducts = unstable_cache(
   async () => {
-    const products = await prisma.product.findMany({
+    const products = await prisma.products.findMany({
       select: {
         id: true,
-        title: true,
-        shortDescription: true,
-        price: true,
-        discountedPrice: true,
+        name: true,
+        short_description: true,
+        base_price: true,
+        discounted_price: true,
         slug: true,
-        quantity: true,
-        updatedAt: true,
-        productVariants: {
+        updated_at: true,
+        product_variants: {
           select: {
-            image: true,
             color: true,
             size: true,
-            isDefault: true
+            is_default: true,
           }
         },
-        _count: {
-          select: {
-            reviews: {
-              where: {
-                isApproved: true
-              }
-            }
-          }
-        }
+        product_images: { select: { url: true, sort_order: true } },
       },
-      orderBy: [
-        { reviews: { _count: "desc" } },
-        { updatedAt: "desc" },
-      ],
+      orderBy: { updated_at: "desc" },
+      take: 6
+    });
+    return products.map((item) => ({
+      id: item.id,
+      title: item.name,
+      shortDescription: item.short_description ?? "",
+      description: "",
+      body: "",
+      price: Number(item.base_price),
+      discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
+      slug: item.slug,
+      quantity: 0,
+      sku: item.sku ?? "",
+      tags: [],
+      offers: "",
+      updatedAt: item.updated_at,
+      product_images: item.product_images,
+      productVariants: item.product_variants.map((v) => ({
+        id: 0,
+        productId: item.id,
+        image: pickDefaultImage(item),
+        color: v.color ?? "",
+        size: v.size ?? "",
+        isDefault: v.is_default,
+      })),
+      reviews: 0,
+    }));
+  },
+  ['products'], { tags: ['products'] }
+);
+
+// get latest products (homepage)
+export const getLatestProducts = unstable_cache(
+  async () => {
+    const products = await prisma.products.findMany({
+      select: {
+        id: true,
+        name: true,
+        short_description: true,
+        base_price: true,
+        discounted_price: true,
+        slug: true,
+        updated_at: true,
+        product_variants: {
+          select: {
+            color: true,
+            size: true,
+            is_default: true,
+          }
+        },
+        product_images: { select: { url: true, sort_order: true } },
+      },
+      orderBy: [{ updated_at: "desc" }],
       take: 3
     });
-    return products.map(({ _count, ...item }) => ({
-      ...item,
-      reviews: _count.reviews, // Extract review count
-      shortDescription: item.shortDescription ?? "",
-      productVariants: item.productVariants.map(normalizeVariant),
-      price: item.price.toNumber(),
-      discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
+    return products.map((item) => ({
+      id: item.id,
+      title: item.name,
+      shortDescription: item.short_description ?? "",
+      description: "",
+      body: "",
+      price: Number(item.base_price),
+      discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
+      slug: item.slug,
+      quantity: 0,
+      sku: item.sku ?? "",
+      tags: [],
+      offers: "",
+      updatedAt: item.updated_at,
+      product_images: item.product_images,
+      productVariants: item.product_variants.map((v) => ({
+        id: 0,
+        productId: item.id,
+        image: pickDefaultImage(item),
+        color: v.color ?? "",
+        size: v.size ?? "",
+        isDefault: v.is_default,
+      })),
+      reviews: 0,
     }));
   },
   ['products'], { tags: ['products'] }
@@ -178,46 +186,53 @@ export const getLatestProducts = unstable_cache(
 // GET ALL PRODUCTS
 export const getAllProducts = unstable_cache(
   async (
-    orderBy: { updatedAt?: Prisma.SortOrder } | { reviews: { _count: Prisma.SortOrder } } = { updatedAt: 'desc' }
+    orderBy: { updated_at?: "asc" | "desc" } = { updated_at: "desc" }
   ) => {
     try {
-      const products = await prisma.product.findMany({
+      const products = await prisma.products.findMany({
         orderBy,
         select: {
           id: true,
-          title: true,
-          shortDescription: true,
-          price: true,
-          discountedPrice: true,
+          name: true,
+          short_description: true,
+          base_price: true,
+          discounted_price: true,
           slug: true,
-          quantity: true,
-          updatedAt: true,
-          productVariants: {
+          updated_at: true,
+          product_variants: {
             select: {
-              image: true,
               color: true,
               size: true,
-              isDefault: true
+              is_default: true,
             }
           },
-          _count: {
-            select: {
-              reviews: {
-                where: {
-                  isApproved: true
-                }
-              }
-            }
-          }
+          product_images: { select: { url: true, sort_order: true } },
         },
       })
-      return products.map(({ _count, ...item }) => ({
-        ...item,
-        reviews: _count.reviews, // Extract review count
-        shortDescription: item.shortDescription ?? "",
-        productVariants: item.productVariants.map(normalizeVariant),
-        price: item.price.toNumber(),
-        discountedPrice: item?.discountedPrice ? item.discountedPrice.toNumber() : null
+      return products.map((item) => ({
+        id: item.id,
+        title: item.name,
+        shortDescription: item.short_description ?? "",
+        description: "",
+        body: "",
+        price: Number(item.base_price),
+        discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
+        slug: item.slug,
+        quantity: 0,
+        sku: item.sku ?? "",
+        tags: [],
+        offers: "",
+        updatedAt: item.updated_at,
+        product_images: item.product_images,
+        productVariants: item.product_variants.map((v) => ({
+          id: 0,
+          productId: item.id,
+          image: pickDefaultImage(item),
+          color: v.color ?? "",
+          size: v.size ?? "",
+          isDefault: v.is_default,
+        })),
+        reviews: 0,
       }));
     } catch {
       return [];
@@ -228,197 +243,168 @@ export const getAllProducts = unstable_cache(
 
 // GET PRODUCT BY SLUG
 export const getProductBySlug = async (slug: string) => {
-  const product = await prisma.product.findUnique({
+  const product = await prisma.products.findUnique({
     where: { slug },
     select: {
       id: true,
-      title: true,
-      shortDescription: true,
+      name: true,
+      short_description: true,
       description: true,
-      price: true,
-      discountedPrice: true,
+      base_price: true,
+      discounted_price: true,
       slug: true,
-      quantity: true,
-      updatedAt: true,
-      category: {
+      updated_at: true,
+      categories: {
         select: {
-          title: true,
           slug: true,
+          name: true,
         },
       },
-      productVariants: {
+      product_variants: {
         select: {
-          image: true,
           color: true,
           size: true,
-          isDefault: true
+          is_default: true,
         }
       },
-      _count: {
-        select: {
-          reviews: {
-            where: {
-              isApproved: true
-            }
-          }
-        }
-      },
-      additionalInformation: {
-        select: {
-          name: true,
-          description: true
-        }
-      },
-      customAttributes: {
-        select: {
-          attributeName: true,
-          attributeValues: {
-            select: {
-              id: true,
-              title: true
-            }
-          }
-        }
-      },
-      body: true,
-      reviews: {
-        select: {
-          name: true,
-          comment: true,
-          email: true,
-          ratings: true
-        }
-      },
-      tags: true,
-      offers: true,
+      product_images: { select: { url: true, sort_order: true } },
       sku: true,
     },
   });
-  const transformProduct = {
-    ...product,
-    shortDescription: product?.shortDescription ?? "",
-    productVariants: product?.productVariants?.map(normalizeVariant) ?? [],
-    price: product?.price.toNumber(),
-    discountedPrice: product?.discountedPrice ? product.discountedPrice.toNumber() : null,
-    reviews: product?._count.reviews,
-  }
-  return transformProduct;
+  if (!product) return null;
+  return {
+    id: product.id,
+    title: product.name,
+    shortDescription: product.short_description ?? "",
+    description: product.description ?? "",
+    body: "",
+    price: Number(product.base_price),
+    discountedPrice: product.discounted_price ? Number(product.discounted_price) : null,
+    slug: product.slug,
+    quantity: 0,
+    sku: product.sku ?? "",
+    tags: [],
+    offers: "",
+    updatedAt: product.updated_at,
+    category: product.categories
+      ? { title: product.categories.name, slug: product.categories.slug }
+      : null,
+    product_images: product.product_images,
+    productVariants: product.product_variants.map((v) => ({
+      id: 0,
+      productId: product.id,
+      image: pickDefaultImage(product),
+      color: v.color ?? "",
+      size: v.size ?? "",
+      isDefault: v.is_default,
+    })),
+    reviews: 0,
+    additionalInformation: [],
+    customAttributes: [],
+  };
 }
 
 // GET PRODUCT BY ID
 export const getProductById = async (productId: string) => {
-  const product = await prisma.product.findUnique({
+  const product = await prisma.products.findUnique({
     where: { id: productId },
-    include: {
-      productVariants: true,
-      additionalInformation: {
-        select: {
-          name: true,
-          description: true,
-        },
-      },
-      customAttributes: {
-        select: {
-          attributeName: true,
-          attributeValues: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
-        },
-      },
+    select: {
+      id: true,
+      name: true,
+      short_description: true,
+      description: true,
+      base_price: true,
+      discounted_price: true,
+      slug: true,
+      updated_at: true,
+      sku: true,
+      product_images: { select: { url: true, sort_order: true } },
+      product_variants: { select: { color: true, size: true, is_default: true } },
+      categories: { select: { name: true, slug: true } },
     },
-  })
-  const transformProduct = {
-    ...product,
-    shortDescription: product?.shortDescription ?? "",
-    productVariants: product?.productVariants?.map(normalizeVariant) ?? [],
-    price: product?.price.toNumber(),
-    discountedPrice: product?.discountedPrice ? product.discountedPrice.toNumber() : null
-  }
-  return transformProduct;
+  });
+  if (!product) return null;
+  return {
+    id: product.id,
+    title: product.name,
+    shortDescription: product.short_description ?? "",
+    description: product.description ?? "",
+    body: "",
+    price: Number(product.base_price),
+    discountedPrice: product.discounted_price ? Number(product.discounted_price) : null,
+    slug: product.slug,
+    quantity: 0,
+    sku: product.sku ?? "",
+    tags: [],
+    offers: "",
+    updatedAt: product.updated_at,
+    category: product.categories
+      ? { title: product.categories.name, slug: product.categories.slug }
+      : null,
+    productVariants: product.product_variants.map((v) => ({
+      id: 0,
+      productId: product.id,
+      image: pickDefaultImage(product),
+      color: v.color ?? "",
+      size: v.size ?? "",
+      isDefault: v.is_default,
+    })),
+    reviews: 0,
+    additionalInformation: [],
+    customAttributes: [],
+  };
 };
 
-
 export const getRelatedProducts = unstable_cache(
-  async (category: string, tags: string[] | undefined, currentProductId: string,productTitle:string) => {
-    const products = await prisma.product.findMany({
+  async (_category: string, _tags: string[] | undefined, currentProductId: string, _productTitle: string) => {
+    const products = await prisma.products.findMany({
       select: {
         id: true,
-        title: true,
+        name: true,
         slug: true,
-        shortDescription: true,
-        price: true,
-        discountedPrice: true,
-        quantity: true,
-        updatedAt: true,
-        tags: true,
-        category:{
-          select: {
-            title: true
-          }
-        },
-        productVariants: {
-          select: {
-            image: true,
-            color: true,
-            size: true,
-            isDefault: true,
-          },
-        },
-        _count: {
-          select: {
-            reviews: {
-              where: {
-                isApproved: true,
-              },
-            },
-          },
-        },
+        short_description: true,
+        base_price: true,
+        discounted_price: true,
+        updated_at: true,
+        product_images: { select: { url: true, sort_order: true } },
+        product_variants: { select: { color: true, size: true, is_default: true } },
       },
       where: {
         id: {
           not: currentProductId, // Exclude the current product
         },
-        OR: [
-          {
-            category:{
-              title: {
-                contains: category,
-                mode: 'insensitive',
-              },
-            }
-          },
-          {
-            tags: {
-              hasSome: tags,
-            }
-          },
-          {
-            title: {
-              contains: productTitle,
-              mode: 'insensitive',
-            }
-          }
-        ]
       },
       
       orderBy: {
-        updatedAt: 'desc',
+        updated_at: 'desc',
       },
       take: 8, // or however many related items you want
     });
 
-    return products.map(({ _count, ...item }) => ({
-      ...item,
-      reviews: _count.reviews,
-      shortDescription: item.shortDescription ?? "",
-      productVariants: item.productVariants.map(normalizeVariant),
-      price: item.price.toNumber(),
-      discountedPrice: item?.discountedPrice
-        ? item.discountedPrice.toNumber()
-        : null,
+    return products.map((item) => ({
+      id: item.id,
+      title: item.name,
+      shortDescription: item.short_description ?? "",
+      description: "",
+      body: "",
+      price: Number(item.base_price),
+      discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
+      slug: item.slug,
+      quantity: 0,
+      sku: "",
+      tags: [],
+      offers: "",
+      updatedAt: item.updated_at,
+      product_images: item.product_images,
+      productVariants: item.product_variants.map((v) => ({
+        id: 0,
+        productId: item.id,
+        image: pickDefaultImage(item),
+        color: v.color ?? "",
+        size: v.size ?? "",
+        isDefault: v.is_default,
+      })),
+      reviews: 0,
     }));
   },
   ['related-products'],

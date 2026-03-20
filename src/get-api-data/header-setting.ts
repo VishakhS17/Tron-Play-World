@@ -5,7 +5,14 @@ import { unstable_cache } from "next/cache";
 export const getHeaderSettings = unstable_cache(
   async () => {
     try {
-      return await prisma.headerSetting.findFirst();
+      // Step 3 DB schema does not include persisted header settings yet.
+      // Return a minimal compatible shape used by `MainHeader`.
+      return {
+        headerText:
+          "Free delivery on orders over ₹2000 – toys for every age!",
+        headerLogo: "/images/logo/logo.svg",
+        emailLogo: "/images/logo/logo.svg",
+      };
     } catch {
       return null;
     }

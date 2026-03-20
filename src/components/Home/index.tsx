@@ -239,12 +239,6 @@ const Home = () => {
                     Banashankari, Bengaluru, Karnataka 560070
                   </dd>
                 </div>
-                <div>
-                  <dt className="font-semibold text-dark">Hours</dt>
-                  <dd className="mt-1 text-meta-3">
-                    Open 7 days a week from 11am to 10pm.
-                  </dd>
-                </div>
               </dl>
 
               <div className="mt-8">

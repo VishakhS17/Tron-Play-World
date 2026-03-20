@@ -21,10 +21,20 @@ type IProps = {
   headerData?: HeaderSetting | null;
 };
 
+type MeResponse = {
+  user: {
+    id: string;
+    email: string;
+    name?: string | null;
+    roles: string[];
+  } | null;
+};
+
 const MainHeader = ({ headerData }: IProps) => {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [stickyMenu, setStickyMenu] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
   const { handleCartClick, cartCount, totalPrice } = useCart();
   const wishlistCount = useAppSelector((state) => state.wishlistReducer).items
     ?.length;
@@ -63,36 +73,68 @@ const MainHeader = ({ headerData }: IProps) => {
     };
   }, []);
 
+  // Read current customer session for greeting text
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as MeResponse | null;
+        if (!mounted) return;
+        const rawName = data?.user?.name?.trim();
+        const fallback = data?.user?.email?.split("@")[0] ?? null;
+        setUserName(rawName || fallback);
+      } catch {
+        if (mounted) setUserName(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <>
       <header
         className={`fixed left-0 top-0 w-full z-50 bg-white transition-all  ease-in-out duration-300 ${stickyMenu && "shadow-sm"
           }`}
       >
-        {/* Topbar - red theme */}
-        <div className="bg-red py-2.5">
+        {/* Announcement bar */}
+        <div className="bg-gray-1 py-2.5 border-b border-gray-3">
           <div className="px-4 mx-auto max-w-7xl sm:px-6 xl:px-0">
-            <div className="flex justify-between">
-              <div className="hidden lg:block">
-                <p className="text-sm font-medium text-white">
-                  {headerData?.headerText ||
-                    "Free delivery on orders over ₹2000 – toys for every age!"}
-                </p>
-              </div>
-              <div className="flex divide-x divide-white/20">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs sm:text-sm font-medium text-dark">
+                Minimum order value for free shipping: <span className="font-semibold">₹2000</span>
+              </p>
+              {userName ? (
                 <Link
-                  href="/signup"
-                  className="pr-3 text-sm font-medium text-white transition hover:text-red-light-4"
+                  href="/account"
+                  className="text-xs sm:text-sm font-medium text-blue hover:underline"
                 >
-                  Create an account
+                  Welcome, {userName}!
                 </Link>
+              ) : (
                 <Link
-                  href="#"
-                  className="pl-3 text-sm font-medium text-white transition hover:text-red-light-4"
+                  href="/login"
+                  className="text-xs sm:text-sm font-medium text-blue hover:underline"
                 >
-                  {"Sign In"}
+                  Sign in
                 </Link>
-              </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Running promo banner */}
+        <div className="bg-white border-b border-gray-3 overflow-hidden">
+          <div className="relative">
+            <div className="whitespace-nowrap text-xs sm:text-sm font-medium text-dark py-2 animate-[marquee_18s_linear_infinite]">
+              <span className="mx-6">Use code <b>WELCOME10</b> for 10% off</span>
+              <span className="mx-6">Free shipping over <b>₹2000</b></span>
+              <span className="mx-6">New arrivals added weekly</span>
+              <span className="mx-6">Use code <b>WELCOME10</b> for 10% off</span>
+              <span className="mx-6">Free shipping over <b>₹2000</b></span>
+              <span className="mx-6">New arrivals added weekly</span>
             </div>
           </div>
         </div>
@@ -132,7 +174,7 @@ const MainHeader = ({ headerData }: IProps) => {
               </button>
 
               <Link
-                href="#"
+                href="/account"
                 className="transition hover:text-blue focus:outline-none"
                 aria-label="Account"
               >

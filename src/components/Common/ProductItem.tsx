@@ -15,6 +15,7 @@ import CheckoutBtn from "../Shop/CheckoutBtn";
 import WishlistButton from "../Wishlist/AddWishlistButton";
 import Tooltip from "./Tooltip";
 import { calculateDiscountPercentage } from "@/utils/calculateDiscountPercentage";
+import { formatPrice } from "@/utils/formatePrice";
 
 type Props = {
   bgClr?: string;
@@ -22,11 +23,11 @@ type Props = {
 };
 // add updated the type here
 const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
-  const displayTitle = "Hotwheels";
-  const displayPrice = "₹660";
-  const defaultVariant = item?.productVariants.find(
-    (variant) => variant.isDefault
-  );
+  const displayTitle = item.title;
+  const defaultVariant = item?.productVariants.find((variant) => variant.isDefault);
+  const firstVariantWithImage = item?.productVariants.find((variant) => Boolean(variant.image));
+  // Prefer default variant image, then any variant image, then first product image
+  const cardImage = defaultVariant?.image || firstVariantWithImage?.image || item.product_images?.[0]?.url || "";
   const { openModal } = useModalContext();
   // const [product, setProduct] = useState({});
   const dispatch = useDispatch<AppDispatch>();
@@ -43,7 +44,7 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
     name: displayTitle,
     price: 660,
     currency: "usd",
-    image: defaultVariant?.image ? defaultVariant.image : "",
+    image: cardImage,
     slug: item?.slug,
     availableQuantity: item.quantity,
     color: defaultVariant?.color ? defaultVariant.color : "",
@@ -79,7 +80,7 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
         id: item.id,
         title: item.title,
         slug: item.slug,
-        image: defaultVariant?.image ? defaultVariant.image : "",
+        image: cardImage,
         price: item.discountedPrice ? item.discountedPrice : item.price,
         quantity: item.quantity,
         color: defaultVariant?.color ? defaultVariant.color : "",
@@ -93,14 +94,10 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
         className={`relative overflow-hidden border border-gray-3 flex items-center justify-center rounded-xl bg-${bgClr} min-h-[270px] mb-4`}
       >
         <Link
-          href={`${
-            pathUrl.includes("products")
-              ? `${item?.slug}`
-              : `products/${item?.slug}`
-          }`}
+          href={`/shop/${item?.slug}`}
         >
           <Image
-            src={defaultVariant?.image ? defaultVariant.image : ""}
+            src={cardImage || "/images/404.svg"}
             alt={item.title || "product-image"}
             width={250}
             height={250}
@@ -108,7 +105,7 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
         </Link>
         <div className="absolute top-2 right-2">
           {item.quantity < 1 ? (
-            <span className="px-2 py-1 text-xs font-medium text-white bg-red-500 rounded-full">
+            <span className="px-2 py-1 text-xs font-medium text-white bg-amber-600 rounded-full">
               Out of Stock
             </span>
           ) : item?.discountedPrice && item?.discountedPrice > 0 ? (
@@ -153,11 +150,7 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
 
       <h3 className="font-semibold text-dark ease-out text-base duration-200 hover:text-blue mb-1.5 line-clamp-1">
         <Link
-          href={`${
-            pathUrl.includes("products")
-              ? `${item?.slug}`
-              : `products/${item?.slug}`
-          }`}
+          href={`/shop/${item?.slug}`}
         >
           {" "}
           {displayTitle}{" "}
@@ -165,7 +158,14 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
       </h3>
 
       <span className="flex items-center gap-2 text-base font-medium">
-        <span className="text-dark">{displayPrice}</span>
+        {item.discountedPrice ? (
+          <>
+            <span className="text-blue font-semibold">{formatPrice(item.discountedPrice)}</span>
+            <span className="text-sm text-meta-4 line-through">{formatPrice(item.price)}</span>
+          </>
+        ) : (
+          <span className="text-dark">{formatPrice(item.price)}</span>
+        )}
       </span>
     </div>
   );

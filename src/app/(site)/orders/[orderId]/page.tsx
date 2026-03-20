@@ -1,0 +1,154 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prismaDB";
+import { getSession } from "@/lib/auth/session";
+import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
+import { formatPrice } from "@/utils/formatePrice";
+
+type Props = {
+  params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ access?: string }>;
+};
+
+export default async function OrderDetailPage({ params, searchParams }: Props) {
+  const { orderId } = await params;
+  const { access } = await searchParams;
+  const session = await getSession();
+
+  const order = await prisma.orders.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      user_id: true,
+      status: true,
+      payment_status: true,
+      subtotal_amount: true,
+      discount_amount: true,
+      total_amount: true,
+      created_at: true,
+      is_gift: true,
+      gift_message: true,
+      order_items: {
+        select: { id: true, product_name: true, quantity: true, unit_price: true, subtotal_amount: true },
+      },
+      shipments: { select: { status: true, tracking_number: true, carrier: true } },
+    },
+  });
+
+  if (!order) notFound();
+  const isOwner = Boolean(session?.sub && order.user_id && order.user_id === session.sub);
+  const hasGuestAccess = Boolean(!order.user_id && access && verifyOrderAccessToken(access, order.id));
+  if (!isOwner && !hasGuestAccess) {
+    return (
+      <section className="pt-36 pb-16">
+        <div className="w-full px-4 mx-auto max-w-3xl sm:px-6">
+          <div className="rounded-2xl border border-gray-3 bg-white p-8 text-center">
+            <p className="text-sm text-meta-3">
+              You do not have access to this order. Please sign in with the account that placed it.
+            </p>
+            <Link href="/login" className="mt-4 inline-flex rounded-lg bg-blue px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition">
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="pt-36 pb-16">
+      <div className="w-full px-4 mx-auto max-w-5xl sm:px-8 xl:px-0">
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <h1 className="text-2xl font-semibold text-dark">Order details</h1>
+          <Link href="/orders" className="text-sm font-medium text-blue hover:underline">
+            Back to orders
+          </Link>
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,_1fr)_360px]">
+          <div className="rounded-2xl border border-gray-3 bg-white">
+            <div className="p-5 sm:p-6 border-b border-gray-3">
+              <div className="text-sm text-meta-3">Order ID</div>
+              <div className="font-semibold text-dark">{order.id}</div>
+              <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                <span className="rounded-full bg-gray-1 px-3 py-1 border border-gray-3">
+                  Status: <b>{String(order.status)}</b>
+                </span>
+                <span className="rounded-full bg-gray-1 px-3 py-1 border border-gray-3">
+                  Payment: <b>{String(order.payment_status)}</b>
+                </span>
+              </div>
+            </div>
+
+            <div className="divide-y divide-gray-3">
+              {order.order_items.map((it) => (
+                <div key={it.id} className="p-5 sm:p-6 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-dark">{it.product_name}</div>
+                    <div className="mt-1 text-sm text-meta-3">Qty: {it.quantity}</div>
+                  </div>
+                  <div className="text-sm font-semibold text-dark">
+                    {formatPrice(Number(it.subtotal_amount))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <aside className="space-y-6">
+            <div className="rounded-2xl border border-gray-3 bg-white p-5">
+              <h2 className="text-lg font-semibold text-dark">Totals</h2>
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-meta-3">Subtotal</span>
+                  <span className="font-medium text-dark">{formatPrice(Number(order.subtotal_amount))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-meta-3">Discount</span>
+                  <span className="font-medium text-dark">-{formatPrice(Number(order.discount_amount))}</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-3 pt-2">
+                  <span className="text-meta-3">Total</span>
+                  <span className="font-semibold text-dark">{formatPrice(Number(order.total_amount))}</span>
+                </div>
+              </div>
+              <Link
+                href={
+                  access
+                    ? `/orders/${order.id}/invoice?access=${encodeURIComponent(access)}`
+                    : `/orders/${order.id}/invoice`
+                }
+                className="mt-4 inline-flex w-full justify-center rounded-lg border border-gray-3 bg-white px-5 py-2.5 text-sm font-medium text-dark hover:bg-gray-1 transition"
+              >
+                Download invoice (HTML)
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-gray-3 bg-white p-5">
+              <h2 className="text-lg font-semibold text-dark">Shipment</h2>
+              {order.shipments ? (
+                <div className="mt-3 text-sm text-meta-3 space-y-1">
+                  <div>Status: <b className="text-dark">{String(order.shipments.status)}</b></div>
+                  <div>Carrier: <b className="text-dark">{order.shipments.carrier ?? "—"}</b></div>
+                  <div>Tracking: <b className="text-dark">{order.shipments.tracking_number ?? "—"}</b></div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-meta-3">Shipment will be created after payment confirmation.</p>
+              )}
+            </div>
+
+            {order.is_gift ? (
+              <div className="rounded-2xl border border-gray-3 bg-white p-5">
+                <h2 className="text-lg font-semibold text-dark">Gift</h2>
+                <p className="mt-3 text-sm text-meta-3">
+                  Gift message: <span className="text-dark">{order.gift_message ?? "—"}</span>
+                </p>
+              </div>
+            ) : null}
+          </aside>
+        </div>
+      </div>
+    </section>
+  );
+}
+

@@ -92,6 +92,32 @@ const Footer = () => {
           <AccountLinks />
 
           <QuickLinks />
+
+          <div className="w-full sm:w-auto">
+            <h2 className="mb-7.5 text-xl font-semibold text-dark">
+              Business
+            </h2>
+            <ul className="flex flex-col gap-3">
+              <li className="text-base">
+                <span className="font-medium text-dark">Wholesale enquiries</span>
+                <div className="text-sm text-meta-3 mt-1">
+                  Email:{" "}
+                  <Link className="text-blue hover:underline" href="mailto:wholesale@example.com">
+                    wholesale@example.com
+                  </Link>
+                </div>
+              </li>
+              <li className="text-base">
+                <span className="font-medium text-dark">Retail partnerships</span>
+                <div className="text-sm text-meta-3 mt-1">
+                  Email:{" "}
+                  <Link className="text-blue hover:underline" href="mailto:partnerships@example.com">
+                    partnerships@example.com
+                  </Link>
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
         {/* <!-- footer menu end --> */}
       </div>

@@ -18,8 +18,8 @@ const quickLinks = [
   },
   {
     id: 4,
-    label: "FAQ's",
-    href: "#",
+    label: "FAQ",
+    href: "/faq",
   },
   {
     id: 5,

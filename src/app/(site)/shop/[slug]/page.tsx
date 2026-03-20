@@ -2,44 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import DemoProductGallery from "./DemoProductGallery";
-
-const PRODUCT_IMAGES = [
-  "/images/products/2e9757bf-25f8-4dcf-bc3f-9a13dd51ad61.webp",
-  "/images/products/6bbee6b4-64ce-4fc0-b70b-5d6bd4160657.webp",
-  "/images/products/94f47974-409b-40f2-ba61-9994d6b1da57.webp",
-  "/images/products/a6265a80-6b7f-49e0-8dc4-a781c908ba55.webp",
-];
-
-const DEMO_PRODUCT_PAGES = {
-  "starter-garage-set": {
-    title: "Starter Garage Set",
-    price: "$24.99",
-    description:
-      "A beginner-friendly set designed for everyday play and neat shelf display. This page is ready for your real images and final specs.",
-    highlights: [
-      "Modular storage slots",
-      "Display-first baseplate",
-      "Quick assembly pieces",
-    ],
-    heroImage: PRODUCT_IMAGES[0],
-    thumbnails: [PRODUCT_IMAGES[1], PRODUCT_IMAGES[2], PRODUCT_IMAGES[3]],
-  },
-  "collector-display-case": {
-    title: "Collector Display Case",
-    price: "$39.99",
-    description:
-      "A clean, premium-style display case concept page. Replace placeholders with your final photo set once assets are ready.",
-    highlights: [
-      "Clear front presentation",
-      "Stack-friendly form factor",
-      "Collector-ready profile",
-    ],
-    heroImage: PRODUCT_IMAGES[1],
-    thumbnails: [PRODUCT_IMAGES[0], PRODUCT_IMAGES[2], PRODUCT_IMAGES[3]],
-  },
-} as const;
-
-type DemoSlug = keyof typeof DEMO_PRODUCT_PAGES;
+import { getProductBySlug } from "@/get-api-data/product";
+import { formatPrice } from "@/utils/formatePrice";
+import ReviewForm from "@/components/Shop/ReviewForm";
+import { getSession } from "@/lib/auth/session";
+import { prisma } from "@/lib/prismaDB";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
@@ -49,19 +16,38 @@ export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = DEMO_PRODUCT_PAGES[slug as DemoSlug];
-  if (!product) return { title: "Product Not Found | i-Robox" };
+  const product = await getProductBySlug(slug);
+  if (!product) return { title: "Product Not Found | Tron Play World" };
 
   return {
-    title: `${product.title} | Shop | i-Robox`,
-    description: product.description,
+    title: `${product.title} | Shop | Tron Play World`,
+    description: product.description || `Buy ${product.title} at Tron Play World.`,
   };
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = DEMO_PRODUCT_PAGES[slug as DemoSlug];
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
+
+  const session = await getSession();
+  const approvedReviews = await prisma.reviews.findMany({
+    where: { product_id: product.id, is_approved: true },
+    orderBy: { created_at: "desc" },
+    select: { id: true, rating: true, title: true, comment: true, created_at: true, is_verified_purchase: true },
+    take: 10,
+  });
+
+  // Use product_images from DB; fall back to a placeholder only if truly none
+  const sortedImages = (product.product_images ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((i) => i.url)
+    .filter(Boolean);
+
+  // Also try variant images as secondary fallback
+  const variantImages = product.productVariants.map((v) => v.image).filter(Boolean);
+  const galleryImages = sortedImages.length > 0 ? sortedImages : variantImages.length > 0 ? variantImages : ["/images/products/placeholder.png"];
 
   return (
     <section className="overflow-hidden py-10 pb-20">
@@ -73,20 +59,42 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className="grid items-start gap-8 mt-5 lg:grid-cols-2">
           <DemoProductGallery
             title={product.title}
-            images={[product.heroImage, ...product.thumbnails]}
+            images={galleryImages}
           />
 
           <div>
             <h1 className="text-3xl font-semibold text-dark">{product.title}</h1>
-            <p className="mt-2 text-xl font-semibold text-dark">{product.price}</p>
-            <p className="mt-4 text-base text-meta-3">{product.description}</p>
+            <div className="mt-2 flex items-baseline gap-3">
+              {product.discountedPrice ? (
+                <>
+                  <span className="text-2xl font-bold text-blue">
+                    {formatPrice(product.discountedPrice)}
+                  </span>
+                  <span className="text-base font-medium text-meta-4 line-through">
+                    {formatPrice(product.price)}
+                  </span>
+                  <span className="text-sm font-semibold text-green rounded-full bg-green-light-6 px-2 py-0.5">
+                    {Math.round((1 - product.discountedPrice / product.price) * 100)}% off
+                  </span>
+                </>
+              ) : (
+                <span className="text-2xl font-bold text-dark">
+                  {formatPrice(product.price)}
+                </span>
+              )}
+            </div>
+            {product.shortDescription ? (
+              <p className="mt-4 text-base text-meta-3">{product.shortDescription}</p>
+            ) : null}
 
-            <h2 className="mt-6 text-lg font-semibold text-dark">Highlights</h2>
-            <ul className="mt-3 space-y-2 text-sm text-meta-3">
-              {product.highlights.map((item) => (
-                <li key={item}>- {item}</li>
-              ))}
-            </ul>
+            {product.description ? (
+              <>
+                <h2 className="mt-6 text-lg font-semibold text-dark">Description</h2>
+                <p className="mt-3 text-sm text-meta-3 whitespace-pre-line">
+                  {product.description}
+                </p>
+              </>
+            ) : null}
 
             <button
               type="button"
@@ -94,6 +102,45 @@ export default async function ProductPage({ params }: ProductPageProps) {
             >
               Add to cart
             </button>
+
+            <div className="mt-10 border-t border-gray-3 pt-8">
+              <h2 className="text-lg font-semibold text-dark">Reviews</h2>
+              {approvedReviews.length === 0 ? (
+                <p className="mt-3 text-sm text-meta-3">No approved reviews yet.</p>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {approvedReviews.map((r) => (
+                    <div key={r.id} className="rounded-xl border border-gray-3 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-dark">
+                          {r.rating} / 5
+                        </div>
+                        {r.is_verified_purchase ? (
+                          <span className="text-xs rounded-full bg-gray-1 border border-gray-3 px-3 py-1 text-dark">
+                            Verified purchase
+                          </span>
+                        ) : null}
+                      </div>
+                      {r.title ? (
+                        <div className="mt-2 text-sm font-semibold text-dark">{r.title}</div>
+                      ) : null}
+                      <p className="mt-2 text-sm text-meta-3 whitespace-pre-line">{r.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {session ? (
+                <>
+                  <h3 className="mt-8 text-base font-semibold text-dark">Write a review</h3>
+                  <ReviewForm productId={product.id} />
+                </>
+              ) : (
+                <p className="mt-6 text-sm text-meta-3">
+                  Please <Link className="text-blue hover:underline" href="/login">sign in</Link> to write a review.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
