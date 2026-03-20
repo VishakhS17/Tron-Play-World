@@ -84,6 +84,8 @@ export async function GET(req: NextRequest) {
       quantity,
       updatedAt: p.updated_at,
       reviews: 0,
+      // Needed for thumbnail fallback when a product has no variants
+      product_images: images,
       productVariants: p.product_variants.map((v) => ({
         color: v.color ?? "",
         size: v.size ?? "",

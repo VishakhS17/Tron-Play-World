@@ -27,25 +27,37 @@ export default async function ShopPage({ searchParams }: Props) {
   const available = pickString(sp.available).trim();
   const page = Number(pickString(sp.page) || "1");
 
-  const [categories, productRes] = await Promise.all([
-    getCategories(),
-    fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/api/products?` +
-        new URLSearchParams({
-          ...(q ? { q } : {}),
-          ...(category ? { category } : {}),
-          ...(brand ? { brand } : {}),
-          ...(ageGroup ? { ageGroup } : {}),
-          ...(minPrice ? { minPrice } : {}),
-          ...(maxPrice ? { maxPrice } : {}),
-          ...(available ? { available } : {}),
-          ...(page ? { page: String(page) } : {}),
-        }).toString(),
-      { cache: "no-store" }
-    ),
-  ]);
+  const categories = await getCategories();
 
-  const productData = await productRes.json().catch(() => null);
+  // Avoid crashing on Vercel when NEXT_PUBLIC_SITE_URL isn't set yet.
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+
+  let productData: any = null;
+  if (baseUrl) {
+    try {
+      const productRes = await fetch(
+        `${baseUrl}/api/products?` +
+          new URLSearchParams({
+            ...(q ? { q } : {}),
+            ...(category ? { category } : {}),
+            ...(brand ? { brand } : {}),
+            ...(ageGroup ? { ageGroup } : {}),
+            ...(minPrice ? { minPrice } : {}),
+            ...(maxPrice ? { maxPrice } : {}),
+            ...(available ? { available } : {}),
+            ...(page ? { page: String(page) } : {}),
+          }).toString(),
+        { cache: "no-store" }
+      );
+      productData = await productRes.json().catch(() => null);
+    } catch {
+      productData = null;
+    }
+  }
+
   const products = productData?.items ?? [];
   const totalPages = productData?.totalPages ?? 1;
 
