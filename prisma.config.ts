@@ -1,7 +1,9 @@
 import 'dotenv/config'
 import { defineConfig, env } from 'prisma/config';
 
-const fallbackDbUrl = "postgresql://user:pass@localhost:5432/db";
+// IMPORTANT: Do not hardcode database credentials in the repo.
+// The datasource URL must come from the environment (e.g. local `.env` / Vercel env var).
+const databaseUrl = process.env.DATABASE_URL;
 
 export default defineConfig({
     schema: 'prisma/schema.prisma',
@@ -9,6 +11,6 @@ export default defineConfig({
         path: 'prisma/migrations'
     },
     datasource: {
-        url: process.env.DATABASE_URL || fallbackDbUrl,
+        url: databaseUrl ?? '',
     },
 });
