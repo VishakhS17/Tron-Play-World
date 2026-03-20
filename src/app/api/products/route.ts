@@ -76,6 +76,8 @@ export async function GET(req: NextRequest) {
     return {
       id: p.id,
       title: p.name,
+      // Used by storefront thumbnails even when variants are missing
+      image,
       shortDescription: p.short_description ?? "",
       description: p.description ?? "",
       price: Number(p.base_price),

@@ -27,7 +27,12 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
   const defaultVariant = item?.productVariants.find((variant) => variant.isDefault);
   const firstVariantWithImage = item?.productVariants.find((variant) => Boolean(variant.image));
   // Prefer default variant image, then any variant image, then first product image
-  const cardImage = defaultVariant?.image || firstVariantWithImage?.image || item.product_images?.[0]?.url || "";
+  const cardImage =
+    item.image ||
+    defaultVariant?.image ||
+    firstVariantWithImage?.image ||
+    item.product_images?.[0]?.url ||
+    "";
   const { openModal } = useModalContext();
   // const [product, setProduct] = useState({});
   const dispatch = useDispatch<AppDispatch>();

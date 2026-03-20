@@ -10,6 +10,8 @@ export type Product = {
   updatedAt: Date;
   reviews: number;
   shortDescription: string;
+  /** Cover image URL for thumbnails/cards (first product_image by sort_order). */
+  image?: string;
   productVariants: {
     color: string;
     image: string;
