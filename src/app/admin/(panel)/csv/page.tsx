@@ -47,11 +47,11 @@ export default function AdminCsvPage() {
           placeholder={`name,slug,base_price,discounted_price,sku,is_active\nToy Car,toy-car,199,149,SKU-1,true`}
         />
         <button
-          disabled={loading !== null}
-          onClick={() => upload("products")}
-          className="rounded-lg bg-blue px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition disabled:opacity-60"
+          disabled
+          onClick={() => {}}
+          className="rounded-lg bg-gray-3 px-5 py-2.5 text-sm font-medium text-meta-4 cursor-not-allowed"
         >
-          {loading === "products" ? "Importing…" : "Import products"}
+          Import products
         </button>
       </div>
 
@@ -68,11 +68,11 @@ export default function AdminCsvPage() {
           placeholder={`product_slug,available_quantity,low_stock_threshold\ntoy-car,50,5`}
         />
         <button
-          disabled={loading !== null}
-          onClick={() => upload("inventory")}
-          className="rounded-lg bg-blue px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition disabled:opacity-60"
+          disabled
+          onClick={() => {}}
+          className="rounded-lg bg-gray-3 px-5 py-2.5 text-sm font-medium text-meta-4 cursor-not-allowed"
         >
-          {loading === "inventory" ? "Importing…" : "Import inventory"}
+          Import inventory
         </button>
       </div>
     </div>
