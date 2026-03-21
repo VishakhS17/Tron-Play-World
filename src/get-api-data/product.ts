@@ -9,6 +9,9 @@ const pickDefaultImage = (product: {
   return images.slice().sort((a, b) => a.sort_order - b.sort_order)[0]?.url ?? "";
 };
 
+const getInventoryQuantity = (inventory: { available_quantity: number }[] = []) =>
+  inventory.reduce((sum, row) => sum + Number(row.available_quantity || 0), 0);
+
 // get product for id and title
 export const getProductsIdAndTitle = unstable_cache(
   async () => {
@@ -43,6 +46,7 @@ export const getNewArrivalsProduct = unstable_cache(
             is_default: true,
           }
         },
+        inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
       },
       take: 8
@@ -56,7 +60,7 @@ export const getNewArrivalsProduct = unstable_cache(
       price: Number(item.base_price),
       discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
       slug: item.slug,
-      quantity: 0,
+      quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
       tags: [],
       offers: "",
@@ -95,6 +99,7 @@ export const getBestSellingProducts = unstable_cache(
             is_default: true,
           }
         },
+        inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
       },
       orderBy: { updated_at: "desc" },
@@ -109,7 +114,7 @@ export const getBestSellingProducts = unstable_cache(
       price: Number(item.base_price),
       discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
       slug: item.slug,
-      quantity: 0,
+      quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
       tags: [],
       offers: "",
@@ -148,6 +153,7 @@ export const getLatestProducts = unstable_cache(
             is_default: true,
           }
         },
+        inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
       },
       orderBy: [{ updated_at: "desc" }],
@@ -162,7 +168,7 @@ export const getLatestProducts = unstable_cache(
       price: Number(item.base_price),
       discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
       slug: item.slug,
-      quantity: 0,
+      quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
       tags: [],
       offers: "",
@@ -206,6 +212,7 @@ export const getAllProducts = unstable_cache(
               is_default: true,
             }
           },
+          inventory: { select: { available_quantity: true } },
           product_images: { select: { url: true, sort_order: true } },
         },
       })
@@ -218,7 +225,7 @@ export const getAllProducts = unstable_cache(
         price: Number(item.base_price),
         discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
         slug: item.slug,
-        quantity: 0,
+        quantity: getInventoryQuantity(item.inventory),
         sku: item.sku ?? "",
         tags: [],
         offers: "",
@@ -268,6 +275,7 @@ export const getProductBySlug = async (slug: string) => {
         }
       },
       product_images: { select: { url: true, sort_order: true } },
+      inventory: { select: { available_quantity: true } },
       sku: true,
     },
   });
@@ -281,7 +289,7 @@ export const getProductBySlug = async (slug: string) => {
     price: Number(product.base_price),
     discountedPrice: product.discounted_price ? Number(product.discounted_price) : null,
     slug: product.slug,
-    quantity: 0,
+    quantity: getInventoryQuantity(product.inventory),
     sku: product.sku ?? "",
     tags: [],
     offers: "",
@@ -320,6 +328,7 @@ export const getProductById = async (productId: string) => {
       sku: true,
       product_images: { select: { url: true, sort_order: true } },
       product_variants: { select: { color: true, size: true, is_default: true } },
+      inventory: { select: { available_quantity: true } },
       categories: { select: { name: true, slug: true } },
     },
   });
@@ -333,7 +342,7 @@ export const getProductById = async (productId: string) => {
     price: Number(product.base_price),
     discountedPrice: product.discounted_price ? Number(product.discounted_price) : null,
     slug: product.slug,
-    quantity: 0,
+    quantity: getInventoryQuantity(product.inventory),
     sku: product.sku ?? "",
     tags: [],
     offers: "",
@@ -368,6 +377,7 @@ export const getRelatedProducts = unstable_cache(
         updated_at: true,
         product_images: { select: { url: true, sort_order: true } },
         product_variants: { select: { color: true, size: true, is_default: true } },
+        inventory: { select: { available_quantity: true } },
       },
       where: {
         id: {
@@ -390,7 +400,7 @@ export const getRelatedProducts = unstable_cache(
       price: Number(item.base_price),
       discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
       slug: item.slug,
-      quantity: 0,
+      quantity: getInventoryQuantity(item.inventory),
       sku: "",
       tags: [],
       offers: "",

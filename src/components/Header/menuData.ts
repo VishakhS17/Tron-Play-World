@@ -22,10 +22,6 @@ export const menuData: MenuItem[] = [
         path: "/wishlist",
       },
       {
-        title: "Sign in",
-        path: "/login",
-      },
-      {
         title:"Privacy Policy",
         path:"/privacy-policy"
       },

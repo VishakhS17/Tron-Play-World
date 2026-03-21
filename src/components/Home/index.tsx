@@ -41,10 +41,6 @@ const COLLECTION_SPOTLIGHTS = [
   },
 ];
 const VISIT_US_MAP_URL = "https://maps.app.goo.gl/GqXJNknzeg9wXJjT9";
-const VISIT_US_EMBED_DESKTOP_URL =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3757.0776325542147!2d77.56174517491753!3d12.925243587385886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae150072e599c7%3A0x508be3c9c2d61e89!2sTron%20Play%20World!5e1!3m2!1sen!2sin!4v1773039262238!5m2!1sen!2sin";
-const VISIT_US_EMBED_MOBILE_URL =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3757.0776325542147!2d77.56174517491753!3d12.925243587385886!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae150072e599c7%3A0x508be3c9c2d61e89!2sTron%20Play%20World!5e1!3m2!1sen!2sin!4v1773039262238!5m2!1sen!2sin";
 
 const Home = () => {
   return (
@@ -186,54 +182,18 @@ const Home = () => {
       {/* Visit us section */}
       <section className="py-16 bg-white">
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
-          <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,_1.2fr)_minmax(0,_1fr)]">
-            {/* Embedded map */}
-            <div className="overflow-hidden border rounded-2xl border-gray-3 bg-gray-1">
-              <iframe
-                src={VISIT_US_EMBED_DESKTOP_URL}
-                title="Store location map"
-                className="hidden w-full border-0 md:block"
-                width="680"
-                height="510"
-                loading="lazy"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-              <iframe
-                src={VISIT_US_EMBED_MOBILE_URL}
-                title="Store location map mobile"
-                className="block w-full border-0 md:hidden"
-                width="360"
-                height="270"
-                loading="lazy"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
-
-            {/* Store details placeholder */}
-            <div>
+          <div className="rounded-2xl border border-gray-3 bg-gray-1 p-6 sm:p-8">
+            <div className="max-w-2xl">
               <p className="mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
                 Visit us
               </p>
               <h2 className="mb-3 text-2xl font-semibold sm:text-3xl text-dark">
-                Plan a visit to your flagship space.
+                Find us in Bengaluru.
               </h2>
-              <p className="mb-6 text-sm leading-relaxed text-meta-3 sm:text-base">
-                Use this area to describe where visitors can find you, how your
-                physical space is laid out, or what makes the in-store
-                experience special.
-              </p>
 
-              <dl className="space-y-4 text-sm">
+              <dl className="space-y-4 text-sm rounded-xl border border-gray-3 bg-white p-5">
                 <div>
-                  <dt className="font-semibold text-dark">Store name</dt>
-                  <dd className="mt-1 text-meta-3">
-                    Tron Play World
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-dark">Address</dt>
+                  <dt className="font-semibold text-dark">Location</dt>
                   <dd className="mt-1 text-meta-3">
                     24, Basement, 21st Main Rd, Banashankari Stage II,
                     Banashankari, Bengaluru, Karnataka 560070

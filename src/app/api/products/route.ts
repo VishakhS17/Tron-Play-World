@@ -22,12 +22,25 @@ export async function GET(req: NextRequest) {
 
   const where: any = { is_active: true };
   if (q) {
-    // Basic fallback search without tsvector (Prisma doesn't support tsvector fields).
-    where.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { description: { contains: q, mode: "insensitive" } },
-      { short_description: { contains: q, mode: "insensitive" } },
-      { sku: { contains: q, mode: "insensitive" } },
+    // Token-based combined search:
+    // every token must match at least one searchable field.
+    const tokens = q
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    where.AND = [
+      ...(where.AND ?? []),
+      ...tokens.map((token) => ({
+        OR: [
+          { name: { contains: token, mode: "insensitive" } },
+          { description: { contains: token, mode: "insensitive" } },
+          { short_description: { contains: token, mode: "insensitive" } },
+          { sku: { contains: token, mode: "insensitive" } },
+          { brands: { is: { name: { contains: token, mode: "insensitive" } } } },
+          { categories: { is: { name: { contains: token, mode: "insensitive" } } } },
+        ],
+      })),
     ];
   }
   if (ageGroup) where.age_group = ageGroup;

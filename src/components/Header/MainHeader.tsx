@@ -17,6 +17,7 @@ import {
 } from "./icons";
 import { HeaderSetting } from "@prisma/client";
 import { useAppSelector } from "@/redux/store";
+import toast from "react-hot-toast";
 
 type IProps = {
   headerData?: HeaderSetting | null;
@@ -37,7 +38,9 @@ const MainHeader = ({ headerData }: IProps) => {
   const [stickyMenu, setStickyMenu] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
-  const { handleCartClick, cartCount, totalPrice } = useCart();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const { handleCartClick, cartCount } = useCart();
   const wishlistCount = useAppSelector((state) => state.wishlistReducer).items
     ?.length;
 
@@ -67,12 +70,20 @@ const MainHeader = ({ headerData }: IProps) => {
       if (window.innerWidth >= 1280) {
         setNavigationOpen(false);
       }
+      setIsDesktop(window.innerWidth >= 1280);
     };
 
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
     };
+  }, []);
+
+  useEffect(() => {
+    const close = () => setAccountOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
   }, []);
 
   async function loadMe(signal?: AbortSignal) {
@@ -107,6 +118,23 @@ const MainHeader = ({ headerData }: IProps) => {
     };
   }, [pathname]);
 
+  async function handleLogout() {
+    try {
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to log out");
+      setUserName(null);
+      setAccountOpen(false);
+      window.dispatchEvent(new Event("tpw-auth-changed"));
+      toast.success("Signed out");
+    } catch (err: any) {
+      toast.error(err?.message || "Could not log out");
+    }
+  }
+
   return (
     <>
       <header
@@ -121,12 +149,9 @@ const MainHeader = ({ headerData }: IProps) => {
                 Minimum order value for free shipping: <span className="font-semibold">₹2000</span>
               </p>
               {userName ? (
-                <Link
-                  href="/account"
-                  className="text-xs sm:text-sm font-medium text-blue hover:underline"
-                >
+                <span className="text-xs sm:text-sm font-medium text-blue">
                   Welcome, {userName}!
-                </Link>
+                </span>
               ) : (
                 <Link
                   href="/login"
@@ -174,7 +199,13 @@ const MainHeader = ({ headerData }: IProps) => {
 
             {/* Desktop Menu - Hidden on mobile */}
             <div className="hidden xl:block">
-              <DesktopMenu menuData={menuData} />
+              <DesktopMenu
+                menuData={
+                  pathname !== "/"
+                    ? [{ title: "Home", path: "/" }, ...menuData]
+                    : menuData
+                }
+              />
             </div>
 
             {/* Action Buttons */}
@@ -187,13 +218,51 @@ const MainHeader = ({ headerData }: IProps) => {
                 <SearchIcon />
               </button>
 
-              <Link
-                href="/account"
-                className="transition hover:text-blue focus:outline-none"
-                aria-label="Account"
+              <div
+                className="relative"
+                onMouseEnter={() => {
+                  if (isDesktop) setAccountOpen(true);
+                }}
+                onMouseLeave={() => {
+                  if (isDesktop) setAccountOpen(false);
+                }}
               >
-                <UserIcon />
-              </Link>
+                <button
+                  className="transition hover:text-blue focus:outline-none"
+                  aria-label="Account"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isDesktop) {
+                      setAccountOpen((prev) => !prev);
+                    } else if (!userName) {
+                      window.location.href = "/login";
+                    }
+                  }}
+                >
+                  <UserIcon />
+                </button>
+                <div
+                  className={`absolute right-0 top-full w-40 rounded-lg border border-gray-3 bg-white p-2 shadow-lg transition ${
+                    accountOpen ? "visible opacity-100" : "invisible opacity-0"
+                  }`}
+                >
+                  <Link
+                    href={userName ? "/account" : "/login"}
+                    onClick={() => setAccountOpen(false)}
+                    className="block rounded-md px-3 py-2 text-sm font-medium text-dark hover:bg-gray-1 hover:text-blue"
+                  >
+                    Account
+                  </Link>
+                  {userName ? (
+                    <button
+                      onClick={handleLogout}
+                      className="mt-1 block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-dark hover:bg-gray-1 hover:text-blue"
+                    >
+                      Log out
+                    </button>
+                  ) : null}
+                </div>
+              </div>
 
               <Link
                 href="/wishlist"
@@ -236,7 +305,11 @@ const MainHeader = ({ headerData }: IProps) => {
         headerLogo={headerData?.headerLogo || null}
         isOpen={navigationOpen}
         onClose={() => setNavigationOpen(false)}
-        menuData={menuData}
+        menuData={
+          pathname !== "/"
+            ? [{ title: "Home", path: "/" }, ...menuData]
+            : menuData
+        }
       />
     </>
   );

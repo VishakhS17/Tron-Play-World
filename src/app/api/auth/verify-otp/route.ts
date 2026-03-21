@@ -47,6 +47,9 @@ export async function POST(req: NextRequest) {
   if (!otpRecord) {
     return NextResponse.json({ error: "OTP not found" }, { status: 400 });
   }
+  if (otpRecord.user?.is_active) {
+    return NextResponse.json({ error: "Account already verified" }, { status: 400 });
+  }
 
   if (otpRecord.expires_at <= new Date()) {
     return NextResponse.json({ error: "OTP expired" }, { status: 400 });

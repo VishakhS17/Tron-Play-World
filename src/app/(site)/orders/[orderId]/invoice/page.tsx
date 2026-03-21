@@ -10,7 +10,7 @@ type Props = {
 };
 
 export const metadata = {
-  title: "Invoice | Tron Play World",
+  title: "Invoice | Play World",
 };
 
 export default async function InvoicePage({ params, searchParams }: Props) {

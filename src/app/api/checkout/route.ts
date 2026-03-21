@@ -6,6 +6,8 @@ import { sendEmail, orderEmailTemplate } from "@/lib/email";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { createOrderAccessToken } from "@/lib/security/orderAccess";
+import { validateCommonEmailProvider } from "@/lib/validateEmai";
+import bcrypt from "bcrypt";
 
 type CheckoutItem = {
   productId: string;
@@ -37,14 +39,21 @@ export async function POST(req: NextRequest) {
 
   const full_name = String(address?.full_name ?? "").trim();
   const phone = String(address?.phone ?? "").trim();
+  const email = String(address?.email ?? "").trim().toLowerCase();
   const line1 = String(address?.line1 ?? "").trim();
   const city = String(address?.city ?? "").trim();
   const state = String(address?.state ?? "").trim();
   const postal_code = String(address?.postal_code ?? "").trim();
   const country = String(address?.country ?? "India").trim();
 
-  if (!full_name || !phone || !line1 || !city || !state || !postal_code || !country) {
+  if (!full_name || !phone || !email || !line1 || !city || !state || !postal_code || !country) {
     return NextResponse.json({ error: "Address is incomplete" }, { status: 400 });
+  }
+  if (!validateCommonEmailProvider(email)) {
+    return NextResponse.json(
+      { error: "Use a common email provider (Gmail, Yahoo, Outlook, etc.)" },
+      { status: 400 }
+    );
   }
 
   const productIds = items.map((i) => i.productId);
@@ -60,6 +69,50 @@ export async function POST(req: NextRequest) {
     }
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
       return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
+    }
+  }
+
+  let checkoutUserId = session?.sub ?? null;
+  let checkoutEmail = session?.email ?? email;
+  if (!checkoutUserId) {
+    const existingUser = await prisma.users.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
+    if (existingUser) {
+      checkoutUserId = existingUser.id;
+      checkoutEmail = existingUser.email;
+    } else {
+      const randomPasswordHash = await bcrypt.hash(
+        `${email}:${Date.now()}:${Math.random()}`,
+        12
+      );
+      const createdUser = await prisma.$transaction(async (tx) => {
+        const user = await tx.users.create({
+          data: {
+            email,
+            password_hash: randomPasswordHash,
+            name: full_name || null,
+            phone: phone || null,
+            is_active: true,
+          },
+          select: { id: true, email: true },
+        });
+        const customerRole = await tx.roles.upsert({
+          where: { name: "CUSTOMER" },
+          update: {},
+          create: { name: "CUSTOMER", description: "Customer" },
+          select: { id: true },
+        });
+        await tx.user_roles.upsert({
+          where: { user_id_role_id: { user_id: user.id, role_id: customerRole.id } },
+          update: {},
+          create: { user_id: user.id, role_id: customerRole.id },
+        });
+        return user;
+      });
+      checkoutUserId = createdUser.id;
+      checkoutEmail = createdUser.email;
     }
   }
 
@@ -135,7 +188,7 @@ export async function POST(req: NextRequest) {
   const order = await prisma.$transaction(async (tx) => {
     const addr = await tx.addresses.create({
       data: {
-        user_id: session?.sub ?? null,
+        user_id: checkoutUserId,
         full_name,
         phone,
         line1,
@@ -152,7 +205,7 @@ export async function POST(req: NextRequest) {
 
     const createdOrder = await tx.orders.create({
       data: {
-        user_id: session?.sub ?? null,
+        user_id: checkoutUserId,
         status: "PENDING",
         payment_status: "PENDING",
         subtotal_amount: subtotal,
@@ -226,9 +279,9 @@ export async function POST(req: NextRequest) {
     userAgent: req.headers.get("user-agent"),
   });
 
-  if (session?.email) {
+  if (checkoutEmail) {
     await sendEmail({
-      to: session.email,
+      to: checkoutEmail,
       subject: "Order created (pending payment)",
       html: orderEmailTemplate({
         heading: "We received your order",

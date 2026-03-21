@@ -5,6 +5,7 @@ import { signJwt } from "@/lib/auth/jwt";
 import { getAuthSecret, setSessionCookie } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { validateCommonEmailProvider, validateEmail } from "@/lib/validateEmai";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
@@ -22,18 +23,38 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const identifier =
+    typeof body.identifier === "string"
+      ? body.identifier.trim()
+      : typeof body.email === "string"
+      ? body.email.trim()
+      : "";
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  if (!identifier || !password) {
+    return NextResponse.json({ error: "Email/phone and password are required" }, { status: 400 });
+  }
+  const normalizedIdentifier = identifier.toLowerCase();
+  const looksLikeEmail = validateEmail(normalizedIdentifier);
+  const normalizedPhone = identifier.replace(/\s+/g, "");
+  if (identifier.includes("@") && !looksLikeEmail) {
+    return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+  }
+  if (looksLikeEmail && !validateCommonEmailProvider(normalizedIdentifier)) {
+    return NextResponse.json(
+      { error: "Use a common email provider (Gmail, Yahoo, Outlook, etc.)" },
+      { status: 400 }
+    );
   }
 
-  const user = await prisma.users.findUnique({
-    where: { email },
+  const user = await prisma.users.findFirst({
+    where: looksLikeEmail
+      ? { email: normalizedIdentifier }
+      : { phone: normalizedPhone },
     select: {
       id: true,
       email: true,
+      phone: true,
       password_hash: true,
       is_active: true,
       user_roles: { select: { roles: { select: { name: true } } } },
@@ -41,7 +62,14 @@ export async function POST(req: NextRequest) {
   });
 
   if (!user) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    return NextResponse.json(
+      {
+        error: "Account not found. Please create your account.",
+        redirectToSignup: true,
+        suggestedIdentifier: identifier,
+      },
+      { status: 404 }
+    );
   }
 
   if (!user.is_active) {

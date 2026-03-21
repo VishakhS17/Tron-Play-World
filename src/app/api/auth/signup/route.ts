@@ -8,6 +8,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { sendEmail } from "@/lib/email";
 import { getAuthSecret } from "@/lib/auth/session";
+import { validateCommonEmailProvider } from "@/lib/validateEmai";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const OTP_TTL_SECONDS = 60 * 10; // 10 minutes
@@ -41,17 +42,34 @@ export async function POST(req: NextRequest) {
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
 
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
+  if (!validateCommonEmailProvider(email)) {
+    return NextResponse.json(
+      { error: "Use a common email provider (Gmail, Yahoo, Outlook, etc.)" },
+      { status: 400 }
+    );
+  }
+  if (phone && !/^\+?[0-9]{7,15}$/.test(phone.replace(/\s+/g, ""))) {
+    return NextResponse.json({ error: "Please enter a valid mobile number" }, { status: 400 });
+  }
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
-  const existing = await prisma.users.findUnique({ where: { email } });
+  const existing = await prisma.users.findFirst({
+    where: {
+      OR: [{ email }, ...(phone ? [{ phone }] : [])],
+    },
+  });
   if (existing) {
+    if (existing.phone && phone && existing.phone === phone) {
+      return NextResponse.json({ error: "Mobile number is already registered" }, { status: 409 });
+    }
     if (existing.is_active) {
       return NextResponse.json({ error: "Email is already registered" }, { status: 409 });
     }
@@ -109,6 +127,7 @@ export async function POST(req: NextRequest) {
         email,
         password_hash: passwordHash,
         name: name || null,
+        phone: phone || null,
         is_active: false, // Activated after OTP verification
       },
       select: { id: true, email: true },

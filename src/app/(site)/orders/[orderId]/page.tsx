@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
 import { formatPrice } from "@/utils/formatePrice";
+import { toOrderNumber } from "@/utils/orderNumber";
 
 type Props = {
   params: Promise<{ orderId: string }>;
@@ -32,6 +33,18 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
         select: { id: true, product_name: true, quantity: true, unit_price: true, subtotal_amount: true },
       },
       shipments: { select: { status: true, tracking_number: true, carrier: true } },
+      addresses_orders_shipping_address_idToaddresses: {
+        select: {
+          full_name: true,
+          phone: true,
+          line1: true,
+          line2: true,
+          city: true,
+          state: true,
+          postal_code: true,
+          country: true,
+        },
+      },
     },
   });
 
@@ -69,7 +82,7 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
           <div className="rounded-2xl border border-gray-3 bg-white">
             <div className="p-5 sm:p-6 border-b border-gray-3">
               <div className="text-sm text-meta-3">Order ID</div>
-              <div className="font-semibold text-dark">{order.id}</div>
+              <div className="font-semibold text-dark">{toOrderNumber(order.id)}</div>
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
                 <span className="rounded-full bg-gray-1 px-3 py-1 border border-gray-3">
                   Status: <b>{String(order.status)}</b>
@@ -85,7 +98,9 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
                 <div key={it.id} className="p-5 sm:p-6 flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="font-semibold text-dark">{it.product_name}</div>
-                    <div className="mt-1 text-sm text-meta-3">Qty: {it.quantity}</div>
+                    <div className="mt-1 text-sm text-meta-3">
+                      Qty: {it.quantity} • Unit: {formatPrice(Number(it.unit_price))}
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-dark">
                     {formatPrice(Number(it.subtotal_amount))}
@@ -122,6 +137,32 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
               >
                 Download invoice (HTML)
               </Link>
+            </div>
+
+            <div className="rounded-2xl border border-gray-3 bg-white p-5">
+              <h2 className="text-lg font-semibold text-dark">Shipping address</h2>
+              {order.addresses_orders_shipping_address_idToaddresses ? (
+                <div className="mt-3 text-sm text-meta-3 space-y-1">
+                  <div className="font-medium text-dark">
+                    {order.addresses_orders_shipping_address_idToaddresses.full_name}
+                  </div>
+                  <div>
+                    {order.addresses_orders_shipping_address_idToaddresses.line1}
+                    {order.addresses_orders_shipping_address_idToaddresses.line2
+                      ? `, ${order.addresses_orders_shipping_address_idToaddresses.line2}`
+                      : ""}
+                  </div>
+                  <div>
+                    {order.addresses_orders_shipping_address_idToaddresses.city},{" "}
+                    {order.addresses_orders_shipping_address_idToaddresses.state}{" "}
+                    {order.addresses_orders_shipping_address_idToaddresses.postal_code}
+                  </div>
+                  <div>{order.addresses_orders_shipping_address_idToaddresses.country}</div>
+                  <div>{order.addresses_orders_shipping_address_idToaddresses.phone}</div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-meta-3">Shipping address unavailable.</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-gray-3 bg-white p-5">

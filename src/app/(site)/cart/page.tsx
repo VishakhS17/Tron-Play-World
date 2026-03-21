@@ -4,10 +4,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/utils/formatePrice";
+import { useDispatch } from "react-redux";
+import { AppDispatch, useAppSelector } from "@/redux/store";
+import { addItemToWishlist } from "@/redux/features/wishlist-slice";
+import toast from "react-hot-toast";
 
 export default function CartPage() {
+  const dispatch = useDispatch<AppDispatch>();
+  const wishlistItems = useAppSelector((state) => state.wishlistReducer.items ?? []);
   const { cartCount, cartDetails, totalPrice, incrementItem, decrementItem, removeItem, clearCart } =
     useCart();
+  function handleMoveToWishlist(item: (typeof items)[number]) {
+    const alreadyInWishlist = wishlistItems.some((w) => String(w.id) === String(item.id));
+    if (alreadyInWishlist) {
+      toast("Item already in cart!");
+    } else {
+      dispatch(
+        addItemToWishlist({
+          id: String(item.id),
+          title: item.name,
+          slug: item.slug || "",
+          image: item.image || "",
+          price: item.price,
+          quantity: item.availableQuantity ?? item.quantity,
+          color: item.color ?? "",
+        })
+      );
+    }
+    removeItem(item.id);
+  }
+
 
   const items = Object.values(cartDetails ?? {});
 
@@ -63,12 +89,20 @@ export default function CartPage() {
                             {formatPrice(item.price)}
                           </p>
                         </div>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-sm text-meta-3 hover:text-dark"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleMoveToWishlist(item)}
+                            className="text-sm text-meta-3 hover:text-dark"
+                          >
+                            Move to wishlist
+                          </button>
+                          <button
+                            onClick={() => removeItem(item.id)}
+                            className="text-sm text-meta-3 hover:text-dark"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
 
                       <div className="mt-4 flex items-center justify-between">

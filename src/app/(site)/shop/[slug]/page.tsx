@@ -18,11 +18,11 @@ export async function generateMetadata({
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: "Product Not Found | Tron Play World" };
+  if (!product) return { title: "Product Not Found | Play World" };
 
   return {
-    title: `${product.title} | Shop | Tron Play World`,
-    description: product.description || `Buy ${product.title} at Tron Play World.`,
+    title: `${product.title} | Shop | Play World`,
+    description: product.description || `Buy ${product.title} at Play World.`,
   };
 }
 

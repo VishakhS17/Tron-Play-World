@@ -2,9 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import LogoutButton from "@/components/Auth/LogoutButton";
+import ChangePasswordCard from "@/components/Auth/ChangePasswordCard";
 
 export const metadata = {
-  title: "Account | Tron Play World",
+  title: "Account | Play World",
 };
 
 export default async function AccountPage() {
@@ -49,25 +50,25 @@ export default async function AccountPage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_1fr)_360px]">
-          <div className="rounded-2xl border border-gray-3 bg-white p-6">
-            <h2 className="text-lg font-semibold text-dark">Profile</h2>
-            <dl className="mt-4 space-y-3 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-meta-3">Name</dt>
-                <dd className="font-medium text-dark">{user?.name ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-meta-3">Email</dt>
-                <dd className="font-medium text-dark">{user?.email ?? session.email}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-meta-3">Phone</dt>
-                <dd className="font-medium text-dark">{user?.phone ?? "—"}</dd>
-              </div>
-            </dl>
-            <p className="mt-4 text-xs text-meta-4">
-              Profile editing UI can be added next; for now your account is used for orders and addresses.
-            </p>
+          <div className="space-y-8">
+            <div className="rounded-2xl border border-gray-3 bg-white p-6">
+              <h2 className="text-lg font-semibold text-dark">Profile</h2>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-meta-3">Name</dt>
+                  <dd className="font-medium text-dark">{user?.name ?? "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-meta-3">Email</dt>
+                  <dd className="font-medium text-dark">{user?.email ?? session.email}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-meta-3">Phone</dt>
+                  <dd className="font-medium text-dark">{user?.phone ?? "—"}</dd>
+                </div>
+              </dl>
+            </div>
+            <ChangePasswordCard userId={session.sub} />
           </div>
 
           <aside className="rounded-2xl border border-gray-3 bg-white p-6 h-fit">

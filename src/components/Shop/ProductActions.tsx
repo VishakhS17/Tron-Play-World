@@ -21,9 +21,10 @@ type ProductActionsProps = {
 
 export default function ProductActions(props: ProductActionsProps) {
   const dispatch = useDispatch<AppDispatch>();
-  const { addItem } = useCart();
+  const { addItem, cartDetails, incrementItem, decrementItem } = useCart();
   const wishlistItems = useAppSelector((state) => state.wishlistReducer.items);
   const isAlreadyWishlisted = wishlistItems.some((w) => w.id === props.id);
+  const currentQty = (cartDetails?.[props.id]?.quantity ?? 0) as number;
 
   function handleAddToCart() {
     if (props.quantity < 1) {
@@ -62,14 +63,34 @@ export default function ProductActions(props: ProductActionsProps) {
 
   return (
     <div className="mt-8 flex items-center gap-2.5">
-      <button
-        type="button"
-        onClick={handleAddToCart}
-        disabled={props.quantity < 1}
-        className="inline-flex rounded-lg bg-blue px-6 py-3 text-sm font-medium text-white hover:bg-blue-dark transition-colors disabled:opacity-60"
-      >
-        {props.quantity > 0 ? "Add to cart" : "Out of Stock"}
-      </button>
+      {currentQty > 0 ? (
+        <div className="inline-flex items-center rounded-lg border border-gray-3 bg-white">
+          <button
+            onClick={() => decrementItem(props.id)}
+            className="px-3 py-2 text-dark hover:bg-gray-1"
+            aria-label="Decrease quantity"
+          >
+            -
+          </button>
+          <span className="px-3 py-2 text-sm font-medium text-dark">{currentQty}</span>
+          <button
+            onClick={() => incrementItem(props.id)}
+            className="px-3 py-2 text-dark hover:bg-gray-1"
+            aria-label="Increase quantity"
+          >
+            +
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          disabled={props.quantity < 1}
+          className="inline-flex rounded-lg bg-blue px-6 py-3 text-sm font-medium text-white hover:bg-blue-dark transition-colors disabled:opacity-60"
+        >
+          {props.quantity > 0 ? "Add to cart" : "Out of Stock"}
+        </button>
+      )}
 
       <button
         type="button"

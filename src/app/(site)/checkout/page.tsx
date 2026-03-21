@@ -18,6 +18,7 @@ export default function CheckoutPage() {
 
   const [address, setAddress] = useState({
     full_name: "",
+    email: "",
     phone: "",
     line1: "",
     line2: "",
@@ -73,6 +74,7 @@ export default function CheckoutPage() {
                 {(
                   [
                     ["full_name", "Full name"],
+                    ["email", "Email"],
                     ["phone", "Phone"],
                     ["line1", "Address line 1"],
                     ["line2", "Address line 2 (optional)"],

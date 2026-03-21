@@ -7,11 +7,9 @@ import { AppDispatch } from "@/redux/store";
 import { Product } from "@/types/product";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { useCart } from "@/hooks/useCart";
-import CheckoutBtn from "../Shop/CheckoutBtn";
 import WishlistButton from "../Wishlist/AddWishlistButton";
 import Tooltip from "./Tooltip";
 import { calculateDiscountPercentage } from "@/utils/calculateDiscountPercentage";
@@ -37,12 +35,12 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
   // const [product, setProduct] = useState({});
   const dispatch = useDispatch<AppDispatch>();
 
-  const { addItem, cartDetails } = useCart();
-  const pathUrl = usePathname();
+  const { addItem, cartDetails, incrementItem, decrementItem } = useCart();
 
   const isAlradyAdded = Object.values(cartDetails ?? {}).some(
     (cartItem) => cartItem.id === item.id
   );
+  const currentQty = (cartDetails?.[item.id]?.quantity ?? 0) as number;
 
   const cartItem = {
     id: item.id,
@@ -135,7 +133,25 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
           </Tooltip>
 
           {isAlradyAdded ? (
-            <CheckoutBtn />
+            <div className="inline-flex items-center rounded-lg border border-gray-3 bg-white">
+              <button
+                onClick={() => decrementItem(item.id)}
+                className="px-3 py-2 text-dark hover:bg-gray-1"
+                aria-label="Decrease quantity"
+              >
+                -
+              </button>
+              <span className="px-3 py-2 text-sm font-medium text-dark">
+                {currentQty}
+              </span>
+              <button
+                onClick={() => incrementItem(item.id)}
+                className="px-3 py-2 text-dark hover:bg-gray-1"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => handleAddToCart(item)}

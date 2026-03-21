@@ -37,20 +37,20 @@ const Breadcrumb = ({
     items || generateBreadcrumbsFromPath(pathname, homeLabel, homeHref);
 
   return (
-    <div className="overflow-hidden pt-36 sm:pt-32">
-      <div className=" bg-gray-2">
+    <div className="overflow-hidden pt-[172px] sm:pt-[172px]">
+      <div className="bg-gray-2">
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
-          <div className="flex items-center justify-start gap-3 py-5">
+          <div className="flex h-12 items-center justify-start">
             <nav aria-label="Breadcrumb">
-              <ol className="flex flex-wrap items-center gap-1">
+              <ol className="flex flex-wrap items-center gap-2">
                 {breadcrumbItems.map((item, index) => {
                   const isLast = index === breadcrumbItems.length - 1;
 
                   return (
-                    <li key={index} className="flex items-center">
+                    <li key={index} className="inline-flex items-center">
                       {isLast ? (
                         <span
-                          className="font-medium text-custom-sm text-blue"
+                          className="text-custom-sm font-medium leading-none text-blue"
                           aria-current="page"
                         >
                           {item.label}
@@ -59,11 +59,11 @@ const Breadcrumb = ({
                         <>
                           <Link
                             href={item.href}
-                            className="text-gray-600 transition-colors text-custom-sm hover:text-blue"
+                            className="text-custom-sm font-medium leading-none text-gray-600 transition-colors hover:text-blue"
                           >
                             {item.label}
                           </Link>
-                          <span className="flex items-center mx-1">
+                          <span className="inline-flex items-center text-meta-3 leading-none">
                             {separator}
                           </span>
                         </>

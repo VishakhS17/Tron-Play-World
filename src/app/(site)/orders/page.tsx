@@ -2,9 +2,10 @@ import Link from "next/link";
 import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { formatPrice } from "@/utils/formatePrice";
+import { toOrderNumber } from "@/utils/orderNumber";
 
 export const metadata = {
-  title: "Orders | Tron Play World",
+  title: "Orders | Play World",
 };
 
 export default async function OrdersPage() {
@@ -30,7 +31,17 @@ export default async function OrdersPage() {
   const orders = await prisma.orders.findMany({
     where: { user_id: session.sub },
     orderBy: { created_at: "desc" },
-    select: { id: true, status: true, payment_status: true, total_amount: true, created_at: true },
+    select: {
+      id: true,
+      status: true,
+      payment_status: true,
+      total_amount: true,
+      created_at: true,
+      addresses_orders_shipping_address_idToaddresses: {
+        select: { line1: true, line2: true, city: true, state: true, postal_code: true },
+      },
+      order_items: { select: { product_name: true, quantity: true }, take: 2 },
+    },
   });
 
   return (
@@ -59,7 +70,25 @@ export default async function OrdersPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm text-meta-3">Order</div>
-                    <div className="font-semibold text-dark">{o.id}</div>
+                    <div className="font-semibold text-dark">{toOrderNumber(o.id)}</div>
+                    {o.addresses_orders_shipping_address_idToaddresses ? (
+                      <div className="mt-1 text-xs text-meta-3 line-clamp-1">
+                        {o.addresses_orders_shipping_address_idToaddresses.line1}
+                        {o.addresses_orders_shipping_address_idToaddresses.line2
+                          ? `, ${o.addresses_orders_shipping_address_idToaddresses.line2}`
+                          : ""}
+                        , {o.addresses_orders_shipping_address_idToaddresses.city},{" "}
+                        {o.addresses_orders_shipping_address_idToaddresses.state}{" "}
+                        {o.addresses_orders_shipping_address_idToaddresses.postal_code}
+                      </div>
+                    ) : null}
+                    {o.order_items.length ? (
+                      <div className="mt-1 text-xs text-meta-3 line-clamp-1">
+                        {o.order_items
+                          .map((it) => `${it.product_name} x${it.quantity}`)
+                          .join(", ")}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="text-sm">
                     <div className="text-meta-3">Total</div>

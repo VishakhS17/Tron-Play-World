@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 
 export const metadata = {
-  title: "Returns | Tron Play World",
+  title: "Returns | Play World",
 };
 
 export default async function ReturnsPage() {

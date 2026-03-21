@@ -6,10 +6,36 @@ import { useAppSelector } from "@/redux/store";
 import { useDispatch } from "react-redux";
 import { removeItemFromWishlist, removeAllItemsFromWishlist } from "@/redux/features/wishlist-slice";
 import { formatPrice } from "@/utils/formatePrice";
+import { useCart } from "@/hooks/useCart";
+import toast from "react-hot-toast";
 
 export default function WishlistPage() {
   const dispatch = useDispatch();
   const items = useAppSelector((state) => state.wishlistReducer).items ?? [];
+  const { addItem, cartDetails } = useCart();
+
+  function handleMoveToCart(item: (typeof items)[number]) {
+    const alreadyInCart = Object.values(cartDetails ?? {}).some(
+      (cartItem) => String(cartItem.id) === String(item.id)
+    );
+    if (alreadyInCart) {
+      toast("Item already in cart!");
+    } else {
+      addItem({
+        id: item.id,
+        name: item.title,
+        price: item.price,
+        quantity: 1,
+        currency: "INR",
+        image: item.image,
+        slug: item.slug,
+        availableQuantity: item.quantity,
+        color: item.color ?? "",
+      });
+      toast.success("Item moved to cart!");
+    }
+    dispatch(removeItemFromWishlist(item.id));
+  }
 
   return (
     <section className="pt-36 pb-16">
@@ -66,8 +92,14 @@ export default function WishlistPage() {
                     {formatPrice(item.price)}
                   </div>
                   <button
+                    onClick={() => handleMoveToCart(item)}
+                    className="mt-4 inline-flex w-full justify-center rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition"
+                  >
+                    Move to cart
+                  </button>
+                  <button
                     onClick={() => dispatch(removeItemFromWishlist(item.id))}
-                    className="mt-4 inline-flex w-full justify-center rounded-lg border border-gray-3 bg-white px-4 py-2 text-sm font-medium text-dark hover:bg-gray-1 transition"
+                    className="mt-2 inline-flex w-full justify-center rounded-lg border border-gray-3 bg-white px-4 py-2 text-sm font-medium text-dark hover:bg-gray-1 transition"
                   >
                     Remove
                   </button>

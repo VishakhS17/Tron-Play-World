@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "FAQ | Tron Play World",
+  title: "FAQ | Play World",
 };
 
 const FAQS = [

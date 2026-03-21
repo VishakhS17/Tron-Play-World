@@ -14,8 +14,8 @@ export default function PrivacyPolicyPage() {
         </h1>
 
         <p className="text-base leading-7 text-meta-3 mb-5">
-          <strong>I-Robox</strong> website is owned by Tron Play World, which is
-          a data controller of your personal data.
+          <strong>I-Robox</strong> website is operated by our team and acts as a
+          data controller of your personal data.
         </p>
 
         <p className="text-base leading-7 text-meta-3 mb-5">
