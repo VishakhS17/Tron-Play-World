@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { cleanText, readJsonBody } from "@/lib/validation/input";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,18 +20,23 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session?.sub) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => null);
-  const otp = typeof body?.otp === "string" ? body.otp : "";
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  const otp = cleanText(body.otp, 10);
   const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
   if (!otp || !newPassword) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+  if (!/^\d{6}$/.test(otp)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (newPassword.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
   const otpRecord = await prisma.signup_email_otps.findFirst({
-    where: { user_id: session.sub, used_at: null },
+    where: { customer_id: session.sub, used_at: null },
     orderBy: { created_at: "desc" },
     select: { id: true, code_hash: true, expires_at: true, attempts: true },
   });
@@ -53,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await prisma.$transaction(async (tx) => {
-    await tx.users.update({
+    await tx.customers.update({
       where: { id: session.sub },
       data: { password_hash: passwordHash, is_active: true },
     });

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prismaDB";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { sendEmail } from "@/lib/email";
+import { isUuid, normalizeEmail, readJsonBody } from "@/lib/validation/input";
 
 function generateOtpCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -27,14 +28,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => null);
-  const userId = typeof body?.userId === "string" ? body.userId : "";
-  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  const userId = typeof body.userId === "string" ? body.userId : "";
+  const email = normalizeEmail(body.email);
   if (!userId && !email) {
     return NextResponse.json({ error: "userId or email is required" }, { status: 400 });
   }
+  if (userId && !isUuid(userId)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
-  const user = await prisma.users.findFirst({
+  const user = await prisma.customers.findFirst({
     where: userId ? { id: userId } : { email },
     select: { id: true, email: true, is_active: true },
   });
@@ -47,7 +53,7 @@ export async function POST(req: NextRequest) {
 
   await prisma.signup_email_otps.create({
     data: {
-      user_id: user.id,
+      customer_id: user.id,
       email: user.email,
       code_hash: otpCodeHash,
       expires_at: otpExpiresAt,

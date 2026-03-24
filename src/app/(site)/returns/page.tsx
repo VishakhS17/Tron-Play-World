@@ -24,7 +24,7 @@ export default async function ReturnsPage() {
   }
 
   const returns = await prisma.returns.findMany({
-    where: { user_id: session.sub },
+    where: { customer_id: session.sub },
     orderBy: { created_at: "desc" },
     select: { id: true, status: true, quantity: true, created_at: true, order_id: true },
     take: 50,

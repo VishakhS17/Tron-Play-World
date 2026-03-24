@@ -6,6 +6,7 @@ import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { sendEmail } from "@/lib/email";
 import { validateCommonEmailProvider, validateEmail } from "@/lib/validateEmai";
 import { getSession } from "@/lib/auth/session";
+import { cleanText, isUuid, normalizePhone, readJsonBody, hasSuspiciousInput } from "@/lib/validation/input";
 
 function generateOtpCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -26,14 +27,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => null);
-  const identifier = typeof body?.identifier === "string" ? body.identifier.trim() : "";
-  const requestedUserId = typeof body?.userId === "string" ? body.userId : "";
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  const identifier = cleanText(body.identifier, 320);
+  const requestedUserId = typeof body.userId === "string" ? body.userId : "";
   const session = await getSession();
 
   const normalizedIdentifier = identifier.toLowerCase();
   const byEmail = validateEmail(normalizedIdentifier);
-  const byPhone = identifier.replace(/\s+/g, "");
+  const byPhone = normalizePhone(identifier);
+  if (identifier && hasSuspiciousInput(identifier)) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+  if (requestedUserId && !isUuid(requestedUserId)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
   if (byEmail && !validateCommonEmailProvider(normalizedIdentifier)) {
     return NextResponse.json(
       { error: "Use a common email provider (Gmail, Yahoo, Outlook, etc.)" },
@@ -42,11 +51,11 @@ export async function POST(req: NextRequest) {
   }
 
   const user = requestedUserId
-    ? await prisma.users.findUnique({
+    ? await prisma.customers.findUnique({
         where: { id: requestedUserId },
         select: { id: true, email: true, is_active: true },
       })
-    : await prisma.users.findFirst({
+    : await prisma.customers.findFirst({
         where: byEmail ? { email: normalizedIdentifier } : { phone: byPhone },
         select: { id: true, email: true, is_active: true },
       });
@@ -64,7 +73,7 @@ export async function POST(req: NextRequest) {
 
   await prisma.signup_email_otps.create({
     data: {
-      user_id: user.id,
+      customer_id: user.id,
       email: user.email,
       code_hash: otpCodeHash,
       expires_at: otpExpiresAt,

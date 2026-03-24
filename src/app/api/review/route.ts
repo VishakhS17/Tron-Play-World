@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
+import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,9 +15,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const body = await req.json();
-
-  const { productId } = body;
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const productId = cleanText(parsed.body.productId, 64);
+  if (!productId || !isUuid(productId)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
   try {
     const reviews = await prisma.reviews.findMany({

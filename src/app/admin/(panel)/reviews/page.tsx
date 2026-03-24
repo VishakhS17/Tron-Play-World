@@ -18,7 +18,7 @@ export default async function AdminReviewsPage() {
       is_verified_purchase: true,
       created_at: true,
       products: { select: { name: true } },
-      users: { select: { email: true } },
+      customers: { select: { email: true } },
     },
   });
 
@@ -55,7 +55,7 @@ export default async function AdminReviewsPage() {
                     </span>
                   ) : null}
                 </td>
-                <td className="py-3 px-4 text-dark">{r.users?.email ?? "—"}</td>
+                <td className="py-3 px-4 text-dark">{r.customers?.email ?? "—"}</td>
                 <td className="py-3 px-4 text-dark">{r.is_approved ? "Yes" : "No"}</td>
                 <td className="py-3 px-4">
                   <form action={`/api/admin/reviews/${r.id}/approve`} method="post" className="inline">

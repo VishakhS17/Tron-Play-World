@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prismaDB";
 
 export async function writeAuditLog(input: {
-  userId?: string | null;
+  customerId?: string | null;
+  adminUserId?: string | null;
   entityType: string;
   entityId?: string | null;
   action: string;
@@ -13,7 +14,8 @@ export async function writeAuditLog(input: {
   try {
     await prisma.audit_logs.create({
       data: {
-        user_id: input.userId ?? null,
+        customer_id: input.customerId ?? null,
+        admin_user_id: input.adminUserId ?? null,
         entity_type: input.entityType,
         entity_id: input.entityId ?? null,
         action: input.action,

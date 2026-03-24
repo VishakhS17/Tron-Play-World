@@ -4,11 +4,14 @@ import { getSession } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
+import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const productId = (url.searchParams.get("productId") ?? "").trim();
-  if (!productId) return NextResponse.json({ error: "productId is required" }, { status: 400 });
+  if (!productId || !isUuid(productId)) {
+    return NextResponse.json({ error: "productId is required" }, { status: 400 });
+  }
 
   const reviews = await prisma.reviews.findMany({
     where: { product_id: productId, is_approved: true },
@@ -33,22 +36,32 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
-  const productId = String(body.productId ?? "");
+  const productId = cleanText(body.productId, 64);
   const rating = Number(body.rating ?? 0);
-  const title = typeof body.title === "string" ? body.title.slice(0, 255) : null;
-  const comment = typeof body.comment === "string" ? body.comment.slice(0, 2000) : "";
+  const title = cleanOptionalText(body.title, 255);
+  const comment = cleanText(body.comment, 2000);
 
-  if (!productId || !Number.isInteger(rating) || rating < 1 || rating > 5 || !comment.trim()) {
+  if (
+    !productId ||
+    !isUuid(productId) ||
+    !Number.isInteger(rating) ||
+    rating < 1 ||
+    rating > 5 ||
+    !comment.trim() ||
+    hasSuspiciousInput(comment) ||
+    (title ? hasSuspiciousInput(title) : false)
+  ) {
     return NextResponse.json({ error: "Invalid review" }, { status: 400 });
   }
 
   // Verified purchase: must have a CONFIRMED order containing this product.
   const hasPurchase = await prisma.orders.count({
     where: {
-      user_id: session.sub,
+      customer_id: session.sub,
       status: "CONFIRMED",
       order_items: { some: { product_id: productId } },
     },
@@ -57,7 +70,7 @@ export async function POST(req: NextRequest) {
   const created = await prisma.reviews.create({
     data: {
       product_id: productId,
-      user_id: session.sub,
+      customer_id: session.sub,
       rating,
       title,
       comment,
@@ -68,7 +81,7 @@ export async function POST(req: NextRequest) {
   });
 
   await writeAuditLog({
-    userId: session.sub,
+    customerId: session.sub,
     entityType: "REVIEW",
     entityId: created.id,
     action: "REVIEW_SUBMITTED",

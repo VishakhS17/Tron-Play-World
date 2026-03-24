@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
+import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,23 +20,32 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
-  const orderId = String(body.orderId ?? "");
-  const orderItemId = String(body.orderItemId ?? "");
+  const orderId = cleanText(body.orderId, 64);
+  const orderItemId = cleanText(body.orderItemId, 64);
   const quantity = Number(body.quantity ?? 0);
-  const reason = typeof body.reason === "string" ? body.reason.slice(0, 1000) : null;
+  const reason = cleanOptionalText(body.reason, 1000);
 
-  if (!orderId || !orderItemId || !Number.isInteger(quantity) || quantity <= 0) {
+  if (
+    !orderId ||
+    !orderItemId ||
+    !isUuid(orderId) ||
+    !isUuid(orderItemId) ||
+    !Number.isInteger(quantity) ||
+    quantity <= 0 ||
+    (reason ? hasSuspiciousInput(reason) : false)
+  ) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
   const order = await prisma.orders.findUnique({
     where: { id: orderId },
-    select: { id: true, user_id: true, status: true },
+    select: { id: true, customer_id: true, status: true },
   });
-  if (!order || order.user_id !== session.sub) {
+  if (!order || order.customer_id !== session.sub) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -54,7 +64,7 @@ export async function POST(req: NextRequest) {
     data: {
       order_id: orderId,
       order_item_id: orderItemId,
-      user_id: session.sub,
+      customer_id: session.sub,
       quantity,
       reason,
       status: "REQUESTED",
@@ -63,7 +73,7 @@ export async function POST(req: NextRequest) {
   });
 
   await writeAuditLog({
-    userId: session.sub,
+    customerId: session.sub,
     entityType: "RETURN",
     entityId: ret.id,
     action: "RETURN_REQUESTED",

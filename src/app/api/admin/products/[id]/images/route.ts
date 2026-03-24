@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
-import { getSession } from "@/lib/auth/session";
+import { getAdminSession } from "@/lib/auth/session";
+import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const images = await prisma.product_images.findMany({
     where: { product_id: id },
     orderBy: { sort_order: "asc" },
@@ -21,13 +23,16 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
-  const body = await req.json().catch(() => null);
-  if (!body?.url) return NextResponse.json({ error: "url required" }, { status: 400 });
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  if (!body.url) return NextResponse.json({ error: "url required" }, { status: 400 });
 
   const maxOrder = await prisma.product_images.aggregate({
     _max: { sort_order: true },
@@ -37,8 +42,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const image = await prisma.product_images.create({
     data: {
       product_id: id,
-      url: String(body.url),
-      alt_text: body.alt_text ? String(body.alt_text) : null,
+      url: cleanText(body.url, 2000),
+      alt_text: body.alt_text ? cleanText(body.alt_text, 255) : null,
       sort_order: (maxOrder._max.sort_order ?? -1) + 1,
     },
     select: { id: true, url: true, alt_text: true, sort_order: true },
@@ -50,16 +55,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
  *  Body: { order: string[] }  — array of image IDs in their new order (0-indexed).
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id: productId } = await ctx.params;
-  const body = await req.json().catch(() => null);
-  if (!Array.isArray(body?.order)) {
+  if (!isUuid(productId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  if (!Array.isArray(body.order)) {
     return NextResponse.json({ error: "order array required" }, { status: 400 });
   }
-  const order: string[] = body.order;
+  const order: string[] = body.order.filter((id) => typeof id === "string" && isUuid(id));
 
   await Promise.all(
     order.map((imgId, i) =>
@@ -73,14 +81,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 }
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id: productId } = await ctx.params;
+  if (!isUuid(productId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { searchParams } = new URL(req.url);
   const imageId = searchParams.get("imageId");
-  if (!imageId) return NextResponse.json({ error: "imageId required" }, { status: 400 });
+  if (!imageId || !isUuid(imageId)) {
+    return NextResponse.json({ error: "imageId required" }, { status: 400 });
+  }
 
   await prisma.product_images.deleteMany({
     where: { id: imageId, product_id: productId },

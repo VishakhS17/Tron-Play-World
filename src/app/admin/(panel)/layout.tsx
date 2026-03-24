@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSession } from "@/lib/auth/session";
+import { getAdminSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 
 const NAV = [
@@ -15,7 +15,7 @@ const NAV = [
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
+  const session = await getAdminSession();
   const roles = (session?.roles ?? []) as string[];
   const isAllowed =
     roles.includes("SUPER_ADMIN") ||

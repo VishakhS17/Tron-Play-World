@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { cleanText, isUuid, normalizeCode, readJsonBody } from "@/lib/validation/input";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminWrite();
   if (!auth.ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const coupon = await prisma.coupons.findUnique({
     where: { id },
     select: {
@@ -41,14 +43,16 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   const auth = await requireAdminWrite();
   if (!auth.ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await ctx.params;
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
   const updated = await prisma.coupons.update({
     where: { id },
     data: {
-      code: typeof body.code === "string" ? body.code.trim().toUpperCase() : undefined,
-      discount_type: typeof body.discount_type === "string" ? body.discount_type : undefined,
+      code: typeof body.code === "string" ? normalizeCode(body.code) : undefined,
+      discount_type: typeof body.discount_type === "string" ? cleanText(body.discount_type, 30) : undefined,
       discount_value: body.discount_value !== undefined ? Number(body.discount_value) : undefined,
       min_cart_value: body.min_cart_value !== undefined && body.min_cart_value !== ""
         ? Number(body.min_cart_value)

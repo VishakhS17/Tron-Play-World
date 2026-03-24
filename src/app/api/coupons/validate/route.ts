@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
+import { hasSuspiciousInput, normalizeCode, readJsonBody } from "@/lib/validation/input";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,13 +17,17 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await getSession();
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
-  const code = String(body.code ?? "").trim();
+  const code = normalizeCode(body.code);
   const subtotal = Number(body.subtotal ?? 0);
 
   if (!code) return NextResponse.json({ error: "Coupon code is required" }, { status: 400 });
+  if (hasSuspiciousInput(code)) {
+    return NextResponse.json({ error: "Invalid coupon" }, { status: 400 });
+  }
   if (!Number.isFinite(subtotal) || subtotal <= 0) {
     return NextResponse.json({ error: "Invalid subtotal" }, { status: 400 });
   }
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
 
   if (coupon.max_uses_per_user && session?.sub) {
     const usedByUser = await prisma.coupon_usages.count({
-      where: { coupon_id: coupon.id, user_id: session.sub },
+      where: { coupon_id: coupon.id, customer_id: session.sub },
     });
     if (usedByUser >= coupon.max_uses_per_user) {
       return NextResponse.json({ error: "Coupon usage limit reached for your account" }, { status: 400 });

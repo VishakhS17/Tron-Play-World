@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
-import { getSession } from "@/lib/auth/session";
+import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
+import { cleanText, hasSuspiciousInput, readJsonBody } from "@/lib/validation/input";
 
 function isAllowed(roles: string[]) {
   return (
@@ -13,7 +14,7 @@ function isAllowed(roles: string[]) {
 }
 
 export async function GET() {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -35,13 +36,15 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Bad origin" }, { status: 403 });
   }
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const body = await req.json().catch(() => null);
-  const name = String(body?.name ?? "").trim();
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const name = cleanText(parsed.body.name, 120);
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
+  if (hasSuspiciousInput(name)) return NextResponse.json({ error: "Invalid name" }, { status: 400 });
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 

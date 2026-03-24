@@ -9,7 +9,7 @@ datasource db {
 
 model addresses {
   id                                           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                                      String?  @db.Uuid
+  customer_id                                  String?  @db.Uuid
   full_name                                    String   @db.VarChar(150)
   phone                                        String   @db.VarChar(30)
   line1                                        String   @db.VarChar(255)
@@ -22,35 +22,45 @@ model addresses {
   is_default_shipping                          Boolean  @default(false)
   created_at                                   DateTime @default(now()) @db.Timestamptz(6)
   updated_at                                   DateTime @default(now()) @db.Timestamptz(6)
-  users                                        users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers                                    customers? @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   orders_orders_billing_address_idToaddresses  orders[] @relation("orders_billing_address_idToaddresses")
   orders_orders_shipping_address_idToaddresses orders[] @relation("orders_shipping_address_idToaddresses")
 
-  @@index([user_id], map: "idx_addresses_user_id")
+  @@index([customer_id], map: "idx_addresses_customer_id")
 }
 
 model admin_users {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id    String   @unique @db.Uuid
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String   @unique @db.Citext
+  password_hash String
+  name          String?  @db.VarChar(150)
+  phone         String?  @db.VarChar(30)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  admin_user_roles admin_user_roles[]
+  audit_logs       audit_logs[]
 }
 
 model audit_logs {
-  id          BigInt   @id @default(autoincrement())
-  user_id     String?  @db.Uuid
-  entity_type String   @db.VarChar(80)
-  entity_id   String?  @db.Uuid
-  action      String   @db.VarChar(80)
-  old_values  Json?
-  new_values  Json?
-  ip_address  String?  @db.Inet
-  user_agent  String?
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-  users       users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  id            BigInt      @id @default(autoincrement())
+  customer_id   String?     @db.Uuid
+  admin_user_id String?     @db.Uuid
+  entity_type   String      @db.VarChar(80)
+  entity_id     String?     @db.Uuid
+  action        String      @db.VarChar(80)
+  old_values    Json?
+  new_values    Json?
+  ip_address    String?     @db.Inet
+  user_agent    String?
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  customers     customers?  @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  admin_users   admin_users? @relation(fields: [admin_user_id], references: [id], onUpdate: NoAction)
 
   @@index([entity_type, entity_id], map: "idx_audit_entity")
-  @@index([user_id], map: "idx_audit_user")
+  @@index([customer_id], map: "idx_audit_customer")
+  @@index([admin_user_id], map: "idx_audit_admin_user")
 }
 
 model brands {
@@ -81,14 +91,14 @@ model cart_items {
 }
 
 model carts {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id     String?      @db.Uuid
-  guest_token String?      @db.Uuid
-  status      String       @default("ACTIVE") @db.VarChar(30)
-  created_at  DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime     @default(now()) @db.Timestamptz(6)
-  cart_items  cart_items[]
-  users       users?       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id  String?      @db.Uuid
+  guest_token  String?      @db.Uuid
+  status       String       @default("ACTIVE") @db.VarChar(30)
+  created_at   DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime     @default(now()) @db.Timestamptz(6)
+  cart_items   cart_items[]
+  customers    customers?   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model categories {
@@ -107,14 +117,14 @@ model categories {
 }
 
 model coupon_usages {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  coupon_id String   @db.Uuid
-  user_id   String?  @db.Uuid
-  order_id  String?  @db.Uuid
-  used_at   DateTime @default(now()) @db.Timestamptz(6)
-  coupons   coupons  @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  orders    orders?  @relation(fields: [order_id], references: [id], onUpdate: NoAction)
-  users     users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  coupon_id   String     @db.Uuid
+  customer_id String?    @db.Uuid
+  order_id    String?    @db.Uuid
+  used_at     DateTime   @default(now()) @db.Timestamptz(6)
+  coupons     coupons    @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  orders      orders?    @relation(fields: [order_id], references: [id], onUpdate: NoAction)
+  customers   customers? @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
 }
 
 model coupons {
@@ -196,7 +206,7 @@ model order_items {
 
 model orders {
   id                                              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                                         String?                  @db.Uuid
+  customer_id                                     String?                  @db.Uuid
   status                                          order_status_type        @default(PENDING)
   payment_status                                  payment_status_type      @default(PENDING)
   subtotal_amount                                 Decimal                  @db.Decimal(10, 2)
@@ -220,13 +230,13 @@ model orders {
   addresses_orders_billing_address_idToaddresses  addresses?               @relation("orders_billing_address_idToaddresses", fields: [billing_address_id], references: [id], onUpdate: NoAction)
   coupons                                         coupons?                 @relation(fields: [coupon_id], references: [id], onUpdate: NoAction)
   addresses_orders_shipping_address_idToaddresses addresses?               @relation("orders_shipping_address_idToaddresses", fields: [shipping_address_id], references: [id], onUpdate: NoAction)
-  users                                           users?                   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  customers                                       customers?                 @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
   returns                                         returns[]
   shipments                                       shipments?
 
   @@index([created_at], map: "idx_orders_created_at")
   @@index([status], map: "idx_orders_status")
-  @@index([user_id], map: "idx_orders_user_id")
+  @@index([customer_id], map: "idx_orders_customer_id")
 }
 
 model product_images {
@@ -307,7 +317,7 @@ model returns {
   id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   order_id      String             @db.Uuid
   order_item_id String             @db.Uuid
-  user_id       String?            @db.Uuid
+  customer_id   String?            @db.Uuid
   quantity      Int
   reason        String?
   status        return_status_type @default(REQUESTED)
@@ -317,38 +327,38 @@ model returns {
   created_at    DateTime           @default(now()) @db.Timestamptz(6)
   orders        orders             @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   order_items   order_items        @relation(fields: [order_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users         users?             @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  customers     customers?         @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
 
   @@index([order_id], map: "idx_returns_order_id")
   @@index([status], map: "idx_returns_status")
-  @@index([user_id], map: "idx_returns_user_id")
+  @@index([customer_id], map: "idx_returns_customer_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model reviews {
-  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  product_id           String   @db.Uuid
-  user_id              String?  @db.Uuid
+  id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id           String     @db.Uuid
+  customer_id          String?    @db.Uuid
   rating               Int
-  title                String?  @db.VarChar(255)
+  title                String?    @db.VarChar(255)
   comment              String?
-  is_verified_purchase Boolean  @default(false)
-  is_approved          Boolean  @default(false)
-  created_at           DateTime @default(now()) @db.Timestamptz(6)
-  updated_at           DateTime @default(now()) @db.Timestamptz(6)
-  products             products @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users                users?   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  is_verified_purchase Boolean    @default(false)
+  is_approved          Boolean    @default(false)
+  created_at           DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime   @default(now()) @db.Timestamptz(6)
+  products             products   @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers            customers? @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
 
   @@index([is_approved], map: "idx_reviews_is_approved")
   @@index([product_id], map: "idx_reviews_product_id")
-  @@index([user_id], map: "idx_reviews_user_id")
+  @@index([customer_id], map: "idx_reviews_customer_id")
 }
 
 model roles {
-  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        user_role_type @unique
-  description String?
-  user_roles  user_roles[]
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             admin_role_type    @unique
+  description      String?
+  admin_user_roles admin_user_roles[]
 }
 
 model shipments {
@@ -367,49 +377,47 @@ model shipments {
   @@index([status], map: "idx_shipments_status")
 }
 
-model user_roles {
-  user_id String @db.Uuid
-  role_id String @db.Uuid
-  roles   roles  @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  users   users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model admin_user_roles {
+  admin_user_id String      @db.Uuid
+  role_id       String      @db.Uuid
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  admin_users   admin_users @relation(fields: [admin_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@id([user_id, role_id])
+  @@id([admin_user_id, role_id])
 }
 
-model users {
-  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email         String          @unique @db.Citext
-  password_hash String
-  name          String?         @db.VarChar(150)
-  phone         String?         @db.VarChar(30)
-  is_active     Boolean         @default(true)
-  created_at    DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime        @default(now()) @db.Timestamptz(6)
-  addresses     addresses[]
-  admin_users   admin_users?
-  audit_logs    audit_logs[]
-  carts         carts[]
-  coupon_usages coupon_usages[]
-  orders        orders[]
-  returns       returns[]
-  reviews       reviews[]
-  user_roles    user_roles[]
-  wishlists     wishlists?
+model customers {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String              @unique @db.Citext
+  password_hash     String
+  name              String?             @db.VarChar(150)
+  phone             String?             @db.VarChar(30)
+  is_active         Boolean             @default(true)
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
+  addresses         addresses[]
+  audit_logs        audit_logs[]
+  carts             carts[]
+  coupon_usages     coupon_usages[]
+  orders            orders[]
+  returns           returns[]
+  reviews           reviews[]
+  wishlists         wishlists?
   signup_email_otps signup_email_otps[]
 }
 
 // OTP verification for customer signup (email)
 model signup_email_otps {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id     String   @db.Uuid
-  email       String   @db.Citext
-  code_hash   String   @db.VarChar(255)
-  expires_at  DateTime @db.Timestamptz(6)
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id String    @db.Uuid
+  email       String    @db.Citext
+  code_hash   String    @db.VarChar(255)
+  expires_at  DateTime  @db.Timestamptz(6)
   used_at     DateTime? @db.Timestamptz(6)
-  attempts    Int      @default(0)
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  attempts    Int       @default(0)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
 
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([email])
   @@index([expires_at])
@@ -428,10 +436,10 @@ model wishlist_items {
 
 model wishlists {
   id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id        String           @unique @db.Uuid
+  customer_id    String           @unique @db.Uuid
   created_at     DateTime         @default(now()) @db.Timestamptz(6)
   wishlist_items wishlist_items[]
-  users          users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers      customers        @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 enum order_status_type {
@@ -470,10 +478,9 @@ enum shipment_status_type {
   RETURNED
 }
 
-enum user_role_type {
+enum admin_role_type {
   SUPER_ADMIN
   MANAGER
   STAFF
   SUPPORT
-  CUSTOMER
 }

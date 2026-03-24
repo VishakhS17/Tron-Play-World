@@ -8,6 +8,15 @@ import { rateLimit } from "@/lib/security/rateLimit";
 import { createOrderAccessToken } from "@/lib/security/orderAccess";
 import { validateCommonEmailProvider } from "@/lib/validateEmai";
 import bcrypt from "bcrypt";
+import {
+  cleanOptionalText,
+  cleanText,
+  hasSuspiciousInput,
+  normalizeEmail,
+  normalizePhone,
+  readJsonBody,
+  isUuid,
+} from "@/lib/validation/input";
 
 type CheckoutItem = {
   productId: string;
@@ -26,25 +35,26 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await getSession();
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
   const items = (Array.isArray(body.items) ? body.items : []) as CheckoutItem[];
-  const address = body.address as any;
+  const address = (body.address ?? {}) as Record<string, unknown>;
   const isGift = Boolean(body.isGift);
-  const giftMessage = typeof body.giftMessage === "string" ? body.giftMessage.slice(0, 500) : null;
-  const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
+  const giftMessage = cleanOptionalText(body.giftMessage, 500);
+  const couponCode = cleanText(body.couponCode, 80);
 
   if (items.length === 0) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
 
-  const full_name = String(address?.full_name ?? "").trim();
-  const phone = String(address?.phone ?? "").trim();
-  const email = String(address?.email ?? "").trim().toLowerCase();
-  const line1 = String(address?.line1 ?? "").trim();
-  const city = String(address?.city ?? "").trim();
-  const state = String(address?.state ?? "").trim();
-  const postal_code = String(address?.postal_code ?? "").trim();
-  const country = String(address?.country ?? "India").trim();
+  const full_name = cleanText(address.full_name, 150);
+  const phone = normalizePhone(address.phone);
+  const email = normalizeEmail(address.email);
+  const line1 = cleanText(address.line1, 255);
+  const city = cleanText(address.city, 120);
+  const state = cleanText(address.state, 120);
+  const postal_code = cleanText(address.postal_code, 20);
+  const country = cleanText(address.country ?? "India", 80);
 
   if (!full_name || !phone || !email || !line1 || !city || !state || !postal_code || !country) {
     return NextResponse.json({ error: "Address is incomplete" }, { status: 400 });
@@ -55,6 +65,13 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  if (
+    [full_name, phone, email, line1, city, state, postal_code, country, couponCode]
+      .filter(Boolean)
+      .some((v) => hasSuspiciousInput(v))
+  ) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
 
   const productIds = items.map((i) => i.productId);
   const dbProducts = await prisma.products.findMany({
@@ -64,6 +81,9 @@ export async function POST(req: NextRequest) {
   const productMap = new Map(dbProducts.map((p) => [p.id, p]));
 
   for (const item of items) {
+    if (!isUuid(String(item.productId ?? ""))) {
+      return NextResponse.json({ error: "One or more items are invalid" }, { status: 400 });
+    }
     if (!productMap.has(item.productId)) {
       return NextResponse.json({ error: "One or more items are invalid" }, { status: 400 });
     }
@@ -75,7 +95,7 @@ export async function POST(req: NextRequest) {
   let checkoutUserId = session?.sub ?? null;
   let checkoutEmail = session?.email ?? email;
   if (!checkoutUserId) {
-    const existingUser = await prisma.users.findUnique({
+    const existingUser = await prisma.customers.findUnique({
       where: { email },
       select: { id: true, email: true },
     });
@@ -87,29 +107,15 @@ export async function POST(req: NextRequest) {
         `${email}:${Date.now()}:${Math.random()}`,
         12
       );
-      const createdUser = await prisma.$transaction(async (tx) => {
-        const user = await tx.users.create({
-          data: {
-            email,
-            password_hash: randomPasswordHash,
-            name: full_name || null,
-            phone: phone || null,
-            is_active: true,
-          },
-          select: { id: true, email: true },
-        });
-        const customerRole = await tx.roles.upsert({
-          where: { name: "CUSTOMER" },
-          update: {},
-          create: { name: "CUSTOMER", description: "Customer" },
-          select: { id: true },
-        });
-        await tx.user_roles.upsert({
-          where: { user_id_role_id: { user_id: user.id, role_id: customerRole.id } },
-          update: {},
-          create: { user_id: user.id, role_id: customerRole.id },
-        });
-        return user;
+      const createdUser = await prisma.customers.create({
+        data: {
+          email,
+          password_hash: randomPasswordHash,
+          name: full_name || null,
+          phone: phone || null,
+          is_active: true,
+        },
+        select: { id: true, email: true },
       });
       checkoutUserId = createdUser.id;
       checkoutEmail = createdUser.email;
@@ -166,7 +172,7 @@ export async function POST(req: NextRequest) {
     }
     if (coupon.max_uses_per_user && session?.sub) {
       const usedByUser = await prisma.coupon_usages.count({
-        where: { coupon_id: coupon.id, user_id: session.sub },
+        where: { coupon_id: coupon.id, customer_id: session.sub },
       });
       if (usedByUser >= coupon.max_uses_per_user) {
         return NextResponse.json(
@@ -188,7 +194,7 @@ export async function POST(req: NextRequest) {
   const order = await prisma.$transaction(async (tx) => {
     const addr = await tx.addresses.create({
       data: {
-        user_id: checkoutUserId,
+        customer_id: checkoutUserId,
         full_name,
         phone,
         line1,
@@ -205,7 +211,7 @@ export async function POST(req: NextRequest) {
 
     const createdOrder = await tx.orders.create({
       data: {
-        user_id: checkoutUserId,
+        customer_id: checkoutUserId,
         status: "PENDING",
         payment_status: "PENDING",
         subtotal_amount: subtotal,
@@ -270,7 +276,7 @@ export async function POST(req: NextRequest) {
   });
 
   await writeAuditLog({
-    userId: session?.sub ?? null,
+    customerId: session?.sub ?? null,
     entityType: "ORDER",
     entityId: order.id,
     action: "ORDER_CREATED_PENDING",

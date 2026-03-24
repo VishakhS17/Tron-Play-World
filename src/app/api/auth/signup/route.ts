@@ -9,6 +9,7 @@ import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { sendEmail } from "@/lib/email";
 import { getAuthSecret } from "@/lib/auth/session";
 import { validateCommonEmailProvider } from "@/lib/validateEmai";
+import { cleanText, normalizeEmail, normalizePhone, readJsonBody, hasSuspiciousInput } from "@/lib/validation/input";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const OTP_TTL_SECONDS = 60 * 10; // 10 minutes
@@ -37,12 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const name = cleanText(body.name, 150);
+  const email = normalizeEmail(body.email);
+  const phone = normalizePhone(body.phone);
   const password = typeof body.password === "string" ? body.password : "";
 
   if (!email || !password) {
@@ -57,11 +59,14 @@ export async function POST(req: NextRequest) {
   if (phone && !/^\+?[0-9]{7,15}$/.test(phone.replace(/\s+/g, ""))) {
     return NextResponse.json({ error: "Please enter a valid mobile number" }, { status: 400 });
   }
+  if (hasSuspiciousInput(name) || hasSuspiciousInput(email) || (phone && hasSuspiciousInput(phone))) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
   }
 
-  const existing = await prisma.users.findFirst({
+  const existing = await prisma.customers.findFirst({
     where: {
       OR: [{ email }, ...(phone ? [{ phone }] : [])],
     },
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.signup_email_otps.create({
       data: {
-        user_id: existing.id,
+        customer_id: existing.id,
         email,
         code_hash: otpCodeHash,
         expires_at: otpExpiresAt,
@@ -122,7 +127,7 @@ export async function POST(req: NextRequest) {
 
   // Create user and default role assignment in a transaction.
   const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.users.create({
+    const created = await tx.customers.create({
       data: {
         email,
         password_hash: passwordHash,
@@ -133,20 +138,9 @@ export async function POST(req: NextRequest) {
       select: { id: true, email: true },
     });
 
-    const customerRole = await tx.roles.upsert({
-      where: { name: "CUSTOMER" },
-      update: {},
-      create: { name: "CUSTOMER", description: "Customer" },
-      select: { id: true, name: true },
-    });
-
-    await tx.user_roles.create({
-      data: { user_id: created.id, role_id: customerRole.id },
-    });
-
     await tx.signup_email_otps.create({
       data: {
-        user_id: created.id,
+        customer_id: created.id,
         email,
         code_hash: otpCodeHash,
         expires_at: otpExpiresAt,

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { cleanText, readJsonBody } from "@/lib/validation/input";
 
 function parseCsv(csv: string) {
   const lines = csv
@@ -33,10 +34,12 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdminWrite();
   if (!auth.ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = await req.json().catch(() => null);
-  if (!body?.csv) return NextResponse.json({ error: "csv is required" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  if (!body.csv) return NextResponse.json({ error: "csv is required" }, { status: 400 });
 
-  const rows = parseCsv(String(body.csv));
+  const rows = parseCsv(cleanText(body.csv, 2_000_000));
   let count = 0;
 
   for (const r of rows) {

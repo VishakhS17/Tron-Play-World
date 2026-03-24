@@ -16,8 +16,8 @@ export default async function AdminOrdersPage() {
       payment_status: true,
       total_amount: true,
       created_at: true,
-      user_id: true,
-      users: { select: { email: true } },
+      customer_id: true,
+      customers: { select: { email: true } },
     },
   });
 
@@ -47,7 +47,7 @@ export default async function AdminOrdersPage() {
                   </div>
                 </td>
                 <td className="py-3 px-4 text-dark">
-                  {o.users?.email ?? o.user_id ?? "Guest"}
+                  {o.customers?.email ?? o.customer_id ?? "Guest"}
                 </td>
                 <td className="py-3 px-4 text-dark">{String(o.status)}</td>
                 <td className="py-3 px-4 text-dark">{String(o.payment_status)}</td>

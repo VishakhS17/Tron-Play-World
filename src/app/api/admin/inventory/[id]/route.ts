@@ -3,12 +3,14 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { isUuid, readJsonBody } from "@/lib/validation/input";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminWrite();
   if (!auth.ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const row = await prisma.inventory.findUnique({
     where: { id },
     select: {
@@ -45,8 +47,10 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!auth.ok) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await ctx.params;
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
   const available = Number(body.available_quantity);
   const threshold = Number(body.low_stock_threshold);

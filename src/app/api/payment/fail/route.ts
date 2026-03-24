@@ -6,6 +6,7 @@ import { sendEmail, orderEmailTemplate } from "@/lib/email";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
+import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,22 +20,25 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await getSession();
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  const orderId = String(body.orderId ?? "");
-  const accessToken = typeof body.accessToken === "string" ? body.accessToken : "";
-  if (!orderId) return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  const orderId = cleanText(body.orderId, 64);
+  const accessToken = cleanText(body.accessToken, 512);
+  if (!orderId || !isUuid(orderId)) {
+    return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
       const order = await tx.orders.findUnique({
         where: { id: orderId },
-        select: { id: true, user_id: true, payment_status: true },
+        select: { id: true, customer_id: true, payment_status: true },
       });
       if (!order) throw new Error("NOT_FOUND");
-      const isOwner = Boolean(session?.sub && order.user_id && order.user_id === session.sub);
+      const isOwner = Boolean(session?.sub && order.customer_id && order.customer_id === session.sub);
       const hasGuestAccess =
-        !order.user_id && accessToken && verifyOrderAccessToken(accessToken, orderId);
+        !order.customer_id && accessToken && verifyOrderAccessToken(accessToken, orderId);
       if (!isOwner && !hasGuestAccess) throw new Error("FORBIDDEN");
       if (order.payment_status === "FAILED") return;
 
@@ -77,7 +81,7 @@ export async function POST(req: NextRequest) {
   }
 
   await writeAuditLog({
-    userId: session?.sub ?? null,
+    customerId: session?.sub ?? null,
     entityType: "ORDER",
     entityId: orderId,
     action: "PAYMENT_FAILED",

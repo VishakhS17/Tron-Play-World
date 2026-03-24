@@ -25,13 +25,13 @@ export default async function AccountPage() {
     );
   }
 
-  const user = await prisma.users.findUnique({
+  const user = await prisma.customers.findUnique({
     where: { id: session.sub },
     select: { email: true, name: true, phone: true },
   });
 
   const addresses = await prisma.addresses.findMany({
-    where: { user_id: session.sub },
+    where: { customer_id: session.sub },
     orderBy: { created_at: "desc" },
     take: 10,
   });

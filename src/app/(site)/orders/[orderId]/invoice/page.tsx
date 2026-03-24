@@ -22,7 +22,7 @@ export default async function InvoicePage({ params, searchParams }: Props) {
     where: { id: orderId },
     select: {
       id: true,
-      user_id: true,
+      customer_id: true,
       created_at: true,
       subtotal_amount: true,
       discount_amount: true,
@@ -39,8 +39,8 @@ export default async function InvoicePage({ params, searchParams }: Props) {
     },
   });
   if (!order) notFound();
-  const isOwner = Boolean(session?.sub && order.user_id && order.user_id === session.sub);
-  const hasGuestAccess = Boolean(!order.user_id && access && verifyOrderAccessToken(access, order.id));
+  const isOwner = Boolean(session?.sub && order.customer_id && order.customer_id === session.sub);
+  const hasGuestAccess = Boolean(!order.customer_id && access && verifyOrderAccessToken(access, order.id));
   if (!isOwner && !hasGuestAccess) notFound();
 
   return (

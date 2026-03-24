@@ -1,9 +1,9 @@
-import { getSession } from "@/lib/auth/session";
+import { getAdminSession } from "@/lib/auth/session";
 
 export type AdminRole = "SUPER_ADMIN" | "MANAGER" | "STAFF" | "SUPPORT";
 
 export async function requireAdmin() {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session) return { ok: false as const, session: null };
   const roles = session.roles ?? [];
   const isAdmin = roles.some((r) =>

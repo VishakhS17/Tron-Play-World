@@ -6,6 +6,7 @@ import { getAuthSecret, setSessionCookie } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { validateCommonEmailProvider, validateEmail } from "@/lib/validateEmai";
+import { cleanText, normalizePhone, readJsonBody, hasSuspiciousInput } from "@/lib/validation/input";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
@@ -20,14 +21,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
   const identifier =
     typeof body.identifier === "string"
-      ? body.identifier.trim()
+      ? cleanText(body.identifier, 320)
       : typeof body.email === "string"
-      ? body.email.trim()
+      ? cleanText(body.email, 320)
       : "";
   const password = typeof body.password === "string" ? body.password : "";
 
@@ -36,7 +38,10 @@ export async function POST(req: NextRequest) {
   }
   const normalizedIdentifier = identifier.toLowerCase();
   const looksLikeEmail = validateEmail(normalizedIdentifier);
-  const normalizedPhone = identifier.replace(/\s+/g, "");
+  const normalizedPhone = normalizePhone(identifier);
+  if (hasSuspiciousInput(identifier)) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
   if (identifier.includes("@") && !looksLikeEmail) {
     return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
   }
@@ -47,7 +52,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const user = await prisma.users.findFirst({
+  const user = await prisma.customers.findFirst({
     where: looksLikeEmail
       ? { email: normalizedIdentifier }
       : { phone: normalizedPhone },
@@ -57,7 +62,6 @@ export async function POST(req: NextRequest) {
       phone: true,
       password_hash: true,
       is_active: true,
-      user_roles: { select: { roles: { select: { name: true } } } },
     },
   });
 
@@ -84,9 +88,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const roles = user.user_roles.map((ur) => ur.roles.name);
   const token = signJwt(
-    { sub: user.id, email: user.email, roles },
+    { sub: user.id, email: user.email, roles: [] },
     getAuthSecret(),
     SESSION_TTL_SECONDS
   );

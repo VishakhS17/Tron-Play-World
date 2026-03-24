@@ -29,7 +29,7 @@ export default async function OrdersPage() {
   }
 
   const orders = await prisma.orders.findMany({
-    where: { user_id: session.sub },
+    where: { customer_id: session.sub },
     orderBy: { created_at: "desc" },
     select: {
       id: true,

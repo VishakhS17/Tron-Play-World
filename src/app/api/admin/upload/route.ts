@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
-import { getSession } from "@/lib/auth/session";
+import { getAdminSession } from "@/lib/auth/session";
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -16,7 +16,7 @@ function isAllowed(roles: string[]) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

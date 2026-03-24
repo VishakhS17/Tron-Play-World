@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
-import { getSession } from "@/lib/auth/session";
+import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
+import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
@@ -19,30 +20,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
 
-  const name = String(body.name ?? "").trim();
-  const slug = String(body.slug ?? "").trim();
+  const name = cleanText(body.name, 255);
+  const slug = cleanText(body.slug, 255);
   const base_price = Number(body.base_price);
   const discounted_price = body.discounted_price ? Number(body.discounted_price) : null;
-  const sku = body.sku ? String(body.sku).trim() : null;
-  const description = body.description ? String(body.description) : null;
-  const short_description = body.short_description ? String(body.short_description) : null;
+  const sku = cleanOptionalText(body.sku, 100);
+  const description = cleanOptionalText(body.description, 10000);
+  const short_description = cleanOptionalText(body.short_description, 2000);
   const is_active = Boolean(body.is_active);
-  const age_group = body.age_group ? String(body.age_group).trim() : null;
-  const category_id = body.category_id ? String(body.category_id) : null;
-  const brand_id = body.brand_id ? String(body.brand_id) : null;
+  const age_group = cleanOptionalText(body.age_group, 50);
+  const category_id = cleanOptionalText(body.category_id, 64);
+  const brand_id = cleanOptionalText(body.brand_id, 64);
   const available_quantity = body.available_quantity !== undefined ? Math.max(0, Number(body.available_quantity)) : 0;
   const low_stock_threshold = body.low_stock_threshold !== undefined ? Math.max(0, Number(body.low_stock_threshold)) : 5;
 
   if (!name || !slug || !Number.isFinite(base_price)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+  if ([name, slug, sku ?? "", age_group ?? ""].some((v) => hasSuspiciousInput(v))) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+  if ((category_id && !isUuid(category_id)) || (brand_id && !isUuid(brand_id))) {
+    return NextResponse.json({ error: "Invalid relations" }, { status: 400 });
   }
 
   const created = await prisma.products.create({

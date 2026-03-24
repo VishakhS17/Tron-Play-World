@@ -18,7 +18,8 @@ function base64UrlDecode(input: string) {
 }
 
 export type JwtPayload = {
-  sub: string; // user id
+  /** customers.id for storefront JWT; admin_users.id for admin JWT */
+  sub: string;
   email: string;
   roles: string[];
   iat: number;

@@ -6,6 +6,7 @@ import { getAuthSecret, setSessionCookie } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { sendEmail } from "@/lib/email";
+import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
@@ -20,25 +21,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => null);
-  const userId = typeof body?.userId === "string" ? body.userId : "";
-  const otp = typeof body?.otp === "string" ? body.otp : "";
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsed.body;
+  const userId = cleanText(body.userId, 64);
+  const otp = cleanText(body.otp, 10);
 
   if (!userId || !otp) {
     return NextResponse.json({ error: "userId and otp are required" }, { status: 400 });
   }
+  if (!isUuid(userId) || !/^\d{6}$/.test(otp)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
   const otpRecord = await prisma.signup_email_otps.findFirst({
-    where: { user_id: userId, used_at: null },
+    where: { customer_id: userId, used_at: null },
     orderBy: { created_at: "desc" },
     select: {
       id: true,
-      user_id: true,
+      customer_id: true,
       email: true,
       code_hash: true,
       expires_at: true,
       attempts: true,
-      user: {
+      customers: {
         select: { id: true, email: true, name: true, is_active: true },
       },
     },
@@ -47,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (!otpRecord) {
     return NextResponse.json({ error: "OTP not found" }, { status: 400 });
   }
-  if (otpRecord.user?.is_active) {
+  if (otpRecord.customers?.is_active) {
     return NextResponse.json({ error: "Account already verified" }, { status: 400 });
   }
 
@@ -71,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   // Activate user and mark OTP as used
   await prisma.$transaction(async (tx) => {
-    await tx.users.update({
+    await tx.customers.update({
       where: { id: userId },
       data: { is_active: true },
     });
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
     });
   });
 
-  const user = await prisma.users.findUnique({
+  const user = await prisma.customers.findUnique({
     where: { id: userId },
     select: { id: true, email: true, name: true, is_active: true },
   });
@@ -89,14 +95,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "User not found" }, { status: 400 });
   }
 
-  const roles = await prisma.user_roles.findMany({
-    where: { user_id: userId },
-    select: { roles: { select: { name: true } } },
-  });
-  const roleNames = roles.map((r) => r.roles.name) as string[];
-
   const token = signJwt(
-    { sub: user.id, email: user.email, roles: roleNames },
+    { sub: user.id, email: user.email, roles: [] },
     getAuthSecret(),
     SESSION_TTL_SECONDS
   );
