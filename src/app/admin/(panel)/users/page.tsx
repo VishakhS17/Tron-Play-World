@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import PasswordInput from "@/components/Auth/PasswordInput";
 
 const ROLES = ["SUPER_ADMIN", "MANAGER", "STAFF", "SUPPORT"] as const;
 type AdminRole = (typeof ROLES)[number];
@@ -118,13 +119,13 @@ export default function AdminUsersPage() {
 
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-dark">Password <span className="text-red-500">*</span></span>
-            <input
+            <PasswordInput
               required
-              type="password"
               value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              onChange={(password) => setForm((f) => ({ ...f, password }))}
               placeholder="Min 8 characters"
-              className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+              minLength={8}
+              autoComplete="new-password"
             />
           </label>
 

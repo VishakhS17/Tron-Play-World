@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { validateCommonEmailProvider, validateEmail } from "@/lib/validateEmai";
+import { validateCommonEmailProvider } from "@/lib/validateEmai";
+import PasswordInput from "@/components/Auth/PasswordInput";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -12,8 +13,6 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
 
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
@@ -27,7 +26,12 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "signup" && !validateCommonEmailProvider(email.trim().toLowerCase())) {
+      const trimmedId = identifier.trim();
+      if (
+        mode === "signup" &&
+        trimmedId.includes("@") &&
+        !validateCommonEmailProvider(trimmedId.toLowerCase())
+      ) {
         throw new Error("Use a common email provider (Gmail, Yahoo, Outlook, etc.)");
       }
       const loginOrSignupRoute = mode === "signup" ? "signup" : "login";
@@ -35,20 +39,14 @@ export default function LoginPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          mode === "signup"
-            ? { name, email, phone, password }
-            : { identifier, password }
+          mode === "signup" ? { name, identifier: trimmedId, password } : { identifier: trimmedId, password }
         ),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (mode === "login" && data?.redirectToSignup) {
           const suggested = typeof data?.suggestedIdentifier === "string" ? data.suggestedIdentifier : identifier;
-          if (validateEmail(suggested.toLowerCase())) {
-            setEmail(suggested);
-          } else {
-            setPhone(suggested);
-          }
+          setIdentifier(suggested);
           setMode("signup");
           throw new Error("Account not found. Please complete sign up.");
         }
@@ -67,6 +65,7 @@ export default function LoginPage() {
           return;
         }
         toast.success("Account created!");
+        window.dispatchEvent(new Event("tpw-auth-changed"));
       } else {
         toast.success("Welcome back!");
         window.dispatchEvent(new Event("tpw-auth-changed"));
@@ -161,13 +160,13 @@ export default function LoginPage() {
   }
 
   async function handleResendOtp() {
-    if (!pendingUserId && !email) return;
+    if (!pendingUserId) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/resend-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userId: pendingUserId, email }),
+        body: JSON.stringify({ userId: pendingUserId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -236,64 +235,51 @@ export default function LoginPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                {mode === "signup" && (
-                  <>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-dark">
-                        Name
-                      </span>
-                      <input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                        autoComplete="name"
-                        required
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-dark">
-                        Mobile number
-                      </span>
-                      <input
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                        autoComplete="tel"
-                        required
-                      />
-                    </label>
-                  </>
-                )}
+                {mode === "signup" ? (
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-dark">
+                      Name
+                    </span>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+                      autoComplete="name"
+                      required
+                    />
+                  </label>
+                ) : null}
 
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-dark">
-                    {mode === "signup" ? "Email" : "Email or phone"}
+                    Email or mobile number
                   </span>
                   <input
-                    value={mode === "signup" ? email : identifier}
-                    onChange={(e) =>
-                      mode === "signup"
-                        ? setEmail(e.target.value)
-                        : setIdentifier(e.target.value)
-                    }
-                    type={mode === "signup" ? "email" : "text"}
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    type="text"
+                    inputMode="email"
                     required
                     className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                    autoComplete={mode === "signup" ? "email" : "username"}
+                    autoComplete="username"
+                    placeholder={mode === "signup" ? "you@gmail.com or +91…" : undefined}
                   />
+                  {mode === "signup" ? (
+                    <span className="mt-1 block text-xs text-meta-4">
+                      Use email for OTP verification; mobile creates your account right away.
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-dark">
                     Password
                   </span>
-                  <input
+                  <PasswordInput
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    type="password"
+                    onChange={setPassword}
                     required
                     minLength={8}
-                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
                     autoComplete={
                       mode === "signup" ? "new-password" : "current-password"
                     }
@@ -346,13 +332,12 @@ export default function LoginPage() {
               </label>
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-dark">New password</span>
-                <input
+                <PasswordInput
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  type="password"
+                  onChange={setNewPassword}
                   minLength={8}
                   required
-                  className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+                  autoComplete="new-password"
                 />
               </label>
               <button

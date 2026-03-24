@@ -26,7 +26,8 @@ type IProps = {
 type MeResponse = {
   user: {
     id: string;
-    email: string;
+    email: string | null;
+    phone?: string | null;
     name?: string | null;
     roles: string[];
   } | null;
@@ -90,8 +91,9 @@ const MainHeader = ({ headerData }: IProps) => {
     const res = await fetch("/api/auth/me", { cache: "no-store", signal });
     const data = (await res.json().catch(() => null)) as MeResponse | null;
     const rawName = data?.user?.name?.trim();
-    const fallback = data?.user?.email?.split("@")[0] ?? null;
-    setUserName(rawName || fallback);
+    const fromEmail = data?.user?.email?.split("@")[0]?.trim();
+    const fromPhone = data?.user?.phone?.trim();
+    setUserName(rawName || fromEmail || fromPhone || null);
   }
 
   // Read current customer session for greeting text.

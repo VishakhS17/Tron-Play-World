@@ -111,7 +111,8 @@ function AdminLoginForm() {
                 onClick={() => setShowPassword((v) => !v)}
                 style={{ color: "#94a3b8" }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-80"
-                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
               >
                 {showPassword ? (
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

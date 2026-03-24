@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
+import { isSyntheticPhoneSignupEmail } from "@/lib/auth/signupIdentifier";
 import LogoutButton from "@/components/Auth/LogoutButton";
 import ChangePasswordCard from "@/components/Auth/ChangePasswordCard";
 
@@ -36,6 +37,9 @@ export default async function AccountPage() {
     take: 10,
   });
 
+  const displayEmail =
+    user?.email && !isSyntheticPhoneSignupEmail(user.email) ? user.email : null;
+
   return (
     <section className="pt-36 pb-16">
       <div className="w-full px-4 mx-auto max-w-5xl sm:px-8 xl:px-0">
@@ -60,7 +64,7 @@ export default async function AccountPage() {
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-meta-3">Email</dt>
-                  <dd className="font-medium text-dark">{user?.email ?? session.email}</dd>
+                  <dd className="font-medium text-dark">{displayEmail ?? "—"}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-meta-3">Phone</dt>

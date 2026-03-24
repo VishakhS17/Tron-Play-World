@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
+import PasswordInput from "./PasswordInput";
 
 type Props = {
   userId: string;
@@ -81,14 +82,13 @@ export default function ChangePasswordCard({ userId }: Props) {
           required
           className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
         />
-        <input
+        <PasswordInput
           value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
+          onChange={setNewPassword}
           placeholder="New password"
-          type="password"
           minLength={8}
           required
-          className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          autoComplete="new-password"
         />
         <button
           type="submit"
