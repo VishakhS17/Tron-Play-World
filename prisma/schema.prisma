@@ -390,6 +390,7 @@ model customers {
   id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email             String              @unique @db.Citext
   password_hash     String
+  google_sub        String?             @unique @db.VarChar(255)
   name              String?             @db.VarChar(150)
   phone             String?             @db.VarChar(30)
   is_active         Boolean             @default(true)

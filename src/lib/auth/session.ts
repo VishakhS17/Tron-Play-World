@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { verifyJwt, type JwtPayload } from "./jwt";
 
 /** Customer / storefront session */
@@ -26,16 +27,32 @@ export async function getAdminSession(): Promise<JwtPayload | null> {
   return verifyJwt(token, getAuthSecret());
 }
 
+const sessionCookieOptions = (maxAgeSeconds: number) => ({
+  name: AUTH_COOKIE_NAME,
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: maxAgeSeconds,
+});
+
 export async function setSessionCookie(token: string, maxAgeSeconds: number) {
   const cookieStore = await cookies();
   cookieStore.set({
-    name: AUTH_COOKIE_NAME,
+    ...sessionCookieOptions(maxAgeSeconds),
     value: token,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: maxAgeSeconds,
+  });
+}
+
+/** Use when the response is a redirect so the session cookie is on the same response. */
+export function setSessionCookieOnResponse(
+  response: NextResponse,
+  token: string,
+  maxAgeSeconds: number
+) {
+  response.cookies.set({
+    ...sessionCookieOptions(maxAgeSeconds),
+    value: token,
   });
 }
 
