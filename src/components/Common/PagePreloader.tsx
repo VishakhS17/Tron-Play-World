@@ -8,7 +8,7 @@ const INITIAL_MS = 480;
 const NAV_MS = 360;
 
 /** Default logo path matches MainHeader / MobileMenu fallback */
-const DEFAULT_LOGO = "/images/logo/ChatGPT Image Mar 3, 2026, 09_30_51 PM.png";
+const DEFAULT_LOGO = "/images/logo/site-logo.png";
 
 /**
  * Solid white screen with logo and red progress bar on route load / navigation.

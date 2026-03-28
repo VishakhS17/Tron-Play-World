@@ -189,7 +189,7 @@ const MainHeader = ({ headerData }: IProps) => {
                 <Image
                   src={
                     headerData?.headerLogo ||
-                    "/images/logo/ChatGPT Image Mar 3, 2026, 09_30_51 PM.png"
+                    "/images/logo/site-logo.png"
                   }
                   alt="Site logo"
                   width={160}
