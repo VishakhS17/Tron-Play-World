@@ -8,13 +8,13 @@ const quickLinks = [
   },
   {
     id: 2,
-    label: "Refund Policy",
+    label: "Terms & Conditions",
     href: "/terms-conditions",
   },
   {
     id: 3,
-    label: "Terms of Use",
-    href: "/terms-condition",
+    label: "Return & Cancellation",
+    href: "/return-cancellation",
   },
   {
     id: 4,

@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import { getSeoSettings } from "@/get-api-data/seo-setting";
 import { GoogleTagManager } from '@next/third-parties/google';
 import { DM_Sans } from 'next/font/google'
+import PagePreloader from "@/components/Common/PagePreloader";
 
 const dm_sans = DM_Sans({
   weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
@@ -39,6 +40,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body suppressHydrationWarning={true} className={dm_sans.variable}>
+        <PagePreloader />
         {children}
         {seoSettings?.gtmId && <GoogleTagManager gtmId={seoSettings.gtmId} />}
       </body>

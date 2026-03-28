@@ -22,17 +22,21 @@ export const menuData: MenuItem[] = [
         path: "/wishlist",
       },
       {
-        title:"Privacy Policy",
-        path:"/privacy-policy"
+        title: "Privacy Policy",
+        path: "/privacy-policy",
       },
       {
-        title:"Terms & Conditions",
-        path:"/terms-conditions"
+        title: "Terms & Conditions",
+        path: "/terms-conditions",
+      },
+      {
+        title: "Return & Cancellation",
+        path: "/return-cancellation",
       },
       {
         title: "FAQ",
         path: "/faq",
-      }
+      },
     ],
   },
   {

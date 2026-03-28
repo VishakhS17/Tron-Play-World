@@ -565,3 +565,18 @@ input[type="search"]::-webkit-search-results-decoration {
   font-size: 16px;
   line-height: 1.5;
 }
+
+@keyframes tpw-preloader-progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.tpw-preloader-bar-fill {
+  animation-name: tpw-preloader-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
