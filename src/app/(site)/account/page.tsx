@@ -6,7 +6,7 @@ import LogoutButton from "@/components/Auth/LogoutButton";
 import ChangePasswordCard from "@/components/Auth/ChangePasswordCard";
 
 export const metadata = {
-  title: "Account | Play World",
+  title: "Account | i-Robox",
 };
 
 export default async function AccountPage() {

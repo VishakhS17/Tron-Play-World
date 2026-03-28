@@ -32,9 +32,64 @@ export function isUuid(value: string) {
   );
 }
 
+/**
+ * Heuristic filter for obvious SQL / script-injection probes.
+ * Prisma still parameterizes all queries — this is defense in depth.
+ * Do not use on password fields (users may legitimately use characters that look like SQL).
+ */
 export function hasSuspiciousInput(value: string) {
-  // Lightweight payload check to reject obvious injection probes.
-  return /(--|;\s*drop\s+table|\bunion\s+select\b|\bor\s+1=1\b)/i.test(value);
+  if (!value) return false;
+  const v = value.toLowerCase();
+  // Intentionally omit bare `--` — it false-positives on ranges/SKUs (e.g. "1--10").
+  const patterns: RegExp[] = [
+    /;\s*(select|insert|update|delete|drop|alter|create|truncate|merge|exec|execute|grant|revoke)\b/,
+    /\bunion\s+all\s+select\b|\bunion\s+select\b/,
+    /\bor\s+1\s*=\s*1\b|\bor\s+'1'\s*=\s*'1'/,
+    /;\s*drop\s+table\b/,
+    /\/\*/, // block comment start
+    /@@\w+/, // e.g. @@version
+    /\binto\s+outfile\b|\bload_file\s*\(/,
+    /\bpg_sleep\s*\(|\bsleep\s*\(|\bbenchmark\s*\(/,
+    /\bwaitfor\s+delay\b/,
+    /\bxp_\w+/, // extended procs (SQL Server style)
+    /\bchar\s*\(\s*\d+/, // CHAR(…) concat chains
+    /\binformation_schema\b/,
+  ];
+  return patterns.some((re) => re.test(v));
+}
+
+/** URL slug: lowercase letters, digits, hyphens (e.g. category / brand filters). */
+export function isUrlSlug(value: string) {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}
+
+/** Short controlled labels like age_group in DB. */
+export function isSafeShortLabel(value: string, maxLen = 40) {
+  const s = cleanText(value, maxLen);
+  return s.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9\s._+\-]*$/.test(s);
+}
+
+const ORDER_STATUS_WHITELIST = new Set([
+  "PENDING",
+  "PAYMENT_FAILED",
+  "CONFIRMED",
+  "CANCELLED",
+  "SHIPPED",
+  "DELIVERED",
+  "RETURN_REQUESTED",
+  "RETURN_APPROVED",
+  "RETURN_REJECTED",
+  "REFUNDED",
+]);
+
+export function isAllowedOrderStatus(value: string) {
+  return ORDER_STATUS_WHITELIST.has(value);
+}
+
+const COUPON_DISCOUNT_WHITELIST = new Set(["PERCENTAGE", "FIXED"]);
+
+export function isAllowedCouponDiscountType(value: string) {
+  return COUPON_DISCOUNT_WHITELIST.has(value);
 }
 
 export async function readJsonBody(req: NextRequest) {

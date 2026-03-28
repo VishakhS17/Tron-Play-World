@@ -14,8 +14,8 @@ export default function TermsConditionsPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-6">Terms &amp; Conditions</h1>
 
         <p className="text-base leading-7 text-meta-3 mb-6">
-          Please read these terms carefully. By accessing our website or placing an order with <strong>i-Robox</strong>{" "}
-          (Robox / Tron Play World), you agree to be bound by these Terms &amp; Conditions and any policies referenced
+          Please read these terms carefully. By accessing our website or placing an order with{" "}
+          <strong>i-Robox</strong>, you agree to be bound by these Terms &amp; Conditions and any policies referenced
           here (including our Privacy Policy and Return &amp; Cancellation policy). If you do not agree, please do not
           use the site.
         </p>

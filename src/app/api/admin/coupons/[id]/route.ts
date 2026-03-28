@@ -3,7 +3,14 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
-import { cleanText, isUuid, normalizeCode, readJsonBody } from "@/lib/validation/input";
+import {
+  cleanText,
+  hasSuspiciousInput,
+  isAllowedCouponDiscountType,
+  isUuid,
+  normalizeCode,
+  readJsonBody,
+} from "@/lib/validation/input";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminWrite();
@@ -48,11 +55,34 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const body = parsed.body;
 
+  let code: string | undefined;
+  if (body.code !== undefined) {
+    if (typeof body.code !== "string") {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+    code = normalizeCode(body.code);
+    if (!code || hasSuspiciousInput(code)) {
+      return NextResponse.json({ error: "Invalid coupon code" }, { status: 400 });
+    }
+  }
+
+  let discount_type: string | undefined;
+  if (body.discount_type !== undefined) {
+    if (typeof body.discount_type !== "string") {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+    const dt = cleanText(body.discount_type, 30);
+    if (!isAllowedCouponDiscountType(dt)) {
+      return NextResponse.json({ error: "Invalid discount type" }, { status: 400 });
+    }
+    discount_type = dt;
+  }
+
   const updated = await prisma.coupons.update({
     where: { id },
     data: {
-      code: typeof body.code === "string" ? normalizeCode(body.code) : undefined,
-      discount_type: typeof body.discount_type === "string" ? cleanText(body.discount_type, 30) : undefined,
+      code,
+      discount_type,
       discount_value: body.discount_value !== undefined ? Number(body.discount_value) : undefined,
       min_cart_value: body.min_cart_value !== undefined && body.min_cart_value !== ""
         ? Number(body.min_cart_value)

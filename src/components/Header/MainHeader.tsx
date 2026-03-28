@@ -112,11 +112,11 @@ const MainHeader = ({ headerData }: IProps) => {
     const handleAuthChange = () => {
       void run();
     };
-    window.addEventListener("tpw-auth-changed", handleAuthChange);
+    window.addEventListener("irobox-auth-changed", handleAuthChange);
 
     return () => {
       controller.abort();
-      window.removeEventListener("tpw-auth-changed", handleAuthChange);
+      window.removeEventListener("irobox-auth-changed", handleAuthChange);
     };
   }, [pathname]);
 
@@ -130,7 +130,7 @@ const MainHeader = ({ headerData }: IProps) => {
       if (!res.ok) throw new Error(data?.error || "Failed to log out");
       setUserName(null);
       setAccountOpen(false);
-      window.dispatchEvent(new Event("tpw-auth-changed"));
+      window.dispatchEvent(new Event("irobox-auth-changed"));
       toast.success("Signed out");
     } catch (err: any) {
       toast.error(err?.message || "Could not log out");

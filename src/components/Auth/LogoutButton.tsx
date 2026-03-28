@@ -18,7 +18,7 @@ export default function LogoutButton() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to log out");
 
-      window.dispatchEvent(new Event("tpw-auth-changed"));
+      window.dispatchEvent(new Event("irobox-auth-changed"));
       toast.success("Signed out");
       router.push("/login");
       router.refresh();

@@ -8,14 +8,14 @@ export const getSeoSettings = unstable_cache(
       // Step 3 DB schema does not include persisted SEO settings yet.
       // We return a minimal shape consumed by `src/app/layout.tsx`.
       return {
-        siteTitle: process.env.SITE_NAME ?? "Play World",
+        siteTitle: process.env.SITE_NAME ?? "i-Robox",
         metadescription:
-          "Play World – toys, games & play for every kid. Shop the best toys online.",
+          "i-Robox – diecast models, collectibles & play. Shop online.",
         metaKeywords: "toys, toy store, kids toys, games",
         metaImage: null as string | null,
         favicon: null as string | null,
         gtmId: null as string | null,
-        siteName: process.env.SITE_NAME ?? "Play World",
+        siteName: process.env.SITE_NAME ?? "i-Robox",
       };
     } catch {
       return null;
@@ -27,9 +27,9 @@ export const getSeoSettings = unstable_cache(
 export const getSiteName = unstable_cache(
   async () => {
     try {
-      return process.env.SITE_NAME ? process.env.SITE_NAME : "Play World";
+      return process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
     } catch {
-      return process.env.SITE_NAME ? process.env.SITE_NAME : "Play World";
+      return process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
     }
   },
   ['site-name'], { tags: ['site-name'] }

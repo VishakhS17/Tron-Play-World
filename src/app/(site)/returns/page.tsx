@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 
 export const metadata = {
-  title: "Returns | Play World",
+  title: "Returns | i-Robox",
 };
 
 export default async function ReturnsPage() {

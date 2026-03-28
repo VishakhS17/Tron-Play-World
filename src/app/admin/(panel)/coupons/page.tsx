@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prismaDB";
 
 export const metadata = {
-  title: "Admin Coupons | Tron Play World",
+  title: "Admin Coupons | i-Robox",
 };
 
 export default async function AdminCouponsPage() {

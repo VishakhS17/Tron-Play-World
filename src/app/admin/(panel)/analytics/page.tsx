@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prismaDB";
 import { formatPrice } from "@/utils/formatePrice";
 
 export const metadata = {
-  title: "Admin Analytics | Tron Play World",
+  title: "Admin Analytics | i-Robox",
 };
 
 export default async function AdminAnalyticsPage() {

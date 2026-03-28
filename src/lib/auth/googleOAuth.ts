@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import crypto from "crypto";
 
-export const GOOGLE_OAUTH_STATE_COOKIE = "tpw_google_oauth_state";
-export const GOOGLE_OAUTH_NEXT_COOKIE = "tpw_google_oauth_next";
+export const GOOGLE_OAUTH_STATE_COOKIE = "irobox_google_oauth_state";
+export const GOOGLE_OAUTH_NEXT_COOKIE = "irobox_google_oauth_next";
 
 const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";

@@ -3,7 +3,7 @@ import { formatPrice } from "@/utils/formatePrice";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Admin Dashboard | Tron Play World",
+  title: "Admin Dashboard | i-Robox",
 };
 
 export default async function AdminDashboard() {

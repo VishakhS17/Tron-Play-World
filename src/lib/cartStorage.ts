@@ -1,7 +1,7 @@
 import { CartItem } from "@/redux/features/cart-slice";
 
-const CART_STORAGE_KEY = "tron-play-world-cart";
-const STORAGE_SCOPE_KEY = "tpw_storage_scope";
+const CART_STORAGE_KEY = "irobox-cart";
+const STORAGE_SCOPE_KEY = "irobox_storage_scope";
 
 function getCurrentScope(): string {
     try {

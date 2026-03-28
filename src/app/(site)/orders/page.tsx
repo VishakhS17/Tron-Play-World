@@ -5,7 +5,7 @@ import { formatPrice } from "@/utils/formatePrice";
 import { toOrderNumber } from "@/utils/orderNumber";
 
 export const metadata = {
-  title: "Orders | Play World",
+  title: "Orders | i-Robox",
 };
 
 export default async function OrdersPage() {

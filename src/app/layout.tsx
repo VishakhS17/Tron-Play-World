@@ -15,11 +15,11 @@ const defaultFavicon = "/ChatGPT Image Mar 3, 2026, 09_17_53 PM.png";
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await getSeoSettings();
   return {
-    title: `${seoSettings?.siteTitle || "Home"} | Robox`,
+    title: `${seoSettings?.siteTitle || "Home"} | i-Robox`,
     description:
       seoSettings?.metadescription ||
-      "Robox – toys, games & play for every kid. Shop the best toys online.",
-    keywords: seoSettings?.metaKeywords || "toys, toy store, kids toys, games, Robox",
+      "i-Robox – diecast models, collectibles & play. Shop online.",
+    keywords: seoSettings?.metaKeywords || "diecast, collectibles, toys, i-Robox, hot wheels",
     openGraph: {
       images: seoSettings?.metaImage ? [seoSettings.metaImage] : [],
     },

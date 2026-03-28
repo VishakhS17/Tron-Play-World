@@ -107,10 +107,10 @@ export default function LoginClient() {
           return;
         }
         toast.success("Account created!");
-        window.dispatchEvent(new Event("tpw-auth-changed"));
+        window.dispatchEvent(new Event("irobox-auth-changed"));
       } else {
         toast.success("Welcome back!");
-        window.dispatchEvent(new Event("tpw-auth-changed"));
+        window.dispatchEvent(new Event("irobox-auth-changed"));
       }
       router.push("/");
       router.refresh();
@@ -194,7 +194,7 @@ export default function LoginClient() {
       setPendingUserId(null);
       setOtp("");
       setDevOtpHint(null);
-      window.dispatchEvent(new Event("tpw-auth-changed"));
+      window.dispatchEvent(new Event("irobox-auth-changed"));
       router.push("/");
       router.refresh();
     } catch (err: unknown) {

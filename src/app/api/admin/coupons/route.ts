@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
-import { cleanText, hasSuspiciousInput, normalizeCode, readJsonBody } from "@/lib/validation/input";
+import {
+  cleanText,
+  hasSuspiciousInput,
+  isAllowedCouponDiscountType,
+  normalizeCode,
+  readJsonBody,
+} from "@/lib/validation/input";
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,6 +44,9 @@ export async function POST(req: NextRequest) {
   }
   if (hasSuspiciousInput(code)) {
     return NextResponse.json({ error: "Invalid coupon code" }, { status: 400 });
+  }
+  if (!isAllowedCouponDiscountType(discount_type)) {
+    return NextResponse.json({ error: "Invalid discount type" }, { status: 400 });
   }
 
   const created = await prisma.coupons.create({

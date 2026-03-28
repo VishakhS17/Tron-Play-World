@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 // Load wishlist items from local storage if available
 let initialItemsState: WishlistItem[] = [];
-const STORAGE_SCOPE_KEY = "tpw_storage_scope";
+const STORAGE_SCOPE_KEY = "irobox_storage_scope";
 
 export const getWishlistStorageKey = () => {
   try {

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "tron-play-world/products",
+        folder: "irobox/products",
         resource_type: "image",
         // Quality and format optimisation happens at delivery time (no blocking eager transforms)
         format: "webp",

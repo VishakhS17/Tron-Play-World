@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prismaDB";
 
 export const metadata = {
-  title: "Admin Reviews | Tron Play World",
+  title: "Admin Reviews | i-Robox",
 };
 
 export default async function AdminReviewsPage() {

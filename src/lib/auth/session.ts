@@ -3,9 +3,9 @@ import type { NextResponse } from "next/server";
 import { verifyJwt, type JwtPayload } from "./jwt";
 
 /** Customer / storefront session */
-export const AUTH_COOKIE_NAME = "tpw_session";
+export const AUTH_COOKIE_NAME = "irobox_session";
 /** Admin panel session (separate from customer cookie so both can be signed in). */
-export const ADMIN_AUTH_COOKIE_NAME = "tpw_admin_session";
+export const ADMIN_AUTH_COOKIE_NAME = "irobox_admin_session";
 
 export function getAuthSecret() {
   const secret = process.env.NEXTAUTH_SECRET;

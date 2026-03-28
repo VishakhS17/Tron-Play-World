@@ -34,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="text-sm font-semibold text-dark hover:text-blue">
-              Tron Play World
+              i-Robox
             </Link>
             <span className="text-xs rounded-full bg-gray-1 border border-gray-3 px-3 py-1 text-dark">
               {roleLabel}

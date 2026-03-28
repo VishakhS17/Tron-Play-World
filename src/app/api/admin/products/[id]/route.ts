@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prismaDB";
 import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
-import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
+import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
@@ -73,26 +74,92 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const body = parsed.body;
 
-  const updated = await prisma.products.update({
-    where: { id },
-    data: {
-      name: typeof body.name === "string" ? body.name : undefined,
-      slug: typeof body.slug === "string" ? body.slug : undefined,
-      sku: typeof body.sku === "string" ? body.sku : undefined,
-      description: typeof body.description === "string" ? body.description : undefined,
-      short_description: typeof body.short_description === "string" ? body.short_description : undefined,
-      is_active: typeof body.is_active === "boolean" ? body.is_active : undefined,
-      age_group: body.age_group !== undefined ? (body.age_group || null) : undefined,
-      category_id: body.category_id !== undefined ? (body.category_id || null) : undefined,
-      brand_id: body.brand_id !== undefined ? (body.brand_id || null) : undefined,
-      base_price: body.base_price !== undefined ? Number(body.base_price) : undefined,
-      discounted_price:
-        body.discounted_price !== undefined && body.discounted_price !== ""
-          ? Number(body.discounted_price)
-          : null,
-    },
-    select: { id: true },
-  });
+  const bad = () => NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  const data: Prisma.productsUncheckedUpdateInput = {};
+
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string") return bad();
+    const name = cleanText(body.name, 255);
+    if (!name || hasSuspiciousInput(name)) return bad();
+    data.name = name;
+  }
+  if (body.slug !== undefined) {
+    if (typeof body.slug !== "string") return bad();
+    const slug = cleanText(body.slug, 255);
+    if (!slug || hasSuspiciousInput(slug)) return bad();
+    data.slug = slug;
+  }
+  if (body.sku !== undefined) {
+    const sku = cleanOptionalText(body.sku, 100);
+    if (sku && hasSuspiciousInput(sku)) return bad();
+    data.sku = sku;
+  }
+  if (body.description !== undefined) {
+    if (typeof body.description !== "string") return bad();
+    const description = cleanText(body.description, 10000);
+    if (hasSuspiciousInput(description)) return bad();
+    data.description = description || null;
+  }
+  if (body.short_description !== undefined) {
+    if (typeof body.short_description !== "string") return bad();
+    const short_description = cleanText(body.short_description, 2000);
+    if (hasSuspiciousInput(short_description)) return bad();
+    data.short_description = short_description || null;
+  }
+  if (body.is_active !== undefined) {
+    if (typeof body.is_active !== "boolean") return bad();
+    data.is_active = body.is_active;
+  }
+  if (body.age_group !== undefined) {
+    const age_group = cleanOptionalText(body.age_group, 50);
+    if (age_group && hasSuspiciousInput(age_group)) return bad();
+    data.age_group = age_group;
+  }
+  if (body.category_id !== undefined) {
+    if (body.category_id === null || body.category_id === "") {
+      data.category_id = null;
+    } else if (typeof body.category_id === "string" && isUuid(cleanText(body.category_id, 64))) {
+      data.category_id = cleanText(body.category_id, 64);
+    } else {
+      return bad();
+    }
+  }
+  if (body.brand_id !== undefined) {
+    if (body.brand_id === null || body.brand_id === "") {
+      data.brand_id = null;
+    } else if (typeof body.brand_id === "string" && isUuid(cleanText(body.brand_id, 64))) {
+      data.brand_id = cleanText(body.brand_id, 64);
+    } else {
+      return bad();
+    }
+  }
+  if (body.base_price !== undefined) {
+    const n = Number(body.base_price);
+    if (!Number.isFinite(n)) return bad();
+    data.base_price = n;
+  }
+  if (body.discounted_price !== undefined) {
+    if (body.discounted_price === "" || body.discounted_price === null) {
+      data.discounted_price = null;
+    } else {
+      const n = Number(body.discounted_price);
+      if (!Number.isFinite(n)) return bad();
+      data.discounted_price = n;
+    }
+  }
+
+  let updatedId = id;
+  if (Object.keys(data).length > 0) {
+    const updated = await prisma.products.update({
+      where: { id },
+      data,
+      select: { id: true },
+    });
+    updatedId = updated.id;
+  } else {
+    const exists = await prisma.products.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   // Update inventory row if quantity fields were sent
   const hasQty = body.available_quantity !== undefined || body.low_stock_threshold !== undefined;
@@ -121,5 +188,5 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     }
   }
 
-  return NextResponse.json({ ok: true, id: updated.id }, { status: 200 });
+  return NextResponse.json({ ok: true, id: updatedId }, { status: 200 });
 }

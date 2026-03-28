@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
+import { cleanText, hasSuspiciousInput, isUrlSlug } from "@/lib/validation/input";
 
 function toInt(value: string | null, fallback: number) {
   const n = Number(value);
@@ -8,12 +9,34 @@ function toInt(value: string | null, fallback: number) {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const q = (url.searchParams.get("q") ?? "").trim();
-  const category = (url.searchParams.get("category") ?? "").trim();
-  const brand = (url.searchParams.get("brand") ?? "").trim();
-  const ageGroup = (url.searchParams.get("ageGroup") ?? "").trim();
+  const q = cleanText(url.searchParams.get("q") ?? "", 200);
+  const category = cleanText(url.searchParams.get("category") ?? "", 160);
+  const brand = cleanText(url.searchParams.get("brand") ?? "", 160);
+  const ageGroup = cleanText(url.searchParams.get("ageGroup") ?? "", 50);
   const minPrice = url.searchParams.get("minPrice");
   const maxPrice = url.searchParams.get("maxPrice");
+
+  if (q && hasSuspiciousInput(q)) {
+    return NextResponse.json({ error: "Invalid search query" }, { status: 400 });
+  }
+  if (category && !isUrlSlug(category)) {
+    return NextResponse.json({ error: "Invalid category filter" }, { status: 400 });
+  }
+  if (brand && !isUrlSlug(brand)) {
+    return NextResponse.json({ error: "Invalid brand filter" }, { status: 400 });
+  }
+  if (ageGroup && hasSuspiciousInput(ageGroup)) {
+    return NextResponse.json({ error: "Invalid age group filter" }, { status: 400 });
+  }
+
+  const minP = minPrice !== null && minPrice !== "" ? Number(minPrice) : null;
+  const maxP = maxPrice !== null && maxPrice !== "" ? Number(maxPrice) : null;
+  if ((minP !== null && !Number.isFinite(minP)) || (maxP !== null && !Number.isFinite(maxP))) {
+    return NextResponse.json({ error: "Invalid price filter" }, { status: 400 });
+  }
+  if ((minP !== null && minP < 0) || (maxP !== null && maxP < 0)) {
+    return NextResponse.json({ error: "Invalid price filter" }, { status: 400 });
+  }
   const availableOnly = (url.searchParams.get("available") ?? "").trim() === "true";
 
   const page = Math.max(1, toInt(url.searchParams.get("page"), 1));
@@ -44,10 +67,10 @@ export async function GET(req: NextRequest) {
     ];
   }
   if (ageGroup) where.age_group = ageGroup;
-  if (minPrice || maxPrice) {
+  if (minP !== null || maxP !== null) {
     where.base_price = {
-      ...(minPrice ? { gte: Number(minPrice) } : {}),
-      ...(maxPrice ? { lte: Number(maxPrice) } : {}),
+      ...(minP !== null ? { gte: minP } : {}),
+      ...(maxP !== null ? { lte: maxP } : {}),
     };
   }
   if (category) where.categories = { slug: category };

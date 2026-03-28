@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdmin } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
-import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
+import {
+  cleanText,
+  hasSuspiciousInput,
+  isAllowedOrderStatus,
+  isUuid,
+  readJsonBody,
+} from "@/lib/validation/input";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
@@ -64,14 +70,25 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   const body = parsed.body;
 
   const status = typeof body.status === "string" ? cleanText(body.status, 40) : null;
-  if (!status) return NextResponse.json({ error: "status is required" }, { status: 400 });
+  if (!status) {
+    return NextResponse.json({ error: "status is required" }, { status: 400 });
+  }
+  if (!isAllowedOrderStatus(status)) {
+    return NextResponse.json({ error: "Invalid order status" }, { status: 400 });
+  }
 
   await prisma.orders.update({ where: { id }, data: { status: status as any } });
 
-  if (body.shipment) {
-    const carrier = typeof body.shipment.carrier === "string" ? body.shipment.carrier : null;
-    const tracking_number =
-      typeof body.shipment.tracking_number === "string" ? body.shipment.tracking_number : null;
+  const shipment = body.shipment;
+  if (shipment && typeof shipment === "object" && !Array.isArray(shipment)) {
+    const s = shipment as Record<string, unknown>;
+    const carrierRaw = typeof s.carrier === "string" ? s.carrier : null;
+    const trackingRaw = typeof s.tracking_number === "string" ? s.tracking_number : null;
+    const carrier = carrierRaw !== null ? cleanText(carrierRaw, 120) : null;
+    const tracking_number = trackingRaw !== null ? cleanText(trackingRaw, 255) : null;
+    if ((carrier && hasSuspiciousInput(carrier)) || (tracking_number && hasSuspiciousInput(tracking_number))) {
+      return NextResponse.json({ error: "Invalid shipment fields" }, { status: 400 });
+    }
 
     await prisma.shipments.upsert({
       where: { order_id: id },

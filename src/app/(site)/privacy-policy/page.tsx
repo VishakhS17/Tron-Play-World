@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-dark mb-6">Privacy Policy</h1>
 
         <p className="text-base leading-7 text-meta-3 mb-5">
-          <strong>i-Robox</strong> (operated as part of the Robox / Tron Play World storefront) respects your privacy.
+          <strong>i-Robox</strong> respects your privacy.
           This policy explains what information we collect, how we use it, and your choices. By using our website and
           placing orders, you agree to this Privacy Policy.
         </p>

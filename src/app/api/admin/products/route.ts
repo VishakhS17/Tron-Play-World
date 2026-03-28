@@ -46,7 +46,11 @@ export async function POST(req: NextRequest) {
   if (!name || !slug || !Number.isFinite(base_price)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
-  if ([name, slug, sku ?? "", age_group ?? ""].some((v) => hasSuspiciousInput(v))) {
+  if (
+    [name, slug, sku ?? "", age_group ?? "", description ?? "", short_description ?? ""].some((v) =>
+      hasSuspiciousInput(v)
+    )
+  ) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
   if ((category_id && !isUuid(category_id)) || (brand_id && !isUuid(brand_id))) {

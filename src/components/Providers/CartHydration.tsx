@@ -43,10 +43,10 @@ export default function CartHydration() {
         const handleAuthChange = () => {
             void hydrateByScope();
         };
-        window.addEventListener("tpw-auth-changed", handleAuthChange);
+        window.addEventListener("irobox-auth-changed", handleAuthChange);
 
         return () => {
-            window.removeEventListener("tpw-auth-changed", handleAuthChange);
+            window.removeEventListener("irobox-auth-changed", handleAuthChange);
         };
     }, [dispatch]);
 
