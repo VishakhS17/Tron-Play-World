@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { clearAdminSessionCookie } from "@/lib/auth/session";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   await clearAdminSessionCookie();
-  return NextResponse.redirect(
-    new URL("/admin/login", process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000")
-  );
+  // 303 ensures browser follows redirect with GET after POST logout.
+  return NextResponse.redirect(new URL("/admin/login", req.url), { status: 303 });
 }
