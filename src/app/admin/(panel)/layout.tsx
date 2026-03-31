@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAdminSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
+import { Toaster } from "react-hot-toast";
 
 const NAV = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -8,6 +9,7 @@ const NAV = [
   { href: "/admin/inventory", label: "Inventory" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/coupons", label: "Coupons" },
+  { href: "/admin/marketing", label: "Marketing" },
   { href: "/admin/reviews", label: "Reviews" },
   { href: "/admin/csv", label: "CSV Upload" },
   { href: "/admin/analytics", label: "Analytics" },
@@ -64,7 +66,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             ))}
           </nav>
         </aside>
-        <main className="min-w-0">{children}</main>
+        <main className="min-w-0">
+          <Toaster position="top-center" reverseOrder={false} />
+          {children}
+        </main>
       </div>
     </div>
   );

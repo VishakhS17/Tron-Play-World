@@ -58,23 +58,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid review" }, { status: 400 });
   }
 
-  // Verified purchase: must have a CONFIRMED order containing this product.
-  const hasPurchase = await prisma.orders.count({
+  // Strict enforcement: one review per purchased order item.
+  const unreviewedPurchasedItem = await prisma.order_items.findFirst({
     where: {
-      customer_id: session.sub,
-      status: "CONFIRMED",
-      order_items: { some: { product_id: productId } },
+      product_id: productId,
+      orders: {
+        customer_id: session.sub,
+        status: "CONFIRMED",
+      },
+      reviews: {
+        none: {
+          customer_id: session.sub,
+        },
+      },
     },
+    orderBy: { created_at: "asc" },
+    select: { id: true },
   });
+  if (!unreviewedPurchasedItem) {
+    return NextResponse.json(
+      { error: "You can only review purchased items once per purchase" },
+      { status: 400 }
+    );
+  }
 
   const created = await prisma.reviews.create({
     data: {
       product_id: productId,
       customer_id: session.sub,
+      order_item_id: unreviewedPurchasedItem.id,
       rating,
       title,
       comment,
-      is_verified_purchase: hasPurchase > 0,
+      is_verified_purchase: true,
       is_approved: false, // moderation required
     },
     select: { id: true },
@@ -85,7 +101,7 @@ export async function POST(req: NextRequest) {
     entityType: "REVIEW",
     entityId: created.id,
     action: "REVIEW_SUBMITTED",
-    newValues: { productId, rating, verified: hasPurchase > 0 },
+    newValues: { productId, rating, verified: true, orderItemId: unreviewedPurchasedItem.id },
     ipAddress: req.ip ?? null,
     userAgent: req.headers.get("user-agent"),
   });

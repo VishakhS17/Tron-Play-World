@@ -4,6 +4,7 @@ import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { isUuid, readJsonBody } from "@/lib/validation/input";
+import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdminWrite();
@@ -58,9 +59,14 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ error: "Invalid quantities" }, { status: 400 });
   }
 
-  await prisma.inventory.update({
+  const updated = await prisma.inventory.update({
     where: { id },
     data: { available_quantity: available, low_stock_threshold: threshold },
+    select: { product_id: true },
+  });
+
+  await syncLowStockAlertsByProductIds([updated.product_id]).catch((err) => {
+    console.error("[admin inventory PUT] low stock alert sync failed", err);
   });
 
   return NextResponse.json({ ok: true }, { status: 200 });

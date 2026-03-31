@@ -71,6 +71,7 @@ model brands {
   created_at  DateTime   @default(now()) @db.Timestamptz(6)
   updated_at  DateTime   @default(now()) @db.Timestamptz(6)
   products    products[]
+  homepage_highlights homepage_highlights[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -91,14 +92,15 @@ model cart_items {
 }
 
 model carts {
-  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customer_id  String?      @db.Uuid
-  guest_token  String?      @db.Uuid
-  status       String       @default("ACTIVE") @db.VarChar(30)
-  created_at   DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime     @default(now()) @db.Timestamptz(6)
-  cart_items   cart_items[]
-  customers    customers?   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id                String?      @db.Uuid
+  guest_token                String?      @db.Uuid
+  status                     String       @default("ACTIVE") @db.VarChar(30)
+  abandoned_reminder_sent_at DateTime?    @db.Timestamptz(6)
+  created_at                 DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime     @default(now()) @db.Timestamptz(6)
+  cart_items                 cart_items[]
+  customers                  customers?   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 model categories {
@@ -112,6 +114,8 @@ model categories {
   categories       categories?  @relation("categoriesTocategories", fields: [parent_id], references: [id], onUpdate: NoAction)
   other_categories categories[] @relation("categoriesTocategories")
   products         products[]
+  coupon_categories coupon_categories[]
+  homepage_highlights homepage_highlights[]
 
   @@index([parent_id], map: "idx_categories_parent_id")
 }
@@ -145,6 +149,18 @@ model coupons {
   updated_at          DateTime        @default(now()) @db.Timestamptz(6)
   coupon_usages       coupon_usages[]
   orders              orders[]
+  coupon_categories   coupon_categories[]
+}
+
+/// When rows exist, every cart line product must belong to one of these categories.
+model coupon_categories {
+  coupon_id   String     @db.Uuid
+  category_id String     @db.Uuid
+  coupons     coupons    @relation(fields: [coupon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  categories  categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([coupon_id, category_id])
+  @@index([category_id], map: "idx_coupon_categories_category_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -156,6 +172,7 @@ model inventory {
   reserved_quantity   Int               @default(0)
   sold_quantity       Int               @default(0)
   low_stock_threshold Int               @default(0)
+  low_stock_alert_sent_at DateTime?     @db.Timestamptz(6)
   updated_at          DateTime          @default(now()) @db.Timestamptz(6)
   products            products          @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   product_variants    product_variants? @relation(fields: [product_variant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -200,6 +217,7 @@ model order_items {
   products               products                 @relation(fields: [product_id], references: [id], onUpdate: NoAction)
   product_variants       product_variants?        @relation(fields: [product_variant_id], references: [id], onUpdate: NoAction)
   returns                returns[]
+  reviews                reviews[]
 
   @@index([order_id], map: "idx_order_items_order_id")
 }
@@ -304,6 +322,8 @@ model products {
   categories             categories?              @relation(fields: [category_id], references: [id], onUpdate: NoAction)
   reviews                reviews[]
   wishlist_items         wishlist_items[]
+  homepage_highlights    homepage_highlights[]
+  flash_sale_products    flash_sale_products?
 
   @@index([age_group], map: "idx_products_age_group")
   @@index([brand_id], map: "idx_products_brand_id")
@@ -339,6 +359,7 @@ model reviews {
   id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   product_id           String     @db.Uuid
   customer_id          String?    @db.Uuid
+  order_item_id        String?    @unique @db.Uuid
   rating               Int
   title                String?    @db.VarChar(255)
   comment              String?
@@ -348,6 +369,7 @@ model reviews {
   updated_at           DateTime   @default(now()) @db.Timestamptz(6)
   products             products   @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   customers            customers? @relation(fields: [customer_id], references: [id], onUpdate: NoAction)
+  order_items          order_items? @relation(fields: [order_item_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([is_approved], map: "idx_reviews_is_approved")
   @@index([product_id], map: "idx_reviews_product_id")
@@ -404,7 +426,22 @@ model customers {
   returns           returns[]
   reviews           reviews[]
   wishlists         wishlists?
-  signup_email_otps signup_email_otps[]
+  signup_email_otps              signup_email_otps[]
+  customer_password_setup_tokens customer_password_setup_tokens[]
+}
+
+/// One-time link for checkout-created accounts to set a real password (token stored as SHA-256 hex).
+model customer_password_setup_tokens {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id String    @db.Uuid
+  token_hash  String    @db.VarChar(64)
+  expires_at  DateTime  @db.Timestamptz(6)
+  used_at     DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  customers   customers @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([token_hash], map: "idx_password_setup_token_hash")
+  @@index([customer_id], map: "idx_password_setup_customer_id")
 }
 
 // OTP verification for customer signup (email)
@@ -484,4 +521,126 @@ enum admin_role_type {
   MANAGER
   STAFF
   SUPPORT
+}
+
+enum homepage_highlight_kind {
+  FEATURED
+  TRENDING
+  CATEGORY
+  PRODUCT
+  BRAND
+  CUSTOM
+}
+
+enum announcement_placement {
+  UTILITY
+  MARQUEE
+}
+
+enum marketing_popup_frequency {
+  ONCE_PER_SESSION
+  ONCE_PER_DEVICE
+  EVERY_VISIT
+}
+
+enum marketing_popup_audience {
+  ALL
+  GUESTS_ONLY
+  LOGGED_IN_ONLY
+}
+
+model homepage_hero_slides {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  image_url    String
+  image_public_id String? @db.VarChar(255)
+  title        String?   @db.VarChar(255)
+  link_url     String?
+  sort_order   Int       @default(0)
+  is_active    Boolean   @default(true)
+  active_from  DateTime? @db.Timestamptz(6)
+  active_until DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+}
+
+model homepage_highlights {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind         homepage_highlight_kind
+  category_id  String?                @db.Uuid
+  product_id   String?                @db.Uuid
+  brand_id     String?                @db.Uuid
+  title        String                 @db.VarChar(255)
+  subtitle     String?
+  image_url    String?
+  image_public_id String?             @db.VarChar(255)
+  link_url     String?
+  sort_order   Int                    @default(0)
+  is_active    Boolean                @default(true)
+  active_from  DateTime?              @db.Timestamptz(6)
+  active_until DateTime?              @db.Timestamptz(6)
+  created_at   DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime               @default(now()) @db.Timestamptz(6)
+  categories   categories?            @relation(fields: [category_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  products     products?              @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  brands       brands?                @relation(fields: [brand_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([category_id], map: "idx_homepage_highlights_category_id")
+  @@index([product_id], map: "idx_homepage_highlights_product_id")
+  @@index([brand_id], map: "idx_homepage_highlights_brand_id")
+}
+
+model announcement_entries {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  placement    announcement_placement
+  body         String
+  link_url     String?
+  link_label   String?                @db.VarChar(120)
+  sort_order   Int                    @default(0)
+  is_active    Boolean                @default(true)
+  active_from  DateTime?              @db.Timestamptz(6)
+  active_until DateTime?              @db.Timestamptz(6)
+  created_at   DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime               @default(now()) @db.Timestamptz(6)
+
+  @@index([placement, sort_order], map: "idx_announcement_placement_sort")
+}
+
+model marketing_popups {
+  id                    String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title                 String                     @db.VarChar(255)
+  body                  String
+  image_url             String?
+  cta_label             String?                    @db.VarChar(120)
+  cta_url               String?
+  delay_ms              Int                        @default(0)
+  frequency             marketing_popup_frequency  @default(ONCE_PER_SESSION)
+  audience              marketing_popup_audience   @default(ALL)
+  suggested_coupon_code String?                    @db.VarChar(80)
+  sort_priority         Int                        @default(0)
+  is_active             Boolean                    @default(true)
+  active_from           DateTime?                  @db.Timestamptz(6)
+  active_until          DateTime?                  @db.Timestamptz(6)
+  created_at            DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                   @default(now()) @db.Timestamptz(6)
+
+  @@index([is_active, sort_priority], map: "idx_marketing_popups_active_priority")
+}
+
+model flash_sale_products {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id   String    @unique @db.Uuid
+  sale_price   Decimal   @db.Decimal(10, 2)
+  is_active    Boolean   @default(true)
+  active_from  DateTime? @db.Timestamptz(6)
+  active_until DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  products     products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// Singleton-style settings row (use fixed id in app / seed).
+model site_marketing_settings {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  first_visit_coupon_code String?  @db.VarChar(80)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
 }

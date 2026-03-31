@@ -58,9 +58,10 @@ export function hasSuspiciousInput(value: string) {
   return patterns.some((re) => re.test(v));
 }
 
-/** URL slug: lowercase letters, digits, hyphens (e.g. category / brand filters). */
+/** URL slug param: letters, digits, hyphens, underscores (category / brand filters). */
 export function isUrlSlug(value: string) {
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+  if (value.length > 160) return false;
+  return /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/i.test(value);
 }
 
 /** Short controlled labels like age_group in DB. */
@@ -84,6 +85,19 @@ const ORDER_STATUS_WHITELIST = new Set([
 
 export function isAllowedOrderStatus(value: string) {
   return ORDER_STATUS_WHITELIST.has(value);
+}
+
+const SHIPMENT_STATUS_WHITELIST = new Set([
+  "PENDING",
+  "CREATED",
+  "IN_TRANSIT",
+  "DELIVERED",
+  "DELAYED",
+  "RETURNED",
+]);
+
+export function isAllowedShipmentStatus(value: string) {
+  return SHIPMENT_STATUS_WHITELIST.has(value);
 }
 
 const COUPON_DISCOUNT_WHITELIST = new Set(["PERCENTAGE", "FIXED"]);

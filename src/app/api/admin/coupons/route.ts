@@ -7,6 +7,7 @@ import {
   cleanText,
   hasSuspiciousInput,
   isAllowedCouponDiscountType,
+  isUuid,
   normalizeCode,
   readJsonBody,
 } from "@/lib/validation/input";
@@ -49,20 +50,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid discount type" }, { status: 400 });
   }
 
-  const created = await prisma.coupons.create({
-    data: {
-      code,
-      discount_type,
-      discount_value,
-      min_cart_value,
-      max_uses,
-      max_uses_per_user,
-      starts_at,
-      ends_at,
-      is_active,
-      applies_to_shipping: false,
-    },
-    select: { id: true },
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.coupons.create({
+      data: {
+        code,
+        discount_type,
+        discount_value,
+        min_cart_value,
+        max_uses,
+        max_uses_per_user,
+        starts_at,
+        ends_at,
+        is_active,
+        applies_to_shipping: false,
+      },
+      select: { id: true },
+    });
+    if (Array.isArray(body.category_ids)) {
+      const catIds = body.category_ids.filter(
+        (x: unknown) => typeof x === "string" && isUuid(x)
+      ) as string[];
+      if (catIds.length) {
+        await tx.coupon_categories.createMany({
+          data: catIds.map((category_id) => ({ coupon_id: row.id, category_id })),
+        });
+      }
+    }
+    return row;
   });
 
   return NextResponse.json({ ok: true, id: created.id }, { status: 201 });

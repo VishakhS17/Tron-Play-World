@@ -40,8 +40,8 @@ export default async function InvoicePage({ params, searchParams }: Props) {
   });
   if (!order) notFound();
   const isOwner = Boolean(session?.sub && order.customer_id && order.customer_id === session.sub);
-  const hasGuestAccess = Boolean(!order.customer_id && access && verifyOrderAccessToken(access, order.id));
-  if (!isOwner && !hasGuestAccess) notFound();
+  const hasCheckoutAccess = Boolean(access && verifyOrderAccessToken(access, order.id));
+  if (!isOwner && !hasCheckoutAccess) notFound();
 
   return (
     <main className="pt-28 pb-16 bg-white">

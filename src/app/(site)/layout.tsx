@@ -6,12 +6,36 @@ import NextTopLoader from "nextjs-toploader";
 import MainHeader from "@/components/Header/MainHeader";
 import Breadcrumb from "@/components/Common/Breadcrumb";
 import WhatsAppFloatingButton from "@/components/Common/WhatsAppFloatingButton";
+import { prisma } from "@/lib/prismaDB";
+import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
 
 export default async function SiteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const now = new Date();
+  const announcementRows = await prisma.announcement_entries.findMany({
+    orderBy: [{ placement: "asc" }, { sort_order: "asc" }],
+  });
+  const activeAnnouncements = announcementRows.filter((e) =>
+    isActiveInWindow(e.is_active, e.active_from, e.active_until, now)
+  );
+  const utilityRows = activeAnnouncements.filter((e) => e.placement === "UTILITY");
+  const marqueeRows = activeAnnouncements.filter((e) => e.placement === "MARQUEE");
+  const utilityPrimary = utilityRows[0];
+  const utilityAnnouncement = utilityPrimary
+    ? {
+        body: utilityPrimary.body,
+        linkUrl: utilityPrimary.link_url,
+        linkLabel: utilityPrimary.link_label,
+      }
+    : null;
+  const marqueeAnnouncements = marqueeRows.map((m) => ({
+    body: m.body,
+    linkUrl: m.link_url,
+  }));
+
   return (
     <div>
       <>
@@ -22,7 +46,11 @@ export default async function SiteLayout({
             showSpinner={false}
             shadow="none"
           />
-          <MainHeader headerData={null} />
+          <MainHeader
+            headerData={null}
+            utilityAnnouncement={utilityAnnouncement}
+            marqueeAnnouncements={marqueeAnnouncements}
+          />
           <Breadcrumb />
           <Toaster position="top-center" reverseOrder={false} />
           {children}

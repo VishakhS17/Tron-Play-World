@@ -34,6 +34,11 @@ export default function AdminOrderDetailPage() {
     []
   );
 
+  const shipmentStatusOptions = useMemo(
+    () => ["PENDING", "CREATED", "IN_TRANSIT", "DELIVERED", "DELAYED", "RETURNED"],
+    []
+  );
+
   async function save() {
     setSaving(true);
     try {
@@ -98,6 +103,22 @@ export default function AdminOrderDetailPage() {
 
       <div className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4">
         <h2 className="text-lg font-semibold text-dark">Shipment</h2>
+        <label className="block max-w-md">
+          <span className="mb-1 block text-sm font-medium text-dark">Shipment status</span>
+          <select
+            value={data.shipment?.status ?? "PENDING"}
+            onChange={(e) =>
+              setData((d: any) => ({ ...d, shipment: { ...d.shipment, status: e.target.value } }))
+            }
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          >
+            {shipmentStatusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="block">
             <span className="mb-1 block text-sm font-medium text-dark">Carrier</span>

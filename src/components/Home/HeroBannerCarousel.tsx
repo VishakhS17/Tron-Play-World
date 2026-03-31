@@ -1,54 +1,57 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type TouchEvent } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 
-type Banner = {
-  id: number;
-  src: string;
-  alt: string;
+export type HeroSlide = {
+  id: string;
+  image_url: string;
+  title?: string | null;
+  link_url?: string | null;
 };
 
-const BANNERS: Banner[] = [
-  {
-    id: 1,
-    src: "/images/banners/banner 1.png",
-    alt: "Banner 1",
-  },
-  {
-    id: 2,
-    src: "/images/banners/banner 2.png",
-    alt: "Banner 2",
-  },
-  {
-    id: 3,
-    src: "/images/banners/banner 3.png",
-    alt: "Banner 3",
-  },
+const FALLBACK_SLIDES: HeroSlide[] = [
+  { id: "f1", image_url: "/images/banners/banner 1.png", title: "Banner 1" },
+  { id: "f2", image_url: "/images/banners/banner 2.png", title: "Banner 2" },
+  { id: "f3", image_url: "/images/banners/banner 3.png", title: "Banner 3" },
 ];
 
 const AUTO_ROTATE_INTERVAL = 7000;
 const SWIPE_THRESHOLD = 50;
 
-const HeroBannerCarousel = () => {
+function isRemoteUrl(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+type Props = {
+  slides?: HeroSlide[];
+};
+
+const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
+  const slides = slidesProp && slidesProp.length > 0 ? slidesProp : FALLBACK_SLIDES;
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
-  const goToNext = () => {
-    setActiveIndex((prev) => (prev + 1) % BANNERS.length);
-  };
+  const goToNext = useCallback(() => {
+    setActiveIndex((prev) => (prev + 1) % slides.length);
+  }, [slides.length]);
 
-  const goToPrev = () => {
-    setActiveIndex((prev) => (prev - 1 + BANNERS.length) % BANNERS.length);
-  };
+  const goToPrev = useCallback(() => {
+    setActiveIndex((prev) => (prev - 1 + slides.length) % slides.length);
+  }, [slides.length]);
 
   useEffect(() => {
+    setActiveIndex(0);
+  }, [slides]);
+
+  useEffect(() => {
+    if (slides.length <= 1) return undefined;
     const timer = window.setInterval(() => {
       goToNext();
     }, AUTO_ROTATE_INTERVAL);
-
     return () => window.clearInterval(timer);
-  }, []);
+  }, [goToNext, slides.length]);
 
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -81,20 +84,31 @@ const HeroBannerCarousel = () => {
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${activeIndex * 100}%)` }}
         >
-          {BANNERS.map((banner, index) => (
-            <div
-              key={banner.id}
-              className="relative min-w-full h-full"
-              aria-hidden="true"
-            >
-              <Image
-                src={banner.src}
-                alt={banner.alt}
-                fill
-                priority={index === 0}
-                sizes="100vw"
-                className="object-cover"
-              />
+          {slides.map((banner, index) => (
+            <div key={banner.id} className="relative min-w-full h-full">
+              {banner.link_url ? (
+                <Link href={banner.link_url} className="relative block h-full w-full">
+                  <Image
+                    src={banner.image_url}
+                    alt={banner.title ?? "Hero banner"}
+                    fill
+                    priority={index === 0}
+                    sizes="100vw"
+                    className="object-cover"
+                    unoptimized={isRemoteUrl(banner.image_url)}
+                  />
+                </Link>
+              ) : (
+                <Image
+                  src={banner.image_url}
+                  alt={banner.title ?? "Hero banner"}
+                  fill
+                  priority={index === 0}
+                  sizes="100vw"
+                  className="object-cover"
+                  unoptimized={isRemoteUrl(banner.image_url)}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -104,4 +118,3 @@ const HeroBannerCarousel = () => {
 };
 
 export default HeroBannerCarousel;
-

@@ -4,6 +4,7 @@ import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
+import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
@@ -83,6 +84,10 @@ export async function POST(req: NextRequest) {
       sold_quantity: 0,
       low_stock_threshold,
     },
+  });
+
+  await syncLowStockAlertsByProductIds([created.id]).catch((err) => {
+    console.error("[admin products POST] low stock alert sync failed", err);
   });
 
   return NextResponse.json({ ok: true, id: created.id }, { status: 201 });

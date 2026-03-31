@@ -178,6 +178,14 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
         </Link>
       </h3>
 
+      {item.ageGroup ? (
+        <div className="mb-2">
+          <span className="inline-flex rounded-full border border-gray-3 bg-gray-1 px-2 py-0.5 text-[11px] font-medium text-meta-3">
+            Age: {item.ageGroup}
+          </span>
+        </div>
+      ) : null}
+
       <span className="flex items-center gap-2 text-base font-medium">
         {item.discountedPrice ? (
           <>

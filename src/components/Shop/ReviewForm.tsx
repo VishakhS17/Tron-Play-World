@@ -77,7 +77,7 @@ export default function ReviewForm({ productId }: { productId: string }) {
       </button>
 
       <p className="text-xs text-meta-4">
-        Reviews require moderation. Verified purchase status is applied automatically when applicable.
+        Reviews require moderation and are limited to one review per purchased item.
       </p>
     </form>
   );

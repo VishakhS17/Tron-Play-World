@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit";
-import { sendEmail, orderEmailTemplate } from "@/lib/email";
+import { notifyCustomerOrderOrShipmentUpdate } from "@/lib/orders/customerOrderNotifications";
+import { isSyntheticPhoneSignupEmail } from "@/lib/auth/signupIdentifier";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
@@ -24,12 +25,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   const body = parsed.body;
   const orderId = cleanText(body.orderId, 64);
-  const accessToken = cleanText(body.accessToken, 512);
+  const accessToken = cleanText(body.accessToken, 2048);
   if (!orderId || !isUuid(orderId)) {
     return NextResponse.json({ error: "orderId is required" }, { status: 400 });
   }
 
-  let result: { id: string; already: boolean };
+  let result: {
+    id: string;
+    already: boolean;
+    previousStatus?: string;
+    previousShipment?: { status: string; carrier: string | null; tracking_number: string | null } | null;
+    nextShipment?: { status: string; carrier: string | null; tracking_number: string | null };
+  };
   try {
     // Confirm payment server-side: confirm order, deduct reserved stock, create shipment.
     result = await prisma.$transaction(async (tx) => {
@@ -39,10 +46,27 @@ export async function POST(req: NextRequest) {
       });
       if (!order) throw new Error("NOT_FOUND");
       const isOwner = Boolean(session?.sub && order.customer_id && order.customer_id === session.sub);
-      const hasGuestAccess =
-        !order.customer_id && accessToken && verifyOrderAccessToken(accessToken, orderId);
-      if (!isOwner && !hasGuestAccess) throw new Error("FORBIDDEN");
-      if (order.payment_status === "SUCCEEDED") return { id: order.id, already: true };
+      // Checkout always sets customer_id (including auto-created accounts). The access token from
+      // the payment URL still proves the client completed checkout and may confirm without a session.
+      const hasCheckoutAccess =
+        Boolean(accessToken) && verifyOrderAccessToken(accessToken, orderId);
+      if (!isOwner && !hasCheckoutAccess) throw new Error("FORBIDDEN");
+      if (order.payment_status === "SUCCEEDED") {
+        return { id: order.id, already: true };
+      }
+
+      const previousStatus = String(order.status);
+      const prevShipRow = await tx.shipments.findUnique({
+        where: { order_id: orderId },
+        select: { status: true, carrier: true, tracking_number: true },
+      });
+      const previousShipment = prevShipRow
+        ? {
+            status: String(prevShipRow.status),
+            carrier: prevShipRow.carrier,
+            tracking_number: prevShipRow.tracking_number,
+          }
+        : null;
 
     const reservations = await tx.inventory_reservations.findMany({
       where: { order_id: orderId, released_at: null },
@@ -76,7 +100,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await tx.shipments.upsert({
+    const shipRow = await tx.shipments.upsert({
       where: { order_id: orderId },
       update: { status: "CREATED" },
       create: {
@@ -85,7 +109,13 @@ export async function POST(req: NextRequest) {
         tracking_number: null,
         carrier: null,
       },
+      select: { status: true, carrier: true, tracking_number: true },
     });
+    const nextShipment = {
+      status: String(shipRow.status),
+      carrier: shipRow.carrier,
+      tracking_number: shipRow.tracking_number,
+    };
 
     if (order.coupon_id) {
       await tx.coupon_usages.create({
@@ -97,7 +127,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-      return { id: orderId, already: false };
+      return {
+        id: orderId,
+        already: false,
+        previousStatus,
+        previousShipment,
+        nextShipment,
+      };
     });
   } catch (e: any) {
     if (e?.message === "FORBIDDEN") {
@@ -119,17 +155,32 @@ export async function POST(req: NextRequest) {
     userAgent: req.headers.get("user-agent"),
   });
 
-  if (session?.email) {
-    await sendEmail({
-      to: session.email,
-      subject: "Payment successful — order confirmed",
-      html: orderEmailTemplate({
-        heading: "Payment successful",
-        message:
-          "Your payment has been confirmed by our server. Your order is now confirmed and will be prepared for shipment.",
-        orderId,
-      }),
+  let recipient = session?.email ?? null;
+  if (!recipient) {
+    const row = await prisma.orders.findUnique({
+      where: { id: orderId },
+      select: { customers: { select: { email: true } } },
     });
+    recipient = row?.customers?.email ?? null;
+  }
+
+  if (recipient && !result.already && !isSyntheticPhoneSignupEmail(recipient)) {
+    try {
+      await notifyCustomerOrderOrShipmentUpdate({
+        to: recipient,
+        orderId,
+        previousOrderStatus: result.previousStatus ?? "PENDING",
+        nextOrderStatus: "CONFIRMED",
+        previousShipment: result.previousShipment ?? null,
+        nextShipment: result.nextShipment ?? {
+          status: "CREATED",
+          carrier: null,
+          tracking_number: null,
+        },
+      });
+    } catch (err) {
+      console.error("[payment/confirm] customer notify email failed", err);
+    }
   }
 
   return NextResponse.json({ ok: true, ...result }, { status: 200 });

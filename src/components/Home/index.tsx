@@ -1,5 +1,6 @@
 import Image from "next/image";
-import HeroBannerCarousel from "./HeroBannerCarousel";
+import Link from "next/link";
+import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
 
 const BRAND_ITEMS = [
   {
@@ -23,91 +24,108 @@ const BRAND_ITEMS = [
     label: "TIMEMICRO",
   },
 ];
-const COLLECTION_SPOTLIGHTS = [
-  {
-    src: "/images/collections/693c2377f0a417e6ed0a3758-rc-cars-1-14-all-terrain-rc-car-for.jpg",
-    alt: "RC Cars",
-    label: "RC Cars",
-  },
-  {
-    src: "/images/collections/35984-1024__79878.jpg",
-    alt: "Hotwheels",
-    label: "Hotwheels",
-  },
-  {
-    src: "/images/collections/05248246-75A5-4A35-90E2-B4A1DDFB89B6.jpg",
-    alt: "Die Cast Cars",
-    label: "Die Cast Cars",
-  },
-];
-const VISIT_US_MAP_URL = "https://maps.app.goo.gl/GqXJNknzeg9wXJjT9";
 
-const Home = () => {
+export type HomeHighlightCard = {
+  id: string;
+  href: string;
+  image: string;
+  label: string;
+  alt: string;
+  subtitle?: string | null;
+};
+
+export type HomeCategoryTile = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type HomeProps = {
+  heroSlides?: HeroSlide[];
+  highlights?: HomeHighlightCard[];
+  categories?: HomeCategoryTile[];
+};
+
+function isRemoteImage(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+const Home = ({ heroSlides, highlights, categories }: HomeProps) => {
+  const spotlightItems =
+    highlights && highlights.length > 0
+      ? highlights
+      : null;
+
   return (
     <main className="bg-white">
-      {/* Hero / banner area */}
       <section className="relative overflow-hidden pt-32">
-        <HeroBannerCarousel />
+        <HeroBannerCarousel slides={heroSlides} />
       </section>
 
-      {/* Made for collectors / feature strip */}
       <section className="py-14 bg-white">
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
           <div className="max-w-2xl mx-auto mb-10 text-center">
             <p className="mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
-              Section tagline placeholder
+              Highlights
             </p>
             <h2 className="mb-3 text-2xl font-semibold sm:text-3xl text-dark">
-              Designed for collectors, tuned for everyday browsing.
+              Featured collections and picks.
             </h2>
             <p className="text-sm leading-relaxed text-meta-3 sm:text-base">
-              Use this section to explain how your catalog is organized. Each
-              card below can later link to a highlight category, story, or
-              landing page.
+              Cards below are managed in Admin → Marketing (featured, trending, categories, or
+              individual products).
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            {COLLECTION_SPOTLIGHTS.map((item) => (
-              <button
-                key={item.src}
-                type="button"
-                className="group relative overflow-hidden rounded-2xl border border-gray-3 bg-white shadow-md shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-red/40 active:scale-[0.98] active:translate-y-0"
-                aria-label={item.alt}
-              >
-                <div className="relative aspect-[4/3] md:aspect-[5/4]">
-                  <Image
-                    src={item.src}
-                    alt={item.alt}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-x-3 bottom-3 rounded-lg bg-red/90 px-3 py-2 shadow-md shadow-red/30 transition-all duration-300 group-hover:bg-red group-hover:shadow-lg group-hover:shadow-red/40">
-                    <p className="text-sm font-bold text-white tracking-wide">
-                      {item.label}
-                    </p>
+            {spotlightItems ? (
+              spotlightItems.map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className="group relative overflow-hidden rounded-2xl border border-gray-3 bg-white shadow-md shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-red/40 active:scale-[0.98] active:translate-y-0 text-left"
+                >
+                  <div className="relative aspect-[4/3] md:aspect-[5/4]">
+                    <Image
+                      src={item.image}
+                      alt={item.alt}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="object-cover"
+                      unoptimized={isRemoteImage(item.image)}
+                    />
+                    <div className="absolute inset-x-3 bottom-3 rounded-lg bg-red/90 px-3 py-2 shadow-md shadow-red/30 transition-all duration-300 group-hover:bg-red group-hover:shadow-lg group-hover:shadow-red/40">
+                      <p className="text-sm font-bold text-white tracking-wide">{item.label}</p>
+                      {item.subtitle ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-white/90 line-clamp-2">
+                          {item.subtitle}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </Link>
+              ))
+            ) : (
+              <p className="text-sm text-meta-3 md:col-span-3 text-center py-6">
+                No active homepage highlights — add some under Admin → Marketing.
+              </p>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Shop by brand – horizontal cards, no JS carousel */}
       <section className="py-14 bg-gray-1 border-y border-gray-3">
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
           <div className="flex flex-col items-start justify-between gap-4 mb-8 sm:flex-row sm:items-end">
             <div>
               <p className="mb-1 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
-                Placeholder: brand rail
+                Shop by brand
               </p>
               <h2 className="text-xl font-semibold text-dark xl:text-heading-5">
                 Browse by maker or universe.
               </h2>
               <p className="mt-1 text-sm text-meta-3">
-                This row is reserved for your key brands once they are ready.
+                Brand rail — swap images or wire to catalog brands when ready.
               </p>
             </div>
             <p className="text-xs text-meta-4 sm:text-sm">
@@ -118,10 +136,7 @@ const Home = () => {
           <div className="relative">
             <div className="flex gap-4 px-1 pb-2 overflow-x-auto sm:px-0 sm:gap-5 no-scrollbar">
               {BRAND_ITEMS.map((item, index) => (
-                <div
-                  key={index}
-                  className="min-w-[200px] sm:min-w-[240px] flex flex-col"
-                >
+                <div key={index} className="min-w-[200px] sm:min-w-[240px] flex flex-col">
                   <div className="relative aspect-square overflow-hidden">
                     <Image
                       src={item.src}
@@ -132,9 +147,7 @@ const Home = () => {
                     />
                   </div>
                   <div className="mt-2 inline-flex items-center justify-center rounded-xl bg-white border border-gray-3 px-3 py-2 shadow-sm">
-                    <span className="text-xs sm:text-sm font-semibold text-dark">
-                      {item.label}
-                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-dark">{item.label}</span>
                   </div>
                 </div>
               ))}
@@ -143,43 +156,53 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Shop by category – simple grid to keep DOM light */}
       <section className="py-14 bg-white">
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
           <div className="flex flex-col items-start justify-between gap-4 mb-8 sm:flex-row sm:items-end">
             <div>
               <p className="mb-1 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
-                Placeholder: categories
+                Categories
               </p>
               <h2 className="text-xl font-semibold text-dark xl:text-heading-5">
                 Discover by category.
               </h2>
               <p className="mt-1 text-sm text-meta-3">
-                Each tile below can later map directly to one of your main
-                catalog categories.
+                Pulled from your catalog (up to eight).
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <div
-                key={index}
-                className="flex flex-col justify-between h-full px-4 py-5 rounded-2xl bg-gray-1 border border-gray-3"
-              >
-                <h3 className="text-sm font-semibold text-dark sm:text-base">
-                  Category placeholder {index + 1}
-                </h3>
-                <p className="mt-2 text-[11px] text-meta-3">
-                  Short label that hints at what lives under this category.
-                </p>
-              </div>
-            ))}
+            {categories && categories.length > 0 ? (
+              categories.map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/shop?category=${encodeURIComponent(cat.slug)}`}
+                  className="flex flex-col justify-between h-full px-4 py-5 rounded-2xl bg-gray-1 border border-gray-3 hover:border-blue/40 hover:shadow-sm transition"
+                >
+                  <h3 className="text-sm font-semibold text-dark sm:text-base">{cat.name}</h3>
+                  <p className="mt-2 text-[11px] text-meta-3">View products in this category.</p>
+                </Link>
+              ))
+            ) : (
+              Array.from({ length: 8 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col justify-between h-full px-4 py-5 rounded-2xl bg-gray-1 border border-gray-3"
+                >
+                  <h3 className="text-sm font-semibold text-dark sm:text-base">
+                    Category placeholder {index + 1}
+                  </h3>
+                  <p className="mt-2 text-[11px] text-meta-3">
+                    Add categories in admin to populate this grid.
+                  </p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      {/* Visit us section */}
       <section className="py-16 bg-white">
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
           <div className="rounded-2xl border border-gray-3 bg-gray-1 p-6 sm:p-8">
@@ -195,22 +218,11 @@ const Home = () => {
                 <div>
                   <dt className="font-semibold text-dark">Location</dt>
                   <dd className="mt-1 text-meta-3">
-                    24, Basement, 21st Main Rd, Banashankari Stage II,
-                    Banashankari, Bengaluru, Karnataka 560070
+                    24, Basement, 21st Main Rd, Banashankari Stage II, Banashankari, Bengaluru,
+                    Karnataka 560070
                   </dd>
                 </div>
               </dl>
-
-              <div className="mt-8">
-                <a
-                  href={VISIT_US_MAP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white rounded-lg bg-blue hover:bg-blue-dark transition-colors"
-                >
-                  Get directions
-                </a>
-              </div>
             </div>
           </div>
         </div>

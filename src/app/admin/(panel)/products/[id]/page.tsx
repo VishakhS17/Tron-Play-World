@@ -85,7 +85,7 @@ export default function EditProductPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to save");
       toast.success("Saved");
-      router.refresh();
+      router.push("/admin/products");
     } catch (err: any) {
       toast.error(err?.message || "Failed");
     } finally {

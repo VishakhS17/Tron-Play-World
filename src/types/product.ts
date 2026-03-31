@@ -10,6 +10,7 @@ export type Product = {
   updatedAt: Date;
   reviews: number;
   shortDescription: string;
+  ageGroup?: string | null;
   /** Cover image URL for thumbnails/cards (first product_image by sort_order). */
   image?: string;
   productVariants: {
@@ -29,6 +30,7 @@ export type IProductByDetails = {
   id: string;
   title: string;
   shortDescription: string;
+  ageGroup?: string | null;
   description: string | null;
   price: number;
   discountedPrice?: number | null;

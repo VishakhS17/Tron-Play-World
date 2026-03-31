@@ -4,27 +4,83 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
+type Category = { id: string; name: string; slug: string };
+
+type CouponForm = {
+  code?: string;
+  discount_type?: string;
+  discount_value?: string | number;
+  min_cart_value?: string | number | null;
+  max_uses?: string | number | null;
+  max_uses_per_user?: string | number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  is_active?: boolean;
+  category_ids?: string[];
+};
+
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function EditCouponPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<any>(null);
+  const [form, setForm] = useState<CouponForm | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    void fetch("/api/admin/categories")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setCategories(data);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     (async () => {
       const res = await fetch(`/api/admin/coupons/${id}`);
       const data = await res.json().catch(() => null);
-      setForm(data);
+      if (!data || data.error) {
+        setForm(null);
+        return;
+      }
+      setForm({
+        ...data,
+        category_ids: Array.isArray(data.category_ids) ? data.category_ids : [],
+        starts_at: toLocalInput(data.starts_at),
+        ends_at: toLocalInput(data.ends_at),
+      });
     })();
   }, [id]);
 
   async function save() {
+    if (!form) return;
     setLoading(true);
     try {
+      const starts_at =
+        form.starts_at && String(form.starts_at).trim()
+          ? new Date(String(form.starts_at)).toISOString()
+          : null;
+      const ends_at =
+        form.ends_at && String(form.ends_at).trim()
+          ? new Date(String(form.ends_at)).toISOString()
+          : null;
       const res = await fetch(`/api/admin/coupons/${id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          starts_at,
+          ends_at,
+          category_ids: form.category_ids ?? [],
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed");
@@ -38,6 +94,8 @@ export default function EditCouponPage() {
   }
 
   if (!form) return <div className="text-sm text-meta-3">Loading…</div>;
+
+  const selected = new Set(form.category_ids ?? []);
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -57,7 +115,7 @@ export default function EditCouponPage() {
           <span className="mb-1 block text-sm font-medium text-dark">Code</span>
           <input
             value={form.code ?? ""}
-            onChange={(e) => setForm((f: any) => ({ ...f, code: e.target.value.toUpperCase() }))}
+            onChange={(e) => setForm((f) => ({ ...f!, code: e.target.value.toUpperCase() }))}
             className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
           />
         </label>
@@ -66,7 +124,7 @@ export default function EditCouponPage() {
             <span className="mb-1 block text-sm font-medium text-dark">Type</span>
             <select
               value={form.discount_type}
-              onChange={(e) => setForm((f: any) => ({ ...f, discount_type: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f!, discount_type: e.target.value }))}
               className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
             >
               <option value="PERCENTAGE">PERCENTAGE</option>
@@ -77,7 +135,7 @@ export default function EditCouponPage() {
             <span className="mb-1 block text-sm font-medium text-dark">Value</span>
             <input
               value={form.discount_value ?? ""}
-              onChange={(e) => setForm((f: any) => ({ ...f, discount_value: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f!, discount_value: e.target.value }))}
               className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
             />
           </label>
@@ -87,16 +145,86 @@ export default function EditCouponPage() {
           <span className="mb-1 block text-sm font-medium text-dark">Min cart value</span>
           <input
             value={form.min_cart_value ?? ""}
-            onChange={(e) => setForm((f: any) => ({ ...f, min_cart_value: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f!, min_cart_value: e.target.value }))}
             className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
           />
         </label>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-dark">Max uses (total)</span>
+            <input
+              value={form.max_uses ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f!, max_uses: e.target.value }))}
+              className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+              placeholder="empty = unlimited"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-dark">Max uses per user</span>
+            <input
+              value={form.max_uses_per_user ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f!, max_uses_per_user: e.target.value }))}
+              className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+              placeholder="empty = unlimited"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-dark">Starts at</span>
+            <input
+              type="datetime-local"
+              value={form.starts_at ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f!, starts_at: e.target.value }))}
+              className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-dark">Ends at</span>
+            <input
+              type="datetime-local"
+              value={form.ends_at ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f!, ends_at: e.target.value }))}
+              className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+            />
+          </label>
+        </div>
+
+        <div>
+          <span className="mb-2 block text-sm font-medium text-dark">
+            Allowed categories (optional)
+          </span>
+          <p className="text-xs text-meta-3 mb-2">
+            If any are selected, <strong>every</strong> cart line must belong to one of these categories.
+          </p>
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-3 p-3 space-y-2">
+            {categories.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selected.has(c.id)}
+                  onChange={() => {
+                    setForm((f) => {
+                      const cur = new Set(f!.category_ids ?? []);
+                      if (cur.has(c.id)) cur.delete(c.id);
+                      else cur.add(c.id);
+                      return { ...f!, category_ids: [...cur] };
+                    });
+                  }}
+                />
+                {c.name}
+              </label>
+            ))}
+          </div>
+        </div>
 
         <label className="flex items-center gap-2 text-sm text-meta-3">
           <input
             type="checkbox"
             checked={Boolean(form.is_active)}
-            onChange={(e) => setForm((f: any) => ({ ...f, is_active: e.target.checked }))}
+            onChange={(e) => setForm((f) => ({ ...f!, is_active: e.target.checked }))}
           />
           Active
         </label>
@@ -104,4 +232,3 @@ export default function EditCouponPage() {
     </div>
   );
 }
-

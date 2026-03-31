@@ -50,8 +50,8 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
 
   if (!order) notFound();
   const isOwner = Boolean(session?.sub && order.customer_id && order.customer_id === session.sub);
-  const hasGuestAccess = Boolean(!order.customer_id && access && verifyOrderAccessToken(access, order.id));
-  if (!isOwner && !hasGuestAccess) {
+  const hasCheckoutAccess = Boolean(access && verifyOrderAccessToken(access, order.id));
+  if (!isOwner && !hasCheckoutAccess) {
     return (
       <section className="pt-36 pb-16">
         <div className="w-full px-4 mx-auto max-w-3xl sm:px-6">

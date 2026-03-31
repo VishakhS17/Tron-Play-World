@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 
-function isEmailConfigured() {
+export function isEmailConfigured() {
   return Boolean(
     process.env.EMAIL_SERVER_HOST &&
       process.env.EMAIL_SERVER_PORT &&
@@ -14,6 +14,8 @@ export async function sendEmail(input: {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text part — improves deliverability and shows the link if HTML is clipped. */
+  text?: string;
 }) {
   if (!isEmailConfigured()) return { ok: false, skipped: true };
 
@@ -32,6 +34,7 @@ export async function sendEmail(input: {
     to: input.to,
     subject: input.subject,
     html: input.html,
+    ...(input.text ? { text: input.text } : {}),
   });
 
   return { ok: true };
@@ -47,6 +50,98 @@ export function orderEmailTemplate(input: {
     <h2>${input.heading}</h2>
     <p>${input.message}</p>
     <p><b>Order:</b> ${input.orderId}</p>
+  </div>
+  `;
+}
+
+function escapeHtmlAttr(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+/** Rich order / shipment update (customer-facing). */
+export function orderUpdateCustomerEmailHtml(input: {
+  orderId: string;
+  orderUrl: string;
+  blocksHtml: string[];
+}) {
+  const safeOrder = escapeHtmlAttr(input.orderId);
+  const safeUrl = escapeHtmlAttr(input.orderUrl);
+  return `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.55;color:#111">
+    <h2 style="margin:0 0 0.5em">Order update</h2>
+    <p style="margin:0 0 1em">Your order <strong>${safeOrder}</strong> has an update.</p>
+    ${input.blocksHtml.join("\n")}
+    <p style="margin:1.5em 0 0">
+      <a href="${safeUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">View order</a>
+    </p>
+  </div>`;
+}
+
+export function abandonedCartReminderEmailHtml(input: { shopUrl: string; sampleLines: string[] }) {
+  const safeUrl = escapeHtmlAttr(input.shopUrl);
+  const lines =
+    input.sampleLines.length > 0
+      ? `<ul style="margin:0.5em 0 1em;padding-left:1.25em">${input.sampleLines
+          .slice(0, 5)
+          .map((l) => `<li>${escapeHtmlAttr(l)}</li>`)
+          .join("")}</ul>`
+      : "";
+  return `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.55;color:#111">
+    <h2 style="margin:0 0 0.5em">Still interested?</h2>
+    <p style="margin:0 0 1em">You left items in your cart at i-Robox. Come back when you’re ready to check out.</p>
+    ${lines}
+    <p style="margin:0"><a href="${safeUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">Continue shopping</a></p>
+  </div>`;
+}
+
+/** Dedicated message so the set-password step is not buried in the order email. */
+/** Single email: pending order + optional set-password block (avoids losing a 2nd message to spam/threading). */
+export function orderPendingCustomerEmailHtml(input: {
+  orderId: string;
+  passwordSetup?: { email: string; setupUrl: string };
+}) {
+  const orderPart = orderEmailTemplate({
+    heading: "We received your order",
+    message:
+      "Your order has been created in a pending state. Please complete payment to confirm it.",
+    orderId: input.orderId,
+  });
+  if (!input.passwordSetup) return orderPart;
+  return `${orderPart}
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0" />
+  ${passwordSetupInviteEmailHtml(input.passwordSetup)}`;
+}
+
+export function orderPendingCustomerEmailText(input: {
+  orderId: string;
+  passwordSetup?: { email: string; setupUrl: string };
+}) {
+  let t = `We received your order. It is pending until payment is completed.\n\nOrder id: ${input.orderId}\n`;
+  if (input.passwordSetup) {
+    t += `\n---\nWe created an account for ${input.passwordSetup.email}.\nSet your password (one-time link, 7 days):\n${input.passwordSetup.setupUrl}\n`;
+  }
+  return t;
+}
+
+export function passwordSetupInviteEmailHtml(input: { email: string; setupUrl: string }) {
+  const safeEmail = input.email
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const safeHref = input.setupUrl.replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return `
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.6;color:#111">
+    <h2 style="margin:0 0 0.5em">Choose your password</h2>
+    <p style="margin:0 0 1em">We created an account for <strong>${safeEmail}</strong> so you can track orders and sign in later.</p>
+    <p style="margin:0 0 1em">Use the button below to set a password. This link works once and expires in 7 days.</p>
+    <p style="margin:0 0 1.5em">
+      <a href="${safeHref}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">
+        Set password
+      </a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#555">If the button does not work, copy and paste this link into your browser:<br/>
+    <span style="word-break:break-all">${safeHref}</span></p>
   </div>
   `;
 }

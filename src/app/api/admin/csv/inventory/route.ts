@@ -4,6 +4,7 @@ import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanText, readJsonBody } from "@/lib/validation/input";
+import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
 
 function parseCsv(csv: string) {
   const lines = csv
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
 
   const rows = parseCsv(cleanText(body.csv, 2_000_000));
   let count = 0;
+  const touchedProductIds = new Set<string>();
 
   for (const r of rows) {
     const slug = String(r.product_slug ?? "").trim();
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
 
     const product = await prisma.products.findUnique({ where: { slug }, select: { id: true } });
     if (!product) continue;
+    touchedProductIds.add(product.id);
 
     await prisma.inventory.upsert({
       where: { product_id_product_variant_id: { product_id: product.id, product_variant_id: null } } as any,
@@ -66,6 +69,10 @@ export async function POST(req: NextRequest) {
 
     count++;
   }
+
+  await syncLowStockAlertsByProductIds([...touchedProductIds]).catch((err) => {
+    console.error("[admin csv inventory POST] low stock alert sync failed", err);
+  });
 
   return NextResponse.json({ ok: true, count }, { status: 200 });
 }

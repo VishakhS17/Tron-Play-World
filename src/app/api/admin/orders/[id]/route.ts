@@ -7,9 +7,12 @@ import {
   cleanText,
   hasSuspiciousInput,
   isAllowedOrderStatus,
+  isAllowedShipmentStatus,
   isUuid,
   readJsonBody,
 } from "@/lib/validation/input";
+import { notifyCustomerOrderOrShipmentUpdate } from "@/lib/orders/customerOrderNotifications";
+import { isSyntheticPhoneSignupEmail } from "@/lib/auth/signupIdentifier";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
@@ -77,29 +80,92 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ error: "Invalid order status" }, { status: 400 });
   }
 
+  const before = await prisma.orders.findUnique({
+    where: { id },
+    select: {
+      status: true,
+      customers: { select: { email: true } },
+      shipments: { select: { status: true, carrier: true, tracking_number: true } },
+    },
+  });
+  if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const prevStatus = String(before.status);
+  const prevShip = before.shipments
+    ? {
+        status: String(before.shipments.status),
+        carrier: before.shipments.carrier,
+        tracking_number: before.shipments.tracking_number,
+      }
+    : null;
+
   await prisma.orders.update({ where: { id }, data: { status: status as any } });
 
+  let nextShip = prevShip;
   const shipment = body.shipment;
   if (shipment && typeof shipment === "object" && !Array.isArray(shipment)) {
     const s = shipment as Record<string, unknown>;
     const carrierRaw = typeof s.carrier === "string" ? s.carrier : null;
     const trackingRaw = typeof s.tracking_number === "string" ? s.tracking_number : null;
+    const shipmentStatusRaw = typeof s.status === "string" ? cleanText(s.status, 40) : null;
     const carrier = carrierRaw !== null ? cleanText(carrierRaw, 120) : null;
     const tracking_number = trackingRaw !== null ? cleanText(trackingRaw, 255) : null;
+    if (shipmentStatusRaw && !isAllowedShipmentStatus(shipmentStatusRaw)) {
+      return NextResponse.json({ error: "Invalid shipment status" }, { status: 400 });
+    }
     if ((carrier && hasSuspiciousInput(carrier)) || (tracking_number && hasSuspiciousInput(tracking_number))) {
       return NextResponse.json({ error: "Invalid shipment fields" }, { status: 400 });
     }
 
-    await prisma.shipments.upsert({
+    const createStatus = (shipmentStatusRaw ?? "CREATED") as any;
+    const updated = await prisma.shipments.upsert({
       where: { order_id: id },
-      update: { carrier, tracking_number },
+      update: {
+        carrier,
+        tracking_number,
+        ...(shipmentStatusRaw ? { status: shipmentStatusRaw as any } : {}),
+      },
       create: {
         order_id: id,
-        status: "CREATED",
+        status: createStatus,
         carrier,
         tracking_number,
       },
+      select: { status: true, carrier: true, tracking_number: true },
     });
+    nextShip = {
+      status: String(updated.status),
+      carrier: updated.carrier,
+      tracking_number: updated.tracking_number,
+    };
+  } else {
+    const srow = await prisma.shipments.findUnique({
+      where: { order_id: id },
+      select: { status: true, carrier: true, tracking_number: true },
+    });
+    nextShip = srow
+      ? {
+          status: String(srow.status),
+          carrier: srow.carrier,
+          tracking_number: srow.tracking_number,
+        }
+      : null;
+  }
+
+  const emailTo = before.customers?.email ?? null;
+  if (emailTo && !isSyntheticPhoneSignupEmail(emailTo)) {
+    try {
+      await notifyCustomerOrderOrShipmentUpdate({
+        to: emailTo,
+        orderId: id,
+        previousOrderStatus: prevStatus,
+        nextOrderStatus: status,
+        previousShipment: prevShip,
+        nextShipment: nextShip,
+      });
+    } catch (err) {
+      console.error("[admin orders PUT] customer notify email failed", err);
+    }
   }
 
   return NextResponse.json({ ok: true }, { status: 200 });

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prismaDB";
 import { unstable_cache } from "next/cache";
+import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
 
 const pickDefaultImage = (product: {
   product_images?: { url: string; sort_order: number }[];
@@ -259,6 +260,7 @@ export const getProductBySlug = async (slug: string) => {
       description: true,
       base_price: true,
       discounted_price: true,
+      age_group: true,
       slug: true,
       updated_at: true,
       categories: {
@@ -280,14 +282,24 @@ export const getProductBySlug = async (slug: string) => {
     },
   });
   if (!product) return null;
+  const flash = await prisma.flash_sale_products.findFirst({
+    where: { product_id: product.id, is_active: true },
+    select: { sale_price: true, is_active: true, active_from: true, active_until: true },
+  });
+  const now = new Date();
+  const flashPrice =
+    flash && isActiveInWindow(flash.is_active, flash.active_from, flash.active_until, now)
+      ? Number(flash.sale_price)
+      : null;
   return {
     id: product.id,
     title: product.name,
     shortDescription: product.short_description ?? "",
+    ageGroup: product.age_group ?? null,
     description: product.description ?? "",
     body: "",
     price: Number(product.base_price),
-    discountedPrice: product.discounted_price ? Number(product.discounted_price) : null,
+    discountedPrice: flashPrice ?? (product.discounted_price ? Number(product.discounted_price) : null),
     slug: product.slug,
     quantity: getInventoryQuantity(product.inventory),
     sku: product.sku ?? "",
@@ -323,6 +335,7 @@ export const getProductById = async (productId: string) => {
       description: true,
       base_price: true,
       discounted_price: true,
+      age_group: true,
       slug: true,
       updated_at: true,
       sku: true,
@@ -337,6 +350,7 @@ export const getProductById = async (productId: string) => {
     id: product.id,
     title: product.name,
     shortDescription: product.short_description ?? "",
+    ageGroup: product.age_group ?? null,
     description: product.description ?? "",
     body: "",
     price: Number(product.base_price),

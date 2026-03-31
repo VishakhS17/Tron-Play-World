@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit";
-import { sendEmail, orderEmailTemplate } from "@/lib/email";
+import { sendEmail, orderPendingCustomerEmailHtml, orderPendingCustomerEmailText } from "@/lib/email";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { createOrderAccessToken } from "@/lib/security/orderAccess";
 import { validateCommonEmailProvider } from "@/lib/validateEmai";
+import { getSiteBaseUrl } from "@/lib/siteUrl";
+import { generatePasswordSetupSecret, PASSWORD_SETUP_TTL_MS } from "@/lib/auth/passwordSetupToken";
 import bcrypt from "bcrypt";
 import {
   cleanOptionalText,
@@ -17,6 +19,16 @@ import {
   readJsonBody,
   isUuid,
 } from "@/lib/validation/input";
+import { flashSalePriceMap, unitPriceWithFlashSale } from "@/lib/pricing/flashSale";
+import {
+  categoryScopeError,
+  computeCouponDiscount,
+  couponTimingError,
+  couponUsageErrors,
+  fetchCouponForCart,
+} from "@/lib/coupons/cartCoupon";
+import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
+import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
 
 type CheckoutItem = {
   productId: string;
@@ -65,6 +77,13 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  const guestCheckoutRequested = body.guestCheckout === true || body.guestCheckout === "true";
+  const sessionEmailNorm = session?.email ? normalizeEmail(session.email) : "";
+  const emailMismatch =
+    Boolean(session?.sub) && sessionEmailNorm.length > 0 && sessionEmailNorm !== email;
+  const guestCheckout = guestCheckoutRequested || emailMismatch;
+
   if (
     [full_name, phone, email, line1, city, state, postal_code, country, couponCode]
       .filter(Boolean)
@@ -76,7 +95,14 @@ export async function POST(req: NextRequest) {
   const productIds = items.map((i) => i.productId);
   const dbProducts = await prisma.products.findMany({
     where: { id: { in: productIds }, is_active: true },
-    select: { id: true, name: true, sku: true, base_price: true, discounted_price: true },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      base_price: true,
+      discounted_price: true,
+      category_id: true,
+    },
   });
   const productMap = new Map(dbProducts.map((p) => [p.id, p]));
 
@@ -92,21 +118,33 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let checkoutUserId = session?.sub ?? null;
-  let checkoutEmail = session?.email ?? email;
+  let checkoutUserId: string | null = null;
+  let checkoutEmail = email;
+  let checkoutLinkedAs: "session" | "existing_customer" | "new_customer";
+
+  if (!guestCheckout && session?.sub) {
+    checkoutLinkedAs = "session";
+    checkoutUserId = session.sub;
+    checkoutEmail = normalizeEmail(session.email ?? email);
+  } else {
+    checkoutLinkedAs = "existing_customer";
+  }
+  /** When checkout creates a brand-new customer on this request, we email a set-password link in the order mail. */
+  let newAccountPasswordSetup: { setupUrl: string } | null = null;
+
   if (!checkoutUserId) {
     const existingUser = await prisma.customers.findUnique({
       where: { email },
       select: { id: true, email: true },
     });
     if (existingUser) {
+      checkoutLinkedAs = "existing_customer";
       checkoutUserId = existingUser.id;
       checkoutEmail = existingUser.email;
     } else {
-      const randomPasswordHash = await bcrypt.hash(
-        `${email}:${Date.now()}:${Math.random()}`,
-        12
-      );
+      checkoutLinkedAs = "new_customer";
+      const { raw: autoAccountSecret } = generatePasswordSetupSecret();
+      const randomPasswordHash = await bcrypt.hash(autoAccountSecret, 12);
       const createdUser = await prisma.customers.create({
         data: {
           email,
@@ -119,28 +157,38 @@ export async function POST(req: NextRequest) {
       });
       checkoutUserId = createdUser.id;
       checkoutEmail = createdUser.email;
+
+      try {
+        const { raw: setupRaw, token_hash } = generatePasswordSetupSecret();
+        await prisma.customer_password_setup_tokens.deleteMany({
+          where: { customer_id: createdUser.id, used_at: null },
+        });
+        await prisma.customer_password_setup_tokens.create({
+          data: {
+            customer_id: createdUser.id,
+            token_hash,
+            expires_at: new Date(Date.now() + PASSWORD_SETUP_TTL_MS),
+          },
+        });
+        const setupUrl = `${getSiteBaseUrl()}/set-password?token=${encodeURIComponent(setupRaw)}`;
+        newAccountPasswordSetup = { setupUrl };
+      } catch (tokenErr) {
+        console.error(
+          "[checkout] password setup token failed (run prisma migrate deploy?)",
+          tokenErr
+        );
+      }
     }
   }
 
-  const coupon = couponCode
-    ? await prisma.coupons.findFirst({
-        where: { code: couponCode, is_active: true },
-        select: {
-          id: true,
-          discount_type: true,
-          discount_value: true,
-          min_cart_value: true,
-          starts_at: true,
-          ends_at: true,
-          max_uses: true,
-          max_uses_per_user: true,
-        },
-      })
-    : null;
+  const coupon = couponCode ? await fetchCouponForCart(couponCode) : null;
+
+  const flashMap = await flashSalePriceMap(productIds);
 
   const lineItems = items.map((i) => {
     const p = productMap.get(i.productId)!;
-    const unit = Number(p.discounted_price ?? p.base_price);
+    const catalogUnit = Number(p.discounted_price ?? p.base_price);
+    const unit = unitPriceWithFlashSale(catalogUnit, p.id, flashMap);
     return {
       productId: p.id,
       productName: p.name,
@@ -155,38 +203,43 @@ export async function POST(req: NextRequest) {
   let discount = 0;
   if (coupon) {
     const now = new Date();
-    if (coupon.starts_at && coupon.starts_at > now) {
-      return NextResponse.json({ error: "Coupon is not active yet" }, { status: 400 });
-    }
-    if (coupon.ends_at && coupon.ends_at < now) {
-      return NextResponse.json({ error: "Coupon has expired" }, { status: 400 });
-    }
-    const minOk = coupon.min_cart_value ? subtotal >= Number(coupon.min_cart_value) : true;
+    const timeErr = couponTimingError(coupon, now);
+    if (timeErr) return NextResponse.json({ error: timeErr }, { status: 400 });
+
+    const lineMeta = items.map((i) => {
+      const p = productMap.get(i.productId)!;
+      return { productId: p.id, categoryId: p.category_id };
+    });
+    const scopeErr = categoryScopeError(coupon.categoryIds, lineMeta);
+    if (scopeErr) return NextResponse.json({ error: scopeErr }, { status: 400 });
+
+    const minOk = coupon.min_cart_value != null ? subtotal >= coupon.min_cart_value : true;
     if (!minOk) return NextResponse.json({ error: "Coupon minimum not met" }, { status: 400 });
 
-    if (coupon.max_uses) {
-      const used = await prisma.coupon_usages.count({ where: { coupon_id: coupon.id } });
-      if (used >= coupon.max_uses) {
-        return NextResponse.json({ error: "Coupon usage limit reached" }, { status: 400 });
-      }
-    }
-    if (coupon.max_uses_per_user && session?.sub) {
-      const usedByUser = await prisma.coupon_usages.count({
-        where: { coupon_id: coupon.id, customer_id: session.sub },
+    const usageErr = await couponUsageErrors(coupon, checkoutUserId);
+    if (usageErr) return NextResponse.json({ error: usageErr }, { status: 400 });
+
+    // First-visit coupon is enforced one-time per customer/email regardless of browser storage.
+    if (checkoutUserId) {
+      const settings = await prisma.site_marketing_settings.findUnique({
+        where: { id: SITE_MARKETING_SETTINGS_ID },
+        select: { first_visit_coupon_code: true },
       });
-      if (usedByUser >= coupon.max_uses_per_user) {
-        return NextResponse.json(
-          { error: "Coupon usage limit reached for your account" },
-          { status: 400 }
-        );
+      const firstVisitCode = (settings?.first_visit_coupon_code ?? "").trim().toUpperCase();
+      if (firstVisitCode && coupon.code.toUpperCase() === firstVisitCode) {
+        const usedFirstVisit = await prisma.coupon_usages.count({
+          where: { coupon_id: coupon.id, customer_id: checkoutUserId },
+        });
+        if (usedFirstVisit > 0) {
+          return NextResponse.json(
+            { error: "First-visit offer already used for this email" },
+            { status: 400 }
+          );
+        }
       }
     }
 
-    if (coupon.discount_type === "PERCENTAGE") {
-      discount = Math.round((subtotal * Number(coupon.discount_value)) / 100);
-    } else {
-      discount = Math.min(subtotal, Number(coupon.discount_value));
-    }
+    discount = computeCouponDiscount(subtotal, coupon);
   }
   const total = Math.max(0, subtotal - discount);
 
@@ -275,8 +328,13 @@ export async function POST(req: NextRequest) {
     return createdOrder;
   });
 
+  // Best-effort low-stock alerting after reservation update.
+  await syncLowStockAlertsByProductIds(lineItems.map((li) => li.productId)).catch((err) => {
+    console.error("[checkout] low stock alert sync failed", err);
+  });
+
   await writeAuditLog({
-    customerId: session?.sub ?? null,
+    customerId: checkoutUserId,
     entityType: "ORDER",
     entityId: order.id,
     action: "ORDER_CREATED_PENDING",
@@ -286,19 +344,49 @@ export async function POST(req: NextRequest) {
   });
 
   if (checkoutEmail) {
-    await sendEmail({
-      to: checkoutEmail,
-      subject: "Order created (pending payment)",
-      html: orderEmailTemplate({
-        heading: "We received your order",
-        message:
-          "Your order has been created in a pending state. Please complete payment to confirm it.",
-        orderId: order.id,
-      }),
-    });
+    try {
+      const passwordSetup = newAccountPasswordSetup
+        ? { email: checkoutEmail, setupUrl: newAccountPasswordSetup.setupUrl }
+        : undefined;
+      const mailResult = await sendEmail({
+        to: checkoutEmail,
+        subject: newAccountPasswordSetup
+          ? "Order received — set your password (see email)"
+          : "Order created (pending payment)",
+        html: orderPendingCustomerEmailHtml({
+          orderId: order.id,
+          passwordSetup,
+        }),
+        text: orderPendingCustomerEmailText({
+          orderId: order.id,
+          passwordSetup,
+        }),
+      });
+      if (mailResult.skipped && newAccountPasswordSetup?.setupUrl) {
+        console.warn(
+          "[checkout] SMTP not configured (EMAIL_SERVER_* / EMAIL_FROM) — email skipped. Local set-password URL:\n%s",
+          newAccountPasswordSetup.setupUrl
+        );
+      }
+    } catch (err) {
+      console.error("[checkout] order email failed", err);
+    }
   }
 
   const accessToken = createOrderAccessToken(order.id);
-  return NextResponse.json({ ok: true, orderId: order.id, accessToken }, { status: 201 });
+  return NextResponse.json(
+    {
+      ok: true,
+      orderId: order.id,
+      accessToken,
+      /** Checkout attached to session vs reused email vs new row this request. */
+      checkoutLinkedAs,
+      /** True when a one-time set-password URL was generated and included in the order email. */
+      passwordSetupIncluded: Boolean(newAccountPasswordSetup),
+      /** True when this request created a new `customers` row (may still lack password link if token DB failed). */
+      newAccountCreated: checkoutLinkedAs === "new_customer",
+    },
+    { status: 201 }
+  );
 }
 

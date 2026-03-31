@@ -87,6 +87,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
             {product.shortDescription ? (
               <p className="mt-4 text-base text-meta-3">{product.shortDescription}</p>
             ) : null}
+            {product.ageGroup ? (
+              <p className="mt-3 inline-flex rounded-full border border-gray-3 bg-gray-1 px-3 py-1 text-xs font-medium text-meta-3">
+                Recommended age: {product.ageGroup}
+              </p>
+            ) : null}
 
             {product.description ? (
               <>

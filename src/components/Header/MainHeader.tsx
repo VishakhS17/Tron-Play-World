@@ -15,12 +15,29 @@ import {
   MenuIcon,
   CloseIcon,
 } from "./icons";
-import { HeaderSetting } from "@prisma/client";
 import { useAppSelector } from "@/redux/store";
 import toast from "react-hot-toast";
 
+export type SiteHeaderData = {
+  headerLogo?: string | null;
+};
+
+export type UtilityAnnouncement = {
+  body: string;
+  linkUrl?: string | null;
+  /** Reserved for future (e.g. aria-label); primary tap target is the full `body` when `linkUrl` is set. */
+  linkLabel?: string | null;
+};
+
+export type MarqueeAnnouncement = {
+  body: string;
+  linkUrl?: string | null;
+};
+
 type IProps = {
-  headerData?: HeaderSetting | null;
+  headerData?: SiteHeaderData | null;
+  utilityAnnouncement?: UtilityAnnouncement | null;
+  marqueeAnnouncements?: MarqueeAnnouncement[];
 };
 
 type MeResponse = {
@@ -33,7 +50,11 @@ type MeResponse = {
   } | null;
 };
 
-const MainHeader = ({ headerData }: IProps) => {
+const MainHeader = ({
+  headerData,
+  utilityAnnouncement,
+  marqueeAnnouncements,
+}: IProps) => {
   const pathname = usePathname();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [stickyMenu, setStickyMenu] = useState(false);
@@ -148,7 +169,26 @@ const MainHeader = ({ headerData }: IProps) => {
           <div className="px-4 mx-auto max-w-7xl sm:px-6 xl:px-0">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs sm:text-sm font-medium text-dark">
-                Minimum order value for free shipping: <span className="font-semibold">₹2000</span>
+                {utilityAnnouncement?.body ? (
+                  utilityAnnouncement.linkUrl ? (
+                    <Link
+                      href={utilityAnnouncement.linkUrl}
+                      className="hover:underline text-blue"
+                      {...(utilityAnnouncement.linkLabel
+                        ? { "aria-label": utilityAnnouncement.linkLabel }
+                        : {})}
+                    >
+                      {utilityAnnouncement.body}
+                    </Link>
+                  ) : (
+                    utilityAnnouncement.body
+                  )
+                ) : (
+                  <>
+                    Minimum order value for free shipping:{" "}
+                    <span className="font-semibold">₹2000</span>
+                  </>
+                )}
               </p>
               {userName ? (
                 <span className="text-xs sm:text-sm font-medium text-blue">
@@ -169,14 +209,35 @@ const MainHeader = ({ headerData }: IProps) => {
         {/* Running promo banner */}
         <div className="bg-white border-b border-gray-3 overflow-hidden">
           <div className="relative">
-            <div className="whitespace-nowrap text-xs sm:text-sm font-medium text-dark py-2 animate-[marquee_18s_linear_infinite]">
-              <span className="mx-6">Use code <b>WELCOME10</b> for 10% off</span>
-              <span className="mx-6">Free shipping over <b>₹2000</b></span>
-              <span className="mx-6">New arrivals added weekly</span>
-              <span className="mx-6">Use code <b>WELCOME10</b> for 10% off</span>
-              <span className="mx-6">Free shipping over <b>₹2000</b></span>
-              <span className="mx-6">New arrivals added weekly</span>
-            </div>
+            {(() => {
+              const items =
+                marqueeAnnouncements && marqueeAnnouncements.length > 0
+                  ? marqueeAnnouncements
+                  : [
+                      { body: "Use code WELCOME10 for 10% off", linkUrl: null as string | null },
+                      { body: "Free shipping over ₹2000", linkUrl: null },
+                      { body: "New arrivals added weekly", linkUrl: null },
+                    ];
+              return (
+                <div className="marquee-track py-2 text-xs sm:text-sm font-medium text-dark">
+                  {[0, 1].map((copyIdx) => (
+                    <div key={copyIdx} className="marquee-group">
+                      {items.map((item, idx) => (
+                        <span key={`${copyIdx}-${idx}`} className="mx-6">
+                          {item.linkUrl ? (
+                            <Link href={item.linkUrl} className="hover:underline">
+                              {item.body}
+                            </Link>
+                          ) : (
+                            item.body
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

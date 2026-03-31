@@ -5,6 +5,7 @@ import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
+import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
@@ -90,27 +91,29 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     data.slug = slug;
   }
   if (body.sku !== undefined) {
+    if (body.sku !== null && typeof body.sku !== "string") return bad();
     const sku = cleanOptionalText(body.sku, 100);
     if (sku && hasSuspiciousInput(sku)) return bad();
     data.sku = sku;
   }
   if (body.description !== undefined) {
-    if (typeof body.description !== "string") return bad();
-    const description = cleanText(body.description, 10000);
+    if (body.description !== null && typeof body.description !== "string") return bad();
+    const description = cleanOptionalText(body.description, 10000);
     if (hasSuspiciousInput(description)) return bad();
-    data.description = description || null;
+    data.description = description;
   }
   if (body.short_description !== undefined) {
-    if (typeof body.short_description !== "string") return bad();
-    const short_description = cleanText(body.short_description, 2000);
+    if (body.short_description !== null && typeof body.short_description !== "string") return bad();
+    const short_description = cleanOptionalText(body.short_description, 2000);
     if (hasSuspiciousInput(short_description)) return bad();
-    data.short_description = short_description || null;
+    data.short_description = short_description;
   }
   if (body.is_active !== undefined) {
     if (typeof body.is_active !== "boolean") return bad();
     data.is_active = body.is_active;
   }
   if (body.age_group !== undefined) {
+    if (body.age_group !== null && typeof body.age_group !== "string") return bad();
     const age_group = cleanOptionalText(body.age_group, 50);
     if (age_group && hasSuspiciousInput(age_group)) return bad();
     data.age_group = age_group;
@@ -186,6 +189,12 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
         },
       });
     }
+  }
+
+  if (hasQty) {
+    await syncLowStockAlertsByProductIds([id]).catch((err) => {
+      console.error("[admin products PUT] low stock alert sync failed", err);
+    });
   }
 
   return NextResponse.json({ ok: true, id: updatedId }, { status: 200 });

@@ -3,7 +3,15 @@ import { prisma } from "@/lib/prismaDB";
 import { getSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
-import { hasSuspiciousInput, normalizeCode, readJsonBody } from "@/lib/validation/input";
+import { hasSuspiciousInput, isUuid, normalizeCode, readJsonBody } from "@/lib/validation/input";
+import {
+  categoryScopeError,
+  computeCouponDiscount,
+  couponTimingError,
+  couponUsageErrors,
+  fetchCouponForCart,
+} from "@/lib/coupons/cartCoupon";
+import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +31,7 @@ export async function POST(req: NextRequest) {
 
   const code = normalizeCode(body.code);
   const subtotal = Number(body.subtotal ?? 0);
+  const rawLines = Array.isArray(body.lineItems) ? body.lineItems : [];
 
   if (!code) return NextResponse.json({ error: "Coupon code is required" }, { status: 400 });
   if (hasSuspiciousInput(code)) {
@@ -32,55 +41,70 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid subtotal" }, { status: 400 });
   }
 
-  const coupon = await prisma.coupons.findFirst({
-    where: { code, is_active: true },
-    select: {
-      id: true,
-      code: true,
-      discount_type: true,
-      discount_value: true,
-      min_cart_value: true,
-      starts_at: true,
-      ends_at: true,
-      max_uses: true,
-      max_uses_per_user: true,
-    },
-  });
+  const coupon = await fetchCouponForCart(code);
 
   if (!coupon) return NextResponse.json({ error: "Invalid coupon" }, { status: 404 });
 
   const now = new Date();
-  if (coupon.starts_at && coupon.starts_at > now) {
-    return NextResponse.json({ error: "Coupon is not active yet" }, { status: 400 });
-  }
-  if (coupon.ends_at && coupon.ends_at < now) {
-    return NextResponse.json({ error: "Coupon has expired" }, { status: 400 });
+  const timeErr = couponTimingError(coupon, now);
+  if (timeErr) return NextResponse.json({ error: timeErr }, { status: 400 });
+
+  if (coupon.categoryIds.length > 0) {
+    const idList: string[] = [];
+    for (const row of rawLines) {
+      if (row && typeof row === "object") {
+        const pid = (row as { productId?: unknown }).productId;
+        if (typeof pid === "string" && isUuid(pid)) idList.push(pid);
+      }
+    }
+    const productIds = [...new Set(idList)];
+    if (productIds.length === 0) {
+      return NextResponse.json(
+        { error: "This coupon applies to specific categories — add items to your cart to validate" },
+        { status: 400 }
+      );
+    }
+    const products = await prisma.products.findMany({
+      where: { id: { in: productIds }, is_active: true },
+      select: { id: true, category_id: true },
+    });
+    const pmap = new Map(products.map((p) => [p.id, p.category_id]));
+    const lineMeta = productIds.map((id) => ({
+      productId: id,
+      categoryId: pmap.get(id) ?? null,
+    }));
+    const scopeErr = categoryScopeError(coupon.categoryIds, lineMeta);
+    if (scopeErr) return NextResponse.json({ error: scopeErr }, { status: 400 });
   }
 
-  if (coupon.min_cart_value && subtotal < Number(coupon.min_cart_value)) {
+  if (coupon.min_cart_value != null && subtotal < coupon.min_cart_value) {
     return NextResponse.json({ error: "Coupon minimum not met" }, { status: 400 });
   }
 
-  if (coupon.max_uses) {
-    const used = await prisma.coupon_usages.count({ where: { coupon_id: coupon.id } });
-    if (used >= coupon.max_uses) {
-      return NextResponse.json({ error: "Coupon usage limit reached" }, { status: 400 });
-    }
-  }
+  const usageErr = await couponUsageErrors(coupon, session?.sub ?? null);
+  if (usageErr) return NextResponse.json({ error: usageErr }, { status: 400 });
 
-  if (coupon.max_uses_per_user && session?.sub) {
-    const usedByUser = await prisma.coupon_usages.count({
-      where: { coupon_id: coupon.id, customer_id: session.sub },
+  // Extra guard for first-visit coupon on logged-in users.
+  if (session?.sub) {
+    const settings = await prisma.site_marketing_settings.findUnique({
+      where: { id: SITE_MARKETING_SETTINGS_ID },
+      select: { first_visit_coupon_code: true },
     });
-    if (usedByUser >= coupon.max_uses_per_user) {
-      return NextResponse.json({ error: "Coupon usage limit reached for your account" }, { status: 400 });
+    const firstVisitCode = (settings?.first_visit_coupon_code ?? "").trim().toUpperCase();
+    if (firstVisitCode && coupon.code.toUpperCase() === firstVisitCode) {
+      const usedFirstVisit = await prisma.coupon_usages.count({
+        where: { coupon_id: coupon.id, customer_id: session.sub },
+      });
+      if (usedFirstVisit > 0) {
+        return NextResponse.json(
+          { error: "First-visit offer already used for this email" },
+          { status: 400 }
+        );
+      }
     }
   }
 
-  const discount =
-    coupon.discount_type === "PERCENTAGE"
-      ? Math.round((subtotal * Number(coupon.discount_value)) / 100)
-      : Math.min(subtotal, Number(coupon.discount_value));
+  const discount = computeCouponDiscount(subtotal, coupon);
 
   return NextResponse.json({
     ok: true,
