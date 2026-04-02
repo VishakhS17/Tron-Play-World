@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
-import Home, { type HomeCategoryTile, type HomeHighlightCard } from "@/components/Home";
+import Home, {
+  type HomeBrandRailItem,
+  type HomeCategoryTile,
+  type HomeHighlightCard,
+} from "@/components/Home";
 import type { HeroSlide } from "@/components/Home/HeroBannerCarousel";
+
+/** CMS-driven content must not be prerendered at build time on Vercel (stale until redeploy). */
+export const dynamic = "force-dynamic";
 
 const FALLBACK_HIGHLIGHT_IMAGE =
   "/images/collections/693c2377f0a417e6ed0a3758-rc-cars-1-14-all-terrain-rc-car-for.jpg";
@@ -40,9 +47,15 @@ export default async function HomePage() {
       })
     );
 
-  const [slidesRaw, highlightsRaw, categoriesRaw] = await Promise.all([
+  const [slidesRaw, highlightsRaw, brandRailRaw, categoriesRaw] = await Promise.all([
     prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }),
     highlightsPromise,
+    prisma.homepage_brand_rail
+      .findMany({
+        orderBy: { sort_order: "asc" },
+        include: { brands: { select: { slug: true, name: true } } },
+      })
+      .catch(() => []),
     prisma.categories.findMany({
       orderBy: { name: "asc" },
       take: 8,
@@ -97,5 +110,26 @@ export default async function HomePage() {
     slug: c.slug,
   }));
 
-  return <Home heroSlides={heroSlides} highlights={highlights} categories={categories} />;
+  const brandRail: HomeBrandRailItem[] = brandRailRaw
+    .filter(
+      (row) =>
+        row.brands &&
+        isActiveInWindow(row.is_active, row.active_from, row.active_until, now)
+    )
+    .map((row) => ({
+      id: row.id,
+      href: `/shop?brand=${encodeURIComponent(row.brands!.slug)}`,
+      image: row.image_url,
+      label: row.label_override?.trim() || row.brands!.name,
+      alt: row.brands!.name,
+    }));
+
+  return (
+    <Home
+      heroSlides={heroSlides}
+      highlights={highlights}
+      brandRail={brandRail}
+      categories={categories}
+    />
+  );
 }

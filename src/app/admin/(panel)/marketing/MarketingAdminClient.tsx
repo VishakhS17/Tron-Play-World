@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 type Initial = {
   slides: unknown[];
   highlights: unknown[];
+  brandRail: unknown[];
   announcements: unknown[];
   popups: unknown[];
   flashSales: unknown[];
@@ -38,16 +39,18 @@ async function j<T>(res: Response): Promise<T> {
 export default function MarketingAdminClient({ initial }: { initial: Initial }) {
   const router = useRouter();
   const [tab, setTab] = useState<
-    "hero" | "highlights" | "announcements" | "popups" | "flash" | "settings"
+    "hero" | "highlights" | "brandRail" | "announcements" | "popups" | "flash" | "settings"
   >("hero");
   const [slides, setSlides] = useState(initial.slides);
   const [highlights, setHighlights] = useState(initial.highlights);
+  const [brandRailRows, setBrandRailRows] = useState(initial.brandRail);
   const [announcements, setAnnouncements] = useState(initial.announcements);
   const [popups, setPopups] = useState(initial.popups);
   const [flashSales, setFlashSales] = useState(initial.flashSales);
   const [firstVisit, setFirstVisit] = useState(initial.settings?.first_visit_coupon_code ?? "");
   const [heroUploading, setHeroUploading] = useState(false);
   const [highlightUploading, setHighlightUploading] = useState(false);
+  const [brandRailUploading, setBrandRailUploading] = useState(false);
   const [popupUploading, setPopupUploading] = useState(false);
   const [flashSaving, setFlashSaving] = useState(false);
   const [flashEditingId, setFlashEditingId] = useState<string | null>(null);
@@ -106,6 +109,10 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
     const r = await fetch("/api/admin/marketing/highlights", { cache: "no-store" });
     setHighlights(await r.json());
   }
+  async function refreshBrandRail() {
+    const r = await fetch("/api/admin/marketing/brand-rail", { cache: "no-store" });
+    setBrandRailRows(await r.json());
+  }
   async function refreshAnnouncements() {
     const r = await fetch("/api/admin/marketing/announcements", { cache: "no-store" });
     setAnnouncements(await r.json());
@@ -133,6 +140,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
           [
             ["hero", "Hero"],
             ["highlights", "Highlights"],
+            ["brandRail", "Shop by brand"],
             ["announcements", "Announcements"],
             ["popups", "Popups"],
             ["flash", "Flash sales"],
@@ -419,6 +427,153 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                 className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
                 {highlightUploading ? "Uploading..." : "Add highlight"}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
+      {tab === "brandRail" ? (
+        <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Shop by brand (homepage)</h2>
+          <p className="text-sm text-meta-3">
+            Square image and label below — same layout as the storefront. Each tile links to that brand in
+            the shop. Leave label blank to use the catalog brand name.
+          </p>
+          <ul className="divide-y divide-gray-3 text-sm">
+            {brandRailRows.map((row: any) => (
+              <li key={row.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="flex-1 min-w-[200px]">
+                  <span className="font-medium text-dark">
+                    {row.brands?.name ?? "Brand"}
+                  </span>
+                  {row.label_override ? (
+                    <span className="text-meta-3"> — label: {row.label_override}</span>
+                  ) : null}
+                  <span className="block truncate text-xs text-meta-4 mt-0.5">{row.image_url}</span>
+                </span>
+                <button
+                  type="button"
+                  className="text-red-600 text-sm"
+                  onClick={async () => {
+                    if (!confirm("Delete this brand tile?")) return;
+                    await j(
+                      await fetch(`/api/admin/marketing/brand-rail/${row.id}`, { method: "DELETE" })
+                    );
+                    toast.success("Deleted");
+                    void refreshBrandRail();
+                  }}
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+          <form
+            className="grid gap-3 sm:grid-cols-2"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formEl = e.currentTarget;
+              const fd = new FormData(formEl);
+              try {
+                const brandId = String(fd.get("brand_id") ?? "");
+                if (!brandId) throw new Error("Choose a brand");
+
+                let imageUrl = String(fd.get("image_url") ?? "").trim();
+                let imagePublicId: string | null = null;
+                const brFile = fd.get("image_file");
+                if (brFile instanceof File && brFile.size > 0) {
+                  setBrandRailUploading(true);
+                  const uploadFd = new FormData();
+                  uploadFd.append("file", brFile);
+                  const uploadRes = await j<{ url: string; public_id: string }>(
+                    await fetch("/api/admin/marketing/brand-rail/upload", {
+                      method: "POST",
+                      body: uploadFd,
+                    })
+                  );
+                  imageUrl = uploadRes.url;
+                  imagePublicId = uploadRes.public_id;
+                }
+                if (!imageUrl) throw new Error("Provide an image URL or upload a square image");
+
+                await j(
+                  await fetch("/api/admin/marketing/brand-rail", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                      brand_id: brandId,
+                      image_url: imageUrl,
+                      image_public_id: imagePublicId,
+                      label_override: String(fd.get("label_override") ?? "").trim() || null,
+                      sort_order: Number(fd.get("sort_order") || 0),
+                      is_active: fd.get("is_active") === "on",
+                    }),
+                  })
+                );
+                toast.success("Created");
+                formEl.reset();
+                void refreshBrandRail();
+                router.refresh();
+              } catch (err: unknown) {
+                toast.error(err instanceof Error ? err.message : "Failed");
+              } finally {
+                setBrandRailUploading(false);
+              }
+            }}
+          >
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Brand (shop link)</span>
+              <select
+                name="brand_id"
+                required
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              >
+                <option value="">— Select —</option>
+                {brandOptions}
+              </select>
+            </label>
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Label on tile (optional)</span>
+              <input
+                name="label_override"
+                placeholder="Uses catalog brand name if empty"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Image URL (optional if uploading)</span>
+              <input name="image_url" className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm" />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Upload image (Cloudinary)</span>
+              <input
+                name="image_file"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-xs text-meta-3">Square photos work best. Max 4 MB on production.</p>
+            </label>
+            <label>
+              <span className="text-sm font-medium">Sort</span>
+              <input
+                name="sort_order"
+                type="number"
+                defaultValue={0}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm mt-6">
+              <input name="is_active" type="checkbox" defaultChecked /> Active
+            </label>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={brandRailUploading}
+                className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {brandRailUploading ? "Uploading…" : "Add brand tile"}
               </button>
             </div>
           </form>

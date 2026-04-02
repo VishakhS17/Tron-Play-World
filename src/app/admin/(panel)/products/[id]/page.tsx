@@ -1,10 +1,13 @@
 "use client";
 
+import { parseAdminJsonResponse } from "@/lib/admin/parseAdminFetchResponse";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import SelectWithCreate from "../../_components/SelectWithCreate";
 import ImageGallery, { GalleryImage } from "../../_components/ImageGallery";
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 interface Option { id: string; name: string }
 
@@ -104,20 +107,28 @@ export default function EditProductPage() {
 
     await Promise.allSettled(
       fileArr.map(async (file, i) => {
+        if (file.size > MAX_IMAGE_BYTES) {
+          toast.error(`${file.name}: max 4 MB per image on production (Vercel limit).`);
+          setImages((prev) => prev.filter((img) => img.id !== tempIds[i]));
+          return;
+        }
         const fd = new FormData();
         fd.append("file", file);
         try {
           const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
-          const uploadData = await uploadRes.json();
-          if (!uploadRes.ok) throw new Error(uploadData?.error || "Upload failed");
+          const uploadParsed = await parseAdminJsonResponse<{ url?: string }>(uploadRes);
+          if (!uploadParsed.ok) throw new Error(uploadParsed.message);
+          const uploadData = uploadParsed.data;
+          if (!uploadData.url) throw new Error("Upload failed: no URL returned");
 
           const imgRes = await fetch(`/api/admin/products/${id}/images`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ url: uploadData.url }),
           });
-          const imgData = await imgRes.json();
-          if (!imgRes.ok) throw new Error(imgData?.error || "Failed to save image");
+          const imgParsed = await parseAdminJsonResponse(imgRes);
+          if (!imgParsed.ok) throw new Error(imgParsed.message);
+          const imgData = imgParsed.data as GalleryImage;
 
           // Replace temp placeholder with saved record (which has the real DB id)
           setImages((prev) =>

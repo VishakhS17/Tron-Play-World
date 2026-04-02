@@ -3,28 +3,13 @@ import Link from "next/link";
 import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
 import HomeHighlightsSection from "./HomeHighlightsSection";
 
-const BRAND_ITEMS = [
-  {
-    src: "/images/New folder/Untitled design (1).png",
-    label: "Hot Wheels",
-  },
-  {
-    src: "/images/New folder/Untitled design (2).png",
-    label: "MiniGT",
-  },
-  {
-    src: "/images/New folder/Untitled design (3).png",
-    label: "PopRace",
-  },
-  {
-    src: "/images/New folder/Untitled design (4).png",
-    label: "CM Model",
-  },
-  {
-    src: "/images/New folder/Untitled design (5).png",
-    label: "TIMEMICRO",
-  },
-];
+export type HomeBrandRailItem = {
+  id: string;
+  href: string;
+  image: string;
+  label: string;
+  alt: string;
+};
 
 export type HomeHighlightCard = {
   id: string;
@@ -44,10 +29,15 @@ export type HomeCategoryTile = {
 type HomeProps = {
   heroSlides?: HeroSlide[];
   highlights?: HomeHighlightCard[];
+  brandRail?: HomeBrandRailItem[];
   categories?: HomeCategoryTile[];
 };
 
-const Home = ({ heroSlides, highlights, categories }: HomeProps) => {
+function isRemoteImage(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+const Home = ({ heroSlides, highlights, brandRail, categories }: HomeProps) => {
   const spotlightItems =
     highlights && highlights.length > 0
       ? highlights
@@ -89,7 +79,7 @@ const Home = ({ heroSlides, highlights, categories }: HomeProps) => {
                 Browse by maker or universe.
               </h2>
               <p className="mt-1 text-sm text-meta-3">
-                Brand rail — swap images or wire to catalog brands when ready.
+                Tiles and images are managed in Admin → Marketing → Shop by brand.
               </p>
             </div>
             <p className="text-xs text-meta-4 sm:text-sm">
@@ -99,22 +89,35 @@ const Home = ({ heroSlides, highlights, categories }: HomeProps) => {
 
           <div className="relative">
             <div className="flex gap-4 px-1 pb-2 overflow-x-auto sm:px-0 sm:gap-5 no-scrollbar">
-              {BRAND_ITEMS.map((item, index) => (
-                <div key={index} className="min-w-[200px] sm:min-w-[240px] flex flex-col">
-                  <div className="relative aspect-square overflow-hidden">
-                    <Image
-                      src={item.src}
-                      alt={item.label}
-                      fill
-                      sizes="(max-width: 640px) 200px, 240px"
-                      className="object-cover rounded-2xl"
-                    />
-                  </div>
-                  <div className="mt-2 inline-flex items-center justify-center rounded-xl bg-white border border-gray-3 px-3 py-2 shadow-sm">
-                    <span className="text-xs sm:text-sm font-semibold text-dark">{item.label}</span>
-                  </div>
-                </div>
-              ))}
+              {brandRail && brandRail.length > 0 ? (
+                brandRail.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className="min-w-[200px] sm:min-w-[240px] flex flex-col shrink-0 text-left"
+                  >
+                    <div className="relative aspect-square overflow-hidden">
+                      <Image
+                        src={item.image}
+                        alt={item.alt}
+                        fill
+                        sizes="(max-width: 640px) 200px, 240px"
+                        className="object-cover rounded-2xl"
+                        unoptimized={isRemoteImage(item.image)}
+                      />
+                    </div>
+                    <div className="mt-2 w-full rounded-xl bg-white border border-gray-3 px-3 py-2 shadow-sm flex items-center justify-center">
+                      <span className="text-xs sm:text-sm font-semibold text-dark text-center">
+                        {item.label}
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-sm text-meta-3 py-4">
+                  No brand tiles yet — add them under Admin → Marketing → Shop by brand.
+                </p>
+              )}
             </div>
           </div>
         </div>

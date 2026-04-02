@@ -1,10 +1,14 @@
 "use client";
 
+import { parseAdminJsonResponse } from "@/lib/admin/parseAdminFetchResponse";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import SelectWithCreate from "../../_components/SelectWithCreate";
 import ImageGallery, { GalleryImage } from "../../_components/ImageGallery";
+
+/** Match API / Vercel body limit — reject before upload to avoid opaque 413 errors. */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 interface Option { id: string; name: string }
 
@@ -90,19 +94,26 @@ export default function NewProductPage() {
 
     await Promise.allSettled(
       fileArr.map(async (file, i) => {
+        if (file.size > MAX_IMAGE_BYTES) {
+          toast.error(`${file.name}: max 4 MB per image on production (Vercel limit).`);
+          setImages((prev) => prev.filter((img) => img.id !== tempIds[i]));
+          return;
+        }
         const fd = new FormData();
         fd.append("file", file);
         try {
           const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data?.error || "Upload failed");
+          const parsed = await parseAdminJsonResponse<{ url?: string }>(res);
+          if (!parsed.ok) throw new Error(parsed.message);
+          const data = parsed.data;
+          if (!data.url) throw new Error("Upload failed: no URL returned");
           setImages((prev) =>
             prev.map((img) =>
-              img.id === tempIds[i] ? { id: tempIds[i], url: data.url, uploading: false } : img
+              img.id === tempIds[i] ? { id: tempIds[i], url: data.url!, uploading: false } : img
             )
           );
-        } catch (err: any) {
-          toast.error(err?.message || "Upload failed");
+        } catch (err: unknown) {
+          toast.error(err instanceof Error ? err.message : "Upload failed");
           setImages((prev) => prev.filter((img) => img.id !== tempIds[i]));
         }
       })

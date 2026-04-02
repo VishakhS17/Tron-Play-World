@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { getAdminSession } from "@/lib/auth/session";
+import { assertSameOrigin } from "@/lib/security/origin";
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -9,29 +10,30 @@ cloudinary.config({
 });
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-/** Stay under Vercel's ~4.5 MB serverless body limit so the request reaches this route. */
-const MAX_SIZE_BYTES = 4 * 1024 * 1024; // 4 MB
+/** Stay under Vercel serverless body limit */
+const MAX_SIZE_BYTES = 4 * 1024 * 1024;
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    assertSameOrigin(req);
+  } catch {
+    return NextResponse.json({ error: "Bad origin" }, { status: 403 });
+  }
+
   const session = await getAdminSession();
   if (!session || !isAllowed(session.roles)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let formData: FormData;
-  try {
-    formData = await req.formData();
-  } catch {
-    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
-  }
+  const formData = await req.formData().catch(() => null);
+  if (!formData) return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
 
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
-
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json({ error: "Only JPEG, PNG, WebP and GIF are allowed" }, { status: 400 });
   }
@@ -42,23 +44,21 @@ export async function POST(req: NextRequest) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  // Stream the buffer directly to Cloudinary — no base64 overhead
-  const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+  const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "irobox/products",
+        folder: "irobox/homepage-brand-rail",
         resource_type: "image",
-        // Quality and format optimisation happens at delivery time (no blocking eager transforms)
         format: "webp",
-        transformation: [{ width: 1200, height: 1200, crop: "limit" }],
+        transformation: [{ width: 900, height: 900, crop: "limit" }],
       },
-      (error, result) => {
-        if (error || !result) reject(error ?? new Error("Upload failed"));
-        else resolve(result as { secure_url: string });
+      (error, uploaded) => {
+        if (error || !uploaded) reject(error ?? new Error("Upload failed"));
+        else resolve({ secure_url: uploaded.secure_url, public_id: uploaded.public_id });
       }
     );
     stream.end(buffer);
   });
 
-  return NextResponse.json({ url: result.secure_url }, { status: 201 });
+  return NextResponse.json({ url: result.secure_url, public_id: result.public_id }, { status: 201 });
 }

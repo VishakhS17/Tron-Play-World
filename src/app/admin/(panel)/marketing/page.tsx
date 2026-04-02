@@ -27,10 +27,16 @@ export default async function MarketingAdminPage() {
       })
     );
 
-  const [slides, highlights, announcements, popups, flashSales, settings, categories, products, brands, coupons] =
+  const [slides, highlights, brandRail, announcements, popups, flashSales, settings, categories, products, brands, coupons] =
     await Promise.all([
       prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }).catch(() => []),
       highlightsPromise.catch(() => []),
+      prisma.homepage_brand_rail
+        .findMany({
+          orderBy: { sort_order: "asc" },
+          include: { brands: { select: { id: true, name: true, slug: true } } },
+        })
+        .catch(() => []),
       prisma.announcement_entries
         .findMany({
           orderBy: [{ placement: "asc" }, { sort_order: "asc" }],
@@ -95,6 +101,7 @@ export default async function MarketingAdminPage() {
       initial={{
         slides,
         highlights,
+        brandRail,
         announcements,
         popups,
         flashSales: flashSalesPlain,

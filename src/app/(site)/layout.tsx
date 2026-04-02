@@ -9,6 +9,9 @@ import WhatsAppFloatingButton from "@/components/Common/WhatsAppFloatingButton";
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
 
+/** Announcement bar / header copy comes from DB; avoid static shell stale on production. */
+export const dynamic = "force-dynamic";
+
 export default async function SiteLayout({
   children,
 }: {

@@ -72,6 +72,7 @@ model brands {
   updated_at  DateTime   @default(now()) @db.Timestamptz(6)
   products    products[]
   homepage_highlights homepage_highlights[]
+  homepage_brand_rail homepage_brand_rail[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -587,6 +588,24 @@ model homepage_highlights {
   @@index([category_id], map: "idx_homepage_highlights_category_id")
   @@index([product_id], map: "idx_homepage_highlights_product_id")
   @@index([brand_id], map: "idx_homepage_highlights_brand_id")
+}
+
+/// Homepage horizontal “Shop by brand” tiles (image + label, links to brand filter).
+model homepage_brand_rail {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brand_id        String    @db.Uuid
+  image_url       String
+  image_public_id String?   @db.VarChar(255)
+  label_override  String?   @db.VarChar(120)
+  sort_order      Int       @default(0)
+  is_active       Boolean   @default(true)
+  active_from     DateTime? @db.Timestamptz(6)
+  active_until    DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  brands          brands    @relation(fields: [brand_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([brand_id], map: "idx_homepage_brand_rail_brand_id")
 }
 
 model announcement_entries {
