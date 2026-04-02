@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
+import HomeHighlightsSection from "./HomeHighlightsSection";
 
 const BRAND_ITEMS = [
   {
@@ -46,10 +47,6 @@ type HomeProps = {
   categories?: HomeCategoryTile[];
 };
 
-function isRemoteImage(url: string) {
-  return url.startsWith("http://") || url.startsWith("https://");
-}
-
 const Home = ({ heroSlides, highlights, categories }: HomeProps) => {
   const spotlightItems =
     highlights && highlights.length > 0
@@ -77,40 +74,7 @@ const Home = ({ heroSlides, highlights, categories }: HomeProps) => {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {spotlightItems ? (
-              spotlightItems.map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className="group relative overflow-hidden rounded-2xl border border-gray-3 bg-white shadow-md shadow-black/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-2 hover:ring-red/40 active:scale-[0.98] active:translate-y-0 text-left"
-                >
-                  <div className="relative aspect-[4/3] md:aspect-[5/4]">
-                    <Image
-                      src={item.image}
-                      alt={item.alt}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                      className="object-cover"
-                      unoptimized={isRemoteImage(item.image)}
-                    />
-                    <div className="absolute inset-x-3 bottom-3 rounded-lg bg-red/90 px-3 py-2 shadow-md shadow-red/30 transition-all duration-300 group-hover:bg-red group-hover:shadow-lg group-hover:shadow-red/40">
-                      <p className="text-sm font-bold text-white tracking-wide">{item.label}</p>
-                      {item.subtitle ? (
-                        <p className="mt-0.5 text-[11px] font-medium text-white/90 line-clamp-2">
-                          {item.subtitle}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <p className="text-sm text-meta-3 md:col-span-3 text-center py-6">
-                No active homepage highlights — add some under Admin → Marketing.
-              </p>
-            )}
-          </div>
+          <HomeHighlightsSection items={spotlightItems} />
         </div>
       </section>
 

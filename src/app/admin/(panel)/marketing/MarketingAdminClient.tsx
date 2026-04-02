@@ -183,7 +183,8 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
+              const formEl = e.currentTarget;
+              const fd = new FormData(formEl);
               try {
                 let imageUrl = String(fd.get("image_url") ?? "").trim();
                 let imagePublicId: string | null = null;
@@ -218,7 +219,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                   })
                 );
                 toast.success("Created");
-                e.currentTarget.reset();
+                formEl.reset();
                 void refreshHero();
               } catch (err: any) {
                 toast.error(err?.message || "Failed");
@@ -297,7 +298,8 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
+              const formEl = e.currentTarget;
+              const fd = new FormData(formEl);
               const kind = String(fd.get("kind"));
               try {
                 let imageUrl = String(fd.get("image_url") ?? "").trim();
@@ -336,7 +338,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                   })
                 );
                 toast.success("Created");
-                e.currentTarget.reset();
+                formEl.reset();
                 void refreshHighlights();
               } catch (err: any) {
                 toast.error(err?.message || "Failed");
@@ -456,7 +458,8 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
+              const formEl = e.currentTarget;
+              const fd = new FormData(formEl);
               try {
                 await j(
                   await fetch("/api/admin/marketing/announcements", {
@@ -473,7 +476,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                   })
                 );
                 toast.success("Created");
-                e.currentTarget.reset();
+                formEl.reset();
                 void refreshAnnouncements();
               } catch (err: any) {
                 toast.error(err?.message || "Failed");
@@ -541,7 +544,8 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
+              const formEl = e.currentTarget;
+              const fd = new FormData(formEl);
               try {
                 let imageUrl = String(fd.get("image_url") ?? "").trim();
                 const popupFile = fd.get("image_file");
@@ -577,7 +581,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                   })
                 );
                 toast.success("Created");
-                e.currentTarget.reset();
+                formEl.reset();
                 void refreshPopups();
               } catch (err: any) {
                 toast.error(err?.message || "Failed");
