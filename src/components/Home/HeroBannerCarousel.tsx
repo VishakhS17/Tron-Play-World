@@ -154,10 +154,10 @@ const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
               e.preventDefault();
               goToPrev();
             }}
-            className="absolute left-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white shadow-md backdrop-blur-[2px] transition hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:left-4 sm:h-11 sm:w-11"
+            className="absolute left-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/90 bg-dark text-white shadow-lg shadow-dark/40 transition hover:bg-blue sm:left-4 sm:h-11 sm:w-11"
             aria-label="Previous banner"
           >
-            <ChevronLeftIcon className="size-6" />
+            <ChevronLeftIcon className="size-6 text-white [&_path]:stroke-[2.5]" />
           </button>
           <button
             type="button"
@@ -165,10 +165,10 @@ const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
               e.preventDefault();
               goToNext();
             }}
-            className="absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white shadow-md backdrop-blur-[2px] transition hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:right-4 sm:h-11 sm:w-11"
+            className="absolute right-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/90 bg-dark text-white shadow-lg shadow-dark/40 transition hover:bg-blue sm:right-4 sm:h-11 sm:w-11"
             aria-label="Next banner"
           >
-            <ChevronRightIcon className="size-6" />
+            <ChevronRightIcon className="size-6 text-white [&_path]:stroke-[2.5]" />
           </button>
         </>
       ) : null}

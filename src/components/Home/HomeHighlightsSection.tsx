@@ -212,10 +212,10 @@ function DesktopThreeCarousel({ items }: { items: HighlightItem[] }) {
           e.preventDefault();
           goPrev();
         }}
-        className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white shadow-md backdrop-blur-[2px] transition hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:-left-1 lg:left-0"
+        className="absolute left-0 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-dark text-white shadow-lg shadow-dark/30 transition hover:bg-blue hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue md:-left-1 lg:left-0"
         aria-label="Previous highlights"
       >
-        <ChevronLeftIcon className="size-6" />
+        <ChevronLeftIcon className="size-6 text-white [&_path]:stroke-[2.5]" />
       </button>
       <button
         type="button"
@@ -223,10 +223,10 @@ function DesktopThreeCarousel({ items }: { items: HighlightItem[] }) {
           e.preventDefault();
           goNext();
         }}
-        className="absolute right-0 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white shadow-md backdrop-blur-[2px] transition hover:bg-black/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:-right-1 lg:right-0"
+        className="absolute right-0 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-dark text-white shadow-lg shadow-dark/30 transition hover:bg-blue hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue md:-right-1 lg:right-0"
         aria-label="Next highlights"
       >
-        <ChevronRightIcon className="size-6" />
+        <ChevronRightIcon className="size-6 text-white [&_path]:stroke-[2.5]" />
       </button>
 
       <div

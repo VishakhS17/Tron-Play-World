@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { StoreContactDisplay } from "@/lib/marketing/storeContactDisplay";
 import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
 import HomeHighlightsSection from "./HomeHighlightsSection";
 
@@ -24,6 +25,8 @@ export type HomeCategoryTile = {
   id: string;
   name: string;
   slug: string;
+  /** Set when tile is managed in Admin → Marketing (Discover by category). */
+  image?: string | null;
 };
 
 type HomeProps = {
@@ -31,13 +34,20 @@ type HomeProps = {
   highlights?: HomeHighlightCard[];
   brandRail?: HomeBrandRailItem[];
   categories?: HomeCategoryTile[];
+  storeContact: StoreContactDisplay;
 };
 
 function isRemoteImage(url: string) {
   return url.startsWith("http://") || url.startsWith("https://");
 }
 
-const Home = ({ heroSlides, highlights, brandRail, categories }: HomeProps) => {
+const Home = ({
+  heroSlides,
+  highlights,
+  brandRail,
+  categories,
+  storeContact,
+}: HomeProps) => {
   const spotlightItems =
     highlights && highlights.length > 0
       ? highlights
@@ -134,7 +144,8 @@ const Home = ({ heroSlides, highlights, brandRail, categories }: HomeProps) => {
                 Discover by category.
               </h2>
               <p className="mt-1 text-sm text-meta-3">
-                Pulled from your catalog (up to eight).
+                Choose categories, order, and photos in Admin → Marketing → Discover by category. If none
+                are configured, the first eight catalog categories show here without images.
               </p>
             </div>
           </div>
@@ -145,10 +156,24 @@ const Home = ({ heroSlides, highlights, brandRail, categories }: HomeProps) => {
                 <Link
                   key={cat.id}
                   href={`/shop?category=${encodeURIComponent(cat.slug)}`}
-                  className="flex flex-col justify-between h-full px-4 py-5 rounded-2xl bg-gray-1 border border-gray-3 hover:border-blue/40 hover:shadow-sm transition"
+                  className="flex flex-col h-full overflow-hidden rounded-2xl bg-gray-1 border border-gray-3 hover:border-blue/40 hover:shadow-sm transition"
                 >
-                  <h3 className="text-sm font-semibold text-dark sm:text-base">{cat.name}</h3>
-                  <p className="mt-2 text-[11px] text-meta-3">View products in this category.</p>
+                  {cat.image ? (
+                    <div className="relative aspect-[5/3] w-full shrink-0 bg-gray-2">
+                      <Image
+                        src={cat.image}
+                        alt={cat.name}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        className="object-cover"
+                        unoptimized={isRemoteImage(cat.image)}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="flex flex-col flex-1 justify-between px-4 py-4">
+                    <h3 className="text-sm font-semibold text-dark sm:text-base">{cat.name}</h3>
+                    <p className="mt-2 text-[11px] text-meta-3">View products in this category.</p>
+                  </div>
                 </Link>
               ))
             ) : (
@@ -175,19 +200,16 @@ const Home = ({ heroSlides, highlights, brandRail, categories }: HomeProps) => {
           <div className="rounded-2xl border border-gray-3 bg-gray-1 p-6 sm:p-8">
             <div className="max-w-2xl">
               <p className="mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
-                Visit us
+                {storeContact.visitEyebrow}
               </p>
               <h2 className="mb-3 text-2xl font-semibold sm:text-3xl text-dark">
-                Find us in Bengaluru.
+                {storeContact.visitHeading}
               </h2>
 
               <dl className="space-y-4 text-sm rounded-xl border border-gray-3 bg-white p-5">
                 <div>
-                  <dt className="font-semibold text-dark">Location</dt>
-                  <dd className="mt-1 text-meta-3">
-                    24, Basement, 21st Main Rd, Banashankari Stage II, Banashankari, Bengaluru,
-                    Karnataka 560070
-                  </dd>
+                  <dt className="font-semibold text-dark">{storeContact.visitLocationLabel}</dt>
+                  <dd className="mt-1 text-meta-3">{storeContact.contactAddress}</dd>
                 </div>
               </dl>
             </div>

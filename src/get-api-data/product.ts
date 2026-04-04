@@ -39,6 +39,7 @@ export const getNewArrivalsProduct = unstable_cache(
         base_price: true,
         discounted_price: true,
         slug: true,
+        diecast_scales: { select: { ratio: true } },
         updated_at: true,
         product_variants: {
           select: {
@@ -49,6 +50,7 @@ export const getNewArrivalsProduct = unstable_cache(
         },
         inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
+        sku: true,
       },
       take: 8
     });
@@ -63,6 +65,7 @@ export const getNewArrivalsProduct = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
+      diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",
       updatedAt: item.updated_at,
@@ -92,6 +95,7 @@ export const getBestSellingProducts = unstable_cache(
         base_price: true,
         discounted_price: true,
         slug: true,
+        diecast_scales: { select: { ratio: true } },
         updated_at: true,
         product_variants: {
           select: {
@@ -102,6 +106,7 @@ export const getBestSellingProducts = unstable_cache(
         },
         inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
+        sku: true,
       },
       orderBy: { updated_at: "desc" },
       take: 6
@@ -117,6 +122,7 @@ export const getBestSellingProducts = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
+      diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",
       updatedAt: item.updated_at,
@@ -146,6 +152,7 @@ export const getLatestProducts = unstable_cache(
         base_price: true,
         discounted_price: true,
         slug: true,
+        diecast_scales: { select: { ratio: true } },
         updated_at: true,
         product_variants: {
           select: {
@@ -156,6 +163,7 @@ export const getLatestProducts = unstable_cache(
         },
         inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
+        sku: true,
       },
       orderBy: [{ updated_at: "desc" }],
       take: 3
@@ -171,6 +179,7 @@ export const getLatestProducts = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
+      diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",
       updatedAt: item.updated_at,
@@ -205,6 +214,7 @@ export const getAllProducts = unstable_cache(
           base_price: true,
           discounted_price: true,
           slug: true,
+          diecast_scales: { select: { ratio: true } },
           updated_at: true,
           product_variants: {
             select: {
@@ -215,6 +225,7 @@ export const getAllProducts = unstable_cache(
           },
           inventory: { select: { available_quantity: true } },
           product_images: { select: { url: true, sort_order: true } },
+          sku: true,
         },
       })
       return products.map((item) => ({
@@ -228,6 +239,7 @@ export const getAllProducts = unstable_cache(
         slug: item.slug,
         quantity: getInventoryQuantity(item.inventory),
         sku: item.sku ?? "",
+        diecastScale: item.diecast_scales?.ratio ?? null,
         tags: [],
         offers: "",
         updatedAt: item.updated_at,
@@ -261,6 +273,7 @@ export const getProductBySlug = async (slug: string) => {
       base_price: true,
       discounted_price: true,
       age_group: true,
+      diecast_scales: { select: { ratio: true } },
       slug: true,
       updated_at: true,
       categories: {
@@ -296,6 +309,7 @@ export const getProductBySlug = async (slug: string) => {
     title: product.name,
     shortDescription: product.short_description ?? "",
     ageGroup: product.age_group ?? null,
+    diecastScale: product.diecast_scales?.ratio ?? null,
     description: product.description ?? "",
     body: "",
     price: Number(product.base_price),
@@ -336,6 +350,7 @@ export const getProductById = async (productId: string) => {
       base_price: true,
       discounted_price: true,
       age_group: true,
+      diecast_scales: { select: { ratio: true } },
       slug: true,
       updated_at: true,
       sku: true,
@@ -351,6 +366,7 @@ export const getProductById = async (productId: string) => {
     title: product.name,
     shortDescription: product.short_description ?? "",
     ageGroup: product.age_group ?? null,
+    diecastScale: product.diecast_scales?.ratio ?? null,
     description: product.description ?? "",
     body: "",
     price: Number(product.base_price),
@@ -388,6 +404,7 @@ export const getRelatedProducts = unstable_cache(
         short_description: true,
         base_price: true,
         discounted_price: true,
+        diecast_scales: { select: { ratio: true } },
         updated_at: true,
         product_images: { select: { url: true, sort_order: true } },
         product_variants: { select: { color: true, size: true, is_default: true } },
@@ -416,6 +433,7 @@ export const getRelatedProducts = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: "",
+      diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",
       updatedAt: item.updated_at,

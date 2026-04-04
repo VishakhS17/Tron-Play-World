@@ -1,16 +1,13 @@
-# SOW Feature Status
+SOW Feature Status
 
-
-This file tracks delivery status against the agreed SOW in three buckets.
-
-## 1) Partially done
+1) Partially done
 
 - Returns & refunds workflow (return flow basics exist; full gateway-confirmed refund lifecycle is pending).
 - Promotional / newsletter-style emails (transactional order + cart emails are implemented).
 - SEO setup (friendly URLs/basic metadata exist; canonical/structured-data polish remains).
 - Backup assistance (requires ops/documentation handoff; not a pure code-complete item).
 
-## 2) Completely done
+2) Completely done
 
 - Homepage rendered from dynamic content configuration.
 - Product listing and product detail pages.
@@ -56,7 +53,7 @@ This file tracks delivery status against the agreed SOW in three buckets.
   - Secure authentication/session/RBAC baseline.
   - Encrypted password storage.
 
-## 3) Not done at all
+3) Not done at all
 
 - Refund processed through payment gateway with gateway confirmation (full refund integration pending).
 - Legal/privacy compliance deliverables (as scoped, this is client responsibility, not a build deliverable).

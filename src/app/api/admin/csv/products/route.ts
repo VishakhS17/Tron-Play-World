@@ -3,7 +3,19 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
-import { cleanText, readJsonBody } from "@/lib/validation/input";
+import { readJsonBody, sanitizeCsvPayload } from "@/lib/validation/input";
+import { slugFromProductName } from "@/utils/slugGenerate";
+import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
+import { upsertProductLevelInventory } from "@/lib/inventory/productLevelInventory";
+import { ensureDiecastScaleId, ratioFromImportText } from "@/lib/products/ensureDiecastScale";
+
+function parseNonNegInt(value: unknown, defaultVal: number): number {
+  if (value === undefined || value === null) return defaultVal;
+  const t = String(value).trim();
+  if (t === "") return defaultVal;
+  const n = Math.floor(Number(t));
+  return Number.isFinite(n) && n >= 0 ? n : defaultVal;
+}
 
 function parseCsv(csv: string) {
   const lines = csv
@@ -39,40 +51,75 @@ export async function POST(req: NextRequest) {
   const body = parsed.body;
   if (!body.csv) return NextResponse.json({ error: "csv is required" }, { status: 400 });
 
-  const rows = parseCsv(cleanText(body.csv, 2_000_000));
+  const csvText = sanitizeCsvPayload(body.csv, 2_000_000);
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const header = lines.length > 0 ? lines[0].split(",").map((h) => h.trim()) : [];
+  const hasDiecastCol = header.includes("diecast_scale");
+
+  const rows = parseCsv(csvText);
   let count = 0;
+  const touchedProductIds: string[] = [];
 
   for (const r of rows) {
     const name = String(r.name ?? "").trim();
-    const slug = String(r.slug ?? "").trim();
+    let slug = String(r.slug ?? "").trim();
+    if (!slug) slug = slugFromProductName(name);
+    if (slug.length > 255) slug = slug.slice(0, 255);
     const base_price = Number(r.base_price);
     const discounted_price = r.discounted_price ? Number(r.discounted_price) : null;
     const sku = r.sku ? String(r.sku).trim() : null;
     const is_active = String(r.is_active ?? "true").toLowerCase() !== "false";
     if (!name || !slug || !Number.isFinite(base_price)) continue;
 
+    const available_quantity = parseNonNegInt(r.available_quantity, 0);
+    const low_stock_threshold = parseNonNegInt(r.low_stock_threshold, 5);
+
+    let diecast_scale_id: string | null | undefined = undefined;
+    if (hasDiecastCol) {
+      const raw = String(r.diecast_scale ?? "").trim();
+      const ratio = ratioFromImportText(raw);
+      if (raw !== "" && !ratio) continue;
+      diecast_scale_id = ratio ? await ensureDiecastScaleId(prisma, ratio) : null;
+    }
+
+    const updatePayload = {
+      name,
+      base_price,
+      discounted_price,
+      sku,
+      is_active,
+      ...(hasDiecastCol ? { diecast_scale_id: diecast_scale_id ?? null } : {}),
+    };
+    const createPayload = {
+      name,
+      slug,
+      base_price,
+      discounted_price,
+      sku,
+      is_active,
+      diecast_scale_id: hasDiecastCol ? diecast_scale_id ?? null : null,
+    };
+
     const created = await prisma.products.upsert({
       where: { slug },
-      update: { name, base_price, discounted_price, sku, is_active },
-      create: { name, slug, base_price, discounted_price, sku, is_active },
+      update: updatePayload,
+      create: createPayload,
       select: { id: true },
     });
 
-    await prisma.inventory.upsert({
-      where: { product_id_product_variant_id: { product_id: created.id, product_variant_id: null } } as any,
-      update: {},
-      create: {
-        product_id: created.id,
-        product_variant_id: null,
-        available_quantity: 0,
-        reserved_quantity: 0,
-        sold_quantity: 0,
-        low_stock_threshold: 0,
-      },
-    });
+    touchedProductIds.push(created.id);
+
+    await upsertProductLevelInventory(created.id, { available_quantity, low_stock_threshold });
 
     count++;
   }
+
+  await syncLowStockAlertsByProductIds(touchedProductIds).catch((err) => {
+    console.error("[admin csv products POST] low stock alert sync failed", err);
+  });
 
   return NextResponse.json({ ok: true, count }, { status: 200 });
 }

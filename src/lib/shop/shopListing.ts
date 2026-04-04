@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prismaDB";
+import { normalizeDiecastScale } from "@/lib/products/diecastScales";
 import { cleanText, hasSuspiciousInput, isUrlSlug } from "@/lib/validation/input";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
 
@@ -10,6 +11,7 @@ export type ShopListingItem = {
   shortDescription: string;
   description: string;
   ageGroup: string | null;
+  diecastScale: string | null;
   price: number;
   discountedPrice: number | null;
   slug: string;
@@ -26,6 +28,10 @@ export type ShopListingData = {
   total: number;
   totalPages: number;
   ageGroups: string[];
+  /** Distinct `1:n` scales in the catalog for filter UI */
+  diecastScales: string[];
+  /** Brands that have at least one active product (plus current filter if needed) */
+  brands: { slug: string; name: string }[];
   items: ShopListingItem[];
 };
 
@@ -159,6 +165,7 @@ function mapProductsToItems(
     base_price: { toString(): string } | number;
     discounted_price: { toString(): string } | number | null;
     age_group: string | null;
+    diecast_scales: { ratio: string } | null;
     slug: string;
     updated_at: Date;
     sku: string | null;
@@ -183,6 +190,7 @@ function mapProductsToItems(
       shortDescription: p.short_description ?? "",
       description: p.description ?? "",
       ageGroup: p.age_group ?? null,
+      diecastScale: p.diecast_scales?.ratio ?? null,
       price: basePrice,
       discountedPrice: effectiveDiscounted,
       slug: p.slug,
@@ -215,6 +223,7 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
   ];
   const brand = cleanText(usp.get("brand") ?? "", 160);
   const ageGroup = cleanText(usp.get("ageGroup") ?? "", 50);
+  const diecastScaleRaw = cleanText(usp.get("diecastScale") ?? "", 32);
   const minPrice = usp.get("minPrice");
   const maxPrice = usp.get("maxPrice");
 
@@ -243,6 +252,13 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
   }
   const availableOnly = (usp.get("available") ?? "").trim() === "true";
 
+  const sortRaw = cleanText(usp.get("sort") ?? "", 32);
+  const sortPrice =
+    sortRaw === "price_asc" || sortRaw === "price_desc" ? sortRaw : null;
+  if (sortRaw && !sortPrice) {
+    return { ok: false, error: "Invalid sort", status: 400 };
+  }
+
   const page = Math.max(1, toInt(usp.get("page"), 1));
   const pageSize = Math.min(24, Math.max(6, toInt(usp.get("pageSize"), 12)));
   const skip = (page - 1) * pageSize;
@@ -269,6 +285,11 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
     ];
   }
   if (ageGroup) where.age_group = ageGroup;
+  const diecastNorm = diecastScaleRaw ? normalizeDiecastScale(diecastScaleRaw) : null;
+  if (diecastScaleRaw && !diecastNorm) {
+    return { ok: false, error: "Invalid diecast scale filter", status: 400 };
+  }
+  if (diecastNorm) where.diecast_scales = { is: { ratio: diecastNorm } };
   if (minP !== null || maxP !== null) {
     const priceClause = effectiveRetailPriceWhere(minP, maxP, new Date());
     where.AND = [...((where.AND as unknown[]) ?? []), priceClause];
@@ -291,6 +312,8 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
           total: 0,
           totalPages: 1,
           ageGroups: [],
+          diecastScales: [],
+          brands: [],
           items: [],
         },
       };
@@ -309,6 +332,8 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
           total: 0,
           totalPages: 1,
           ageGroups: [],
+          diecastScales: [],
+          brands: [],
           items: [],
         },
       };
@@ -327,11 +352,29 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
     orderBy: { age_group: "asc" },
   });
 
-  const [total, products, ageGroupsRaw] = await Promise.all([
+  const diecastScalesPromise = prisma.diecast_scales.findMany({
+    select: { ratio: true },
+    orderBy: { ratio: "asc" },
+  });
+
+  const brandsPromise = prisma.brands.findMany({
+    where: { products: { some: { is_active: true } } },
+    select: { slug: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
+  const orderBy: Prisma.productsOrderByWithRelationInput =
+    sortPrice === "price_asc"
+      ? { base_price: "asc" }
+      : sortPrice === "price_desc"
+        ? { base_price: "desc" }
+        : { updated_at: "desc" };
+
+  const [total, products, ageGroupsRaw, diecastScalesRaw, brandsRaw] = await Promise.all([
     prisma.products.count({ where: where as never }),
     prisma.products.findMany({
       where: where as never,
-      orderBy: { updated_at: "desc" },
+      orderBy,
       skip,
       take: pageSize,
       select: {
@@ -342,6 +385,7 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
         base_price: true,
         discounted_price: true,
         age_group: true,
+        diecast_scales: { select: { ratio: true } },
         slug: true,
         updated_at: true,
         sku: true,
@@ -351,6 +395,8 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
       },
     }),
     ageGroupsPromise,
+    diecastScalesPromise,
+    brandsPromise,
   ]);
 
   const productIds = products.map((p) => p.id);
@@ -374,6 +420,21 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
 
   const items = mapProductsToItems(products, flashMap);
 
+  let brandsForUi = brandsRaw.map((b) => ({ slug: b.slug, name: b.name }));
+  const brandFilterTrimmed = brand.trim();
+  if (brandFilterTrimmed) {
+    const lower = brandFilterTrimmed.toLowerCase();
+    if (!brandsForUi.some((b) => b.slug.toLowerCase() === lower)) {
+      const row = await prisma.brands.findFirst({
+        where: { OR: slugMatchOrClause(brandFilterTrimmed) },
+        select: { slug: true, name: true },
+      });
+      if (row) {
+        brandsForUi = [...brandsForUi, row].sort((a, b) => a.name.localeCompare(b.name));
+      }
+    }
+  }
+
   return {
     ok: true,
     data: {
@@ -384,6 +445,16 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
       ageGroups: ageGroupsRaw
         .map((x) => x.age_group)
         .filter((v): v is string => typeof v === "string" && v.trim().length > 0),
+      diecastScales: (() => {
+        const fromDb = diecastScalesRaw.map((x) => x.ratio).filter(Boolean);
+        const merged = [...new Set([...(diecastNorm ? [diecastNorm] : []), ...fromDb])];
+        return merged.sort((a, b) => {
+          const na = parseInt(a.replace(/^1:/i, ""), 10);
+          const nb = parseInt(b.replace(/^1:/i, ""), 10);
+          return (Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0);
+        });
+      })(),
+      brands: brandsForUi,
       items,
     },
   };

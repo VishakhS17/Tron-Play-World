@@ -20,7 +20,7 @@ type Props = {
   item: Product;
 };
 // add updated the type here
-const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
+const ProductItem = ({ item, bgClr = "white" }: Props) => {
   const displayTitle = item.title;
   const defaultVariant = item?.productVariants.find((variant) => variant.isDefault);
   const firstVariantWithImage = item?.productVariants.find((variant) => Boolean(variant.image));
@@ -92,9 +92,9 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
   };
 
   return (
-    <div className="group">
+    <div className="group rounded-xl border border-gray-7 bg-white p-3 sm:p-4">
       <div
-        className={`relative overflow-hidden border border-gray-3 flex items-center justify-center rounded-xl bg-${bgClr} min-h-[270px] mb-4`}
+        className={`relative overflow-hidden border border-white flex items-center justify-center rounded-xl bg-${bgClr} min-h-[270px] mb-4`}
       >
         <Link
           href={`/shop/${item?.slug}`}
@@ -178,11 +178,18 @@ const ProductItem = ({ item, bgClr = "[#F6F7FB]" }: Props) => {
         </Link>
       </h3>
 
-      {item.ageGroup ? (
-        <div className="mb-2">
-          <span className="inline-flex rounded-full border border-gray-3 bg-gray-1 px-2 py-0.5 text-[11px] font-medium text-meta-3">
-            Age: {item.ageGroup}
-          </span>
+      {item.ageGroup || item.diecastScale ? (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {item.ageGroup ? (
+            <span className="inline-flex rounded-full border border-gray-3 bg-gray-1 px-2 py-0.5 text-[11px] font-medium text-meta-3">
+              Age: {item.ageGroup}
+            </span>
+          ) : null}
+          {item.diecastScale ? (
+            <span className="inline-flex rounded-full border border-gray-3 bg-gray-1 px-2 py-0.5 text-[11px] font-medium text-meta-3">
+              Scale: {item.diecastScale}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

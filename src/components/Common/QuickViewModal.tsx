@@ -254,6 +254,13 @@ const QuickViewModal = () => {
                   <p className="text-base line-clamp-3 text-dark-3">
                     {product?.shortDescription}
                   </p>
+                  {product.diecastScale ? (
+                    <p className="mt-3 text-sm text-meta-3">
+                      <span className="inline-flex rounded-full border border-gray-3 bg-gray-1 px-2.5 py-0.5 text-xs font-medium text-dark">
+                        Scale: {product.diecastScale}
+                      </span>
+                    </p>
+                  ) : null}
 
                   <div className="flex flex-wrap justify-between gap-5 mt-6 mb-7.5">
                     <div>

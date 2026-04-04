@@ -102,64 +102,94 @@ const MobileMenu = ({ isOpen, onClose, menuData, headerLogo }: MobileMenuProps) 
           <div className="flex-1 py-2 overflow-y-auto">
             <nav>
               <ul className="px-2">
-                {menuData.map((menuItem, i) => (
-                  <li key={i} className="">
-                    {menuItem.submenu ? (
-                      <div>
-                        <button
-                          onClick={() => toggleSubmenu(i)}
-                          className="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-800 rounded-lg hover:text-blue text-dark hover:bg-gray-2"
-                        >
-                          <span className="font-medium">{menuItem.title}</span>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className={`transition-transform duration-200 ${
-                              expandedItems.includes(i) ? "rotate-180" : ""
+                {menuData.map((menuItem, i) => {
+                  const hasFlat = Boolean(menuItem.submenu?.length);
+                  const hasGrouped = Boolean(menuItem.groupedSubmenu?.length);
+                  const isDropdown = hasFlat || hasGrouped;
+                  const expandedMax =
+                    hasGrouped && expandedItems.includes(i)
+                      ? "max-h-[min(75vh,640px)]"
+                      : "max-h-96";
+
+                  return (
+                    <li key={i} className="">
+                      {isDropdown ? (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => toggleSubmenu(i)}
+                            className="flex items-center justify-between w-full px-4 py-3 text-sm rounded-lg text-dark hover:text-blue hover:bg-gray-2"
+                          >
+                            <span className="font-medium">{menuItem.title}</span>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className={`transition-transform duration-200 ${
+                                expandedItems.includes(i) ? "rotate-180" : ""
+                              }`}
+                            >
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                          </button>
+
+                          <div
+                            className={`overflow-y-auto overflow-x-hidden transition-all duration-300 ${
+                              expandedItems.includes(i) ? expandedMax : "max-h-0"
                             }`}
                           >
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                          </svg>
-                        </button>
-
-                        {/* Submenu */}
-                        <div
-                          className={`overflow-hidden transition-all duration-300 ${
-                            expandedItems.includes(i) ? "max-h-96" : "max-h-0"
-                          }`}
-                        >
-                          <div className="pl-4 bg-gray-50">
-                            {menuItem.submenu.map((subItem, j) => (
-                              <Link
-                                key={j}
-                                href={subItem.path || "#"}
-                                className="block px-4 py-3 text-sm rounded-lg hover:bg-gray-2 text-dark border-gray-3 hover:text-blue "
-                                onClick={onClose}
-                              >
-                                {subItem.title}
-                              </Link>
-                            ))}
+                            <div className="pl-2 bg-gray-50 pb-2">
+                              {menuItem.submenu?.map((subItem, j) => (
+                                <Link
+                                  key={j}
+                                  href={subItem.path || "#"}
+                                  className="block px-4 py-3 text-sm rounded-lg hover:bg-gray-2 text-dark border-gray-3 hover:text-blue "
+                                  onClick={onClose}
+                                >
+                                  {subItem.title}
+                                </Link>
+                              ))}
+                              {menuItem.groupedSubmenu?.map((group, gi) => (
+                                <div
+                                  key={gi}
+                                  className={gi > 0 ? "mt-2 pt-2 border-t border-gray-3" : ""}
+                                >
+                                  <p className="px-4 py-2 text-xs font-bold uppercase tracking-wide text-dark">
+                                    {group.heading}
+                                  </p>
+                                  {group.items.map((subItem, j) => (
+                                    <Link
+                                      key={j}
+                                      href={subItem.path || "#"}
+                                      className="block px-4 py-2.5 text-sm rounded-lg hover:bg-gray-2 text-dark hover:text-blue"
+                                      onClick={onClose}
+                                    >
+                                      {subItem.title}
+                                    </Link>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <Link
-                        href={menuItem.path || "#"}
-                        className="block px-4 py-3 text-sm font-medium rounded-lg hover:text-blue text-dark hover:bg-gray-2"
-                        onClick={onClose}
-                      >
-                        {menuItem.title}
-                      </Link>
-                    )}
-                  </li>
-                ))}
+                      ) : (
+                        <Link
+                          href={menuItem.path || "#"}
+                          className="block px-4 py-3 text-sm font-medium rounded-lg hover:text-blue text-dark hover:bg-gray-2"
+                          onClick={onClose}
+                        >
+                          {menuItem.title}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </nav>
           </div>

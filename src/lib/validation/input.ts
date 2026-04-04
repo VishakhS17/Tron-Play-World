@@ -7,6 +7,17 @@ export function cleanText(value: unknown, maxLength: number) {
   return value.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, maxLength);
 }
 
+/**
+ * For CSV / multiline admin payloads: strips NUL/DEL and BOM only.
+ * {@link cleanText} removes all control chars including newlines and would flatten CSV to one line.
+ */
+export function sanitizeCsvPayload(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") return "";
+  let s = value.replace(/\u0000/g, "").replace(/\u007F/g, "");
+  if (s.charCodeAt(0) === 0xfeff) s = s.slice(1);
+  return s.trim().slice(0, maxLength);
+}
+
 export function cleanOptionalText(value: unknown, maxLength: number) {
   if (typeof value !== "string") return null;
   const cleaned = cleanText(value, maxLength);

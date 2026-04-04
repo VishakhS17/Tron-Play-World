@@ -8,6 +8,8 @@ import Breadcrumb from "@/components/Common/Breadcrumb";
 import WhatsAppFloatingButton from "@/components/Common/WhatsAppFloatingButton";
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
+import { getHeaderNavData } from "@/lib/nav/headerNav";
+import { getStoreContactDisplay } from "@/lib/marketing/storeContactDisplay";
 
 /** Announcement bar / header copy comes from DB; avoid static shell stale on production. */
 export const dynamic = "force-dynamic";
@@ -39,6 +41,9 @@ export default async function SiteLayout({
     linkUrl: m.link_url,
   }));
 
+  const headerNav = await getHeaderNavData();
+  const storeContact = await getStoreContactDisplay();
+
   return (
     <div>
       <>
@@ -53,6 +58,7 @@ export default async function SiteLayout({
             headerData={null}
             utilityAnnouncement={utilityAnnouncement}
             marqueeAnnouncements={marqueeAnnouncements}
+            headerNav={headerNav}
           />
           <Breadcrumb />
           <Toaster position="top-center" reverseOrder={false} />
@@ -61,7 +67,7 @@ export default async function SiteLayout({
 
         <ScrollToTop />
         <WhatsAppFloatingButton />
-        <Footer />
+        <Footer storeContact={storeContact} />
       </>
     </div>
   );

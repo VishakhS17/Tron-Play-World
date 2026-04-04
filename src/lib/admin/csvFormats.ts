@@ -1,0 +1,54 @@
+/** Column order must match POST /api/admin/csv/products import. Slug may be blank — derived from name like the admin new-product form. */
+export const PRODUCTS_CSV_COLUMNS = [
+  "name",
+  "slug",
+  "base_price",
+  "discounted_price",
+  "sku",
+  "diecast_scale",
+  "is_active",
+  "available_quantity",
+  "low_stock_threshold",
+] as const;
+
+/** Column order must match POST /api/admin/csv/inventory import. */
+export const INVENTORY_CSV_COLUMNS = [
+  "product_slug",
+  "available_quantity",
+  "low_stock_threshold",
+] as const;
+
+export function escapeCsvField(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export function productsCsvHeaderLine(): string {
+  return PRODUCTS_CSV_COLUMNS.join(",");
+}
+
+/** Blank template: header + example row (empty slug — importer generates from name). */
+export function productsCsvTemplate(): string {
+  const example = [
+    "Toy Car",
+    "",
+    "199",
+    "149",
+    "SKU-1",
+    "64",
+    "true",
+    "50",
+    "5",
+  ].map(escapeCsvField);
+  return `${productsCsvHeaderLine()}\n${example.join(",")}\n`;
+}
+
+export function inventoryCsvHeaderLine(): string {
+  return INVENTORY_CSV_COLUMNS.join(",");
+}
+
+export function inventoryCsvTemplate(): string {
+  return `${inventoryCsvHeaderLine()}\ntoy-car,50,5\n`;
+}

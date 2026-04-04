@@ -1,17 +1,35 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+
+type SiteSettingsRow = {
+  id?: string;
+  first_visit_coupon_code?: string | null;
+  help_support_title?: string | null;
+  contact_address?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  social_facebook_url?: string | null;
+  social_twitter_url?: string | null;
+  social_instagram_url?: string | null;
+  social_linkedin_url?: string | null;
+  visit_eyebrow?: string | null;
+  visit_heading?: string | null;
+  visit_location_label?: string | null;
+};
 
 type Initial = {
   slides: unknown[];
   highlights: unknown[];
   brandRail: unknown[];
+  categoryTiles: unknown[];
   announcements: unknown[];
   popups: unknown[];
   flashSales: unknown[];
-  settings: { first_visit_coupon_code: string | null } | null;
+  settings: SiteSettingsRow | null;
   categories: { id: string; name: string; slug: string }[];
   products: {
     id: string;
@@ -39,18 +57,40 @@ async function j<T>(res: Response): Promise<T> {
 export default function MarketingAdminClient({ initial }: { initial: Initial }) {
   const router = useRouter();
   const [tab, setTab] = useState<
-    "hero" | "highlights" | "brandRail" | "announcements" | "popups" | "flash" | "settings"
+    | "hero"
+    | "highlights"
+    | "brandRail"
+    | "categoryGrid"
+    | "announcements"
+    | "popups"
+    | "flash"
+    | "settings"
   >("hero");
   const [slides, setSlides] = useState(initial.slides);
   const [highlights, setHighlights] = useState(initial.highlights);
   const [brandRailRows, setBrandRailRows] = useState(initial.brandRail);
+  const [categoryGridRows, setCategoryGridRows] = useState(initial.categoryTiles);
   const [announcements, setAnnouncements] = useState(initial.announcements);
   const [popups, setPopups] = useState(initial.popups);
   const [flashSales, setFlashSales] = useState(initial.flashSales);
   const [firstVisit, setFirstVisit] = useState(initial.settings?.first_visit_coupon_code ?? "");
+  const st0 = initial.settings;
+  const [helpSupportTitle, setHelpSupportTitle] = useState(st0?.help_support_title ?? "");
+  const [contactAddress, setContactAddress] = useState(st0?.contact_address ?? "");
+  const [contactPhone, setContactPhone] = useState(st0?.contact_phone ?? "");
+  const [contactEmail, setContactEmail] = useState(st0?.contact_email ?? "");
+  const [socialFacebook, setSocialFacebook] = useState(st0?.social_facebook_url ?? "");
+  const [socialTwitter, setSocialTwitter] = useState(st0?.social_twitter_url ?? "");
+  const [socialInstagram, setSocialInstagram] = useState(st0?.social_instagram_url ?? "");
+  const [socialLinkedIn, setSocialLinkedIn] = useState(st0?.social_linkedin_url ?? "");
+  const [visitEyebrow, setVisitEyebrow] = useState(st0?.visit_eyebrow ?? "");
+  const [visitHeading, setVisitHeading] = useState(st0?.visit_heading ?? "");
+  const [visitLocationLabel, setVisitLocationLabel] = useState(st0?.visit_location_label ?? "");
+  const [storefrontSaving, setStorefrontSaving] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const [highlightUploading, setHighlightUploading] = useState(false);
   const [brandRailUploading, setBrandRailUploading] = useState(false);
+  const [categoryGridUploading, setCategoryGridUploading] = useState(false);
   const [popupUploading, setPopupUploading] = useState(false);
   const [flashSaving, setFlashSaving] = useState(false);
   const [flashEditingId, setFlashEditingId] = useState<string | null>(null);
@@ -89,6 +129,24 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
       )),
     [brands]
   );
+  const usedCategoryIdsForGrid = useMemo(
+    () =>
+      new Set(
+        (categoryGridRows as { category_id: string }[]).map((r) => r.category_id)
+      ),
+    [categoryGridRows]
+  );
+  const categoryOptionsForGrid = useMemo(
+    () =>
+      cats
+        .filter((c) => !usedCategoryIdsForGrid.has(c.id))
+        .map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        )),
+    [cats, usedCategoryIdsForGrid]
+  );
   const couponOptions = useMemo(
     () =>
       coupons
@@ -112,6 +170,10 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
   async function refreshBrandRail() {
     const r = await fetch("/api/admin/marketing/brand-rail", { cache: "no-store" });
     setBrandRailRows(await r.json());
+  }
+  async function refreshCategoryGrid() {
+    const r = await fetch("/api/admin/marketing/category-tiles", { cache: "no-store" });
+    setCategoryGridRows(await r.json());
   }
   async function refreshAnnouncements() {
     const r = await fetch("/api/admin/marketing/announcements", { cache: "no-store" });
@@ -141,6 +203,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
             ["hero", "Hero"],
             ["highlights", "Highlights"],
             ["brandRail", "Shop by brand"],
+            ["categoryGrid", "Discover by category"],
             ["announcements", "Announcements"],
             ["popups", "Popups"],
             ["flash", "Flash sales"],
@@ -580,6 +643,178 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
         </section>
       ) : null}
 
+      {tab === "categoryGrid" ? (
+        <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Discover by category (homepage)</h2>
+          <p className="text-sm text-meta-3">
+            Each row is one tile on the homepage grid. Pick the catalog category, upload a cover image, and
+            set sort order. Only active tiles are shown; if this list is empty, the site
+            falls back to the first eight categories without photos.
+          </p>
+          <ul className="divide-y divide-gray-3 text-sm">
+            {(categoryGridRows as any[]).map((row) => (
+              <li key={row.id} className="py-3 flex flex-wrap items-start justify-between gap-3">
+                <div className="flex gap-3 min-w-0 flex-1">
+                  {row.image_url ? (
+                    <Image
+                      src={row.image_url}
+                      alt=""
+                      width={64}
+                      height={64}
+                      unoptimized
+                      className="w-16 h-16 rounded-lg object-cover border border-gray-3 shrink-0"
+                    />
+                  ) : null}
+                  <div className="min-w-0">
+                    <span className="font-medium text-dark">
+                      {row.categories?.name ?? "Category"}
+                    </span>
+                    {row.label_override ? (
+                      <span className="text-meta-3"> — label: {row.label_override}</span>
+                    ) : null}
+                    <span className="block text-xs text-meta-4 mt-0.5">
+                      sort {row.sort_order} · {row.is_active ? "active" : "inactive"}
+                    </span>
+                    <span className="block truncate text-xs text-meta-4 mt-0.5 max-w-md">
+                      {row.image_url}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="text-red-600 text-sm shrink-0"
+                  onClick={async () => {
+                    if (!confirm("Delete this category tile?")) return;
+                    await j(
+                      await fetch(`/api/admin/marketing/category-tiles/${row.id}`, {
+                        method: "DELETE",
+                      })
+                    );
+                    toast.success("Deleted");
+                    void refreshCategoryGrid();
+                  }}
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+          <form
+            className="grid gap-3 sm:grid-cols-2"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const formEl = e.currentTarget;
+              const fd = new FormData(formEl);
+              try {
+                const categoryId = String(fd.get("category_id") ?? "");
+                if (!categoryId) throw new Error("Choose a category");
+
+                let imageUrl = String(fd.get("image_url") ?? "").trim();
+                let imagePublicId: string | null = null;
+                const file = fd.get("image_file");
+                if (file instanceof File && file.size > 0) {
+                  setCategoryGridUploading(true);
+                  const uploadFd = new FormData();
+                  uploadFd.append("file", file);
+                  const uploadRes = await j<{ url: string; public_id: string }>(
+                    await fetch("/api/admin/marketing/category-tiles/upload", {
+                      method: "POST",
+                      body: uploadFd,
+                    })
+                  );
+                  imageUrl = uploadRes.url;
+                  imagePublicId = uploadRes.public_id;
+                }
+                if (!imageUrl) throw new Error("Provide an image URL or upload an image");
+
+                await j(
+                  await fetch("/api/admin/marketing/category-tiles", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                      category_id: categoryId,
+                      image_url: imageUrl,
+                      image_public_id: imagePublicId,
+                      label_override: String(fd.get("label_override") ?? "").trim() || null,
+                      sort_order: Number(fd.get("sort_order") || 0),
+                      is_active: fd.get("is_active") === "on",
+                    }),
+                  })
+                );
+                toast.success("Created");
+                formEl.reset();
+                void refreshCategoryGrid();
+                router.refresh();
+              } catch (err: unknown) {
+                toast.error(err instanceof Error ? err.message : "Failed");
+              } finally {
+                setCategoryGridUploading(false);
+              }
+            }}
+          >
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Category (shop link)</span>
+              <select
+                name="category_id"
+                required
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              >
+                <option value="">— Select —</option>
+                {categoryOptionsForGrid}
+              </select>
+              {categoryOptionsForGrid.length === 0 ? (
+                <p className="mt-1 text-xs text-meta-3">
+                  All categories already have a tile. Delete one to add a different category.
+                </p>
+              ) : null}
+            </label>
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Label on tile (optional)</span>
+              <input
+                name="label_override"
+                placeholder="Uses catalog category name if empty"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Image URL (optional if uploading)</span>
+              <input name="image_url" className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm" />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="text-sm font-medium">Upload image (Cloudinary)</span>
+              <input
+                name="image_file"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-xs text-meta-3">Landscape or square works well for the card. Max 4 MB.</p>
+            </label>
+            <label>
+              <span className="text-sm font-medium">Sort</span>
+              <input
+                name="sort_order"
+                type="number"
+                defaultValue={0}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm mt-6">
+              <input name="is_active" type="checkbox" defaultChecked /> Active
+            </label>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                disabled={categoryGridUploading}
+                className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {categoryGridUploading ? "Uploading…" : "Add category tile"}
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
+
       {tab === "announcements" ? (
         <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4">
           <h2 className="text-lg font-semibold">Announcement bar</h2>
@@ -1003,45 +1238,212 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
       ) : null}
 
       {tab === "settings" ? (
-        <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4 max-w-lg">
-          <h2 className="text-lg font-semibold">First-visit coupon</h2>
-          <p className="text-sm text-meta-3">
-            Choose from existing active coupons. Offer is enforced one-time per customer email.
-          </p>
-          <label className="block">
-            <span className="text-sm font-medium">Coupon</span>
-            <select
-              value={firstVisit}
-              onChange={(e) => setFirstVisit(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+        <div className="space-y-8">
+          <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4 max-w-lg">
+            <h2 className="text-lg font-semibold">First-visit coupon</h2>
+            <p className="text-sm text-meta-3">
+              Choose from existing active coupons. Offer is enforced one-time per customer email.
+            </p>
+            <label className="block">
+              <span className="text-sm font-medium">Coupon</span>
+              <select
+                value={firstVisit}
+                onChange={(e) => setFirstVisit(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              >
+                <option value="">No first-visit coupon</option>
+                {couponOptions}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white"
+              onClick={async () => {
+                try {
+                  await j(
+                    await fetch("/api/admin/marketing/settings", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        first_visit_coupon_code: firstVisit.trim() || null,
+                      }),
+                    })
+                  );
+                  toast.success("Saved");
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : "Failed");
+                }
+              }}
             >
-              <option value="">No first-visit coupon</option>
-              {couponOptions}
-            </select>
-          </label>
-          <button
-            type="button"
-            className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white"
-            onClick={async () => {
-              try {
-                await j(
-                  await fetch("/api/admin/marketing/settings", {
-                    method: "PATCH",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({
-                      first_visit_coupon_code: firstVisit.trim() || null,
-                    }),
-                  })
-                );
-                toast.success("Saved");
-              } catch (err: any) {
-                toast.error(err?.message || "Failed");
-              }
-            }}
-          >
-            Save
-          </button>
-        </section>
+              Save coupon
+            </button>
+          </section>
+
+          <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4 max-w-2xl">
+            <h2 className="text-lg font-semibold">Footer: Help &amp; Support</h2>
+            <p className="text-sm text-meta-3">
+              Shown in the site footer (address, phone, email, social icons). Leave any field empty and
+              save to use the built-in default for that field.
+            </p>
+            <label className="block">
+              <span className="text-sm font-medium">Section title</span>
+              <input
+                value={helpSupportTitle}
+                onChange={(e) => setHelpSupportTitle(e.target.value)}
+                placeholder="Help & Support"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Address</span>
+              <textarea
+                value={contactAddress}
+                onChange={(e) => setContactAddress(e.target.value)}
+                rows={3}
+                placeholder="Store address"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Phone (display)</span>
+              <input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="+91 98447 16214"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Email</span>
+              <input
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="support@example.com"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium">Facebook URL</span>
+                <input
+                  value={socialFacebook}
+                  onChange={(e) => setSocialFacebook(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium">Twitter / X URL</span>
+                <input
+                  value={socialTwitter}
+                  onChange={(e) => setSocialTwitter(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium">Instagram URL</span>
+                <input
+                  value={socialInstagram}
+                  onChange={(e) => setSocialInstagram(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-sm font-medium">LinkedIn URL</span>
+                <input
+                  value={socialLinkedIn}
+                  onChange={(e) => setSocialLinkedIn(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+
+            <h3 className="text-base font-semibold pt-2 border-t border-gray-3">Homepage: Visit us</h3>
+            <p className="text-sm text-meta-3">
+              The card near the bottom of the homepage. The address shown is the same as the footer
+              address above.
+            </p>
+            <label className="block">
+              <span className="text-sm font-medium">Small label (uppercase in UI)</span>
+              <input
+                value={visitEyebrow}
+                onChange={(e) => setVisitEyebrow(e.target.value)}
+                placeholder="Visit us"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Main heading</span>
+              <input
+                value={visitHeading}
+                onChange={(e) => setVisitHeading(e.target.value)}
+                placeholder="Find us in Bengaluru."
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Location row title</span>
+              <input
+                value={visitLocationLabel}
+                onChange={(e) => setVisitLocationLabel(e.target.value)}
+                placeholder="Location"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+
+            <button
+              type="button"
+              disabled={storefrontSaving}
+              className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              onClick={async () => {
+                try {
+                  setStorefrontSaving(true);
+                  const row = await j<SiteSettingsRow>(
+                    await fetch("/api/admin/marketing/settings", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        help_support_title: helpSupportTitle.trim() || null,
+                        contact_address: contactAddress.trim() || null,
+                        contact_phone: contactPhone.trim() || null,
+                        contact_email: contactEmail.trim() || null,
+                        social_facebook_url: socialFacebook.trim() || null,
+                        social_twitter_url: socialTwitter.trim() || null,
+                        social_instagram_url: socialInstagram.trim() || null,
+                        social_linkedin_url: socialLinkedIn.trim() || null,
+                        visit_eyebrow: visitEyebrow.trim() || null,
+                        visit_heading: visitHeading.trim() || null,
+                        visit_location_label: visitLocationLabel.trim() || null,
+                      }),
+                    })
+                  );
+                  setHelpSupportTitle(row.help_support_title ?? "");
+                  setContactAddress(row.contact_address ?? "");
+                  setContactPhone(row.contact_phone ?? "");
+                  setContactEmail(row.contact_email ?? "");
+                  setSocialFacebook(row.social_facebook_url ?? "");
+                  setSocialTwitter(row.social_twitter_url ?? "");
+                  setSocialInstagram(row.social_instagram_url ?? "");
+                  setSocialLinkedIn(row.social_linkedin_url ?? "");
+                  setVisitEyebrow(row.visit_eyebrow ?? "");
+                  setVisitHeading(row.visit_heading ?? "");
+                  setVisitLocationLabel(row.visit_location_label ?? "");
+                  toast.success("Storefront contact saved");
+                  router.refresh();
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : "Failed");
+                } finally {
+                  setStorefrontSaving(false);
+                }
+              }}
+            >
+              {storefrontSaving ? "Saving…" : "Save footer & Visit us"}
+            </button>
+          </section>
+        </div>
       ) : null}
     </div>
   );

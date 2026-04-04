@@ -1,5 +1,6 @@
 "use client";
 
+import { slugFromProductName } from "@/utils/slugGenerate";
 import { parseAdminJsonResponse } from "@/lib/admin/parseAdminFetchResponse";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -23,6 +24,7 @@ export default function NewProductPage() {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [categories, setCategories] = useState<Option[]>([]);
   const [brands, setBrands] = useState<Option[]>([]);
+  const [diecastScales, setDiecastScales] = useState<Option[]>([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -34,6 +36,7 @@ export default function NewProductPage() {
     short_description: "",
     is_active: true,
     age_group: "",
+    diecast_scale_id: "",
     category_id: "",
     brand_id: "",
     available_quantity: "0",
@@ -53,34 +56,35 @@ export default function NewProductPage() {
 
     (async () => {
       try {
-        const [catRes, brandRes] = await Promise.all([
+        const [catRes, brandRes, scaleRes] = await Promise.all([
           fetch("/api/admin/categories"),
           fetch("/api/admin/brands"),
+          fetch("/api/admin/diecast-scales"),
         ]);
-        const [cats, brnds] = await Promise.all([
+        const [cats, brnds, scales] = await Promise.all([
           readJsonSafe(catRes),
           readJsonSafe(brandRes),
+          readJsonSafe(scaleRes),
         ]);
-        if (!catRes.ok || !brandRes.ok) {
+        if (!catRes.ok || !brandRes.ok || !scaleRes.ok) {
           const msg =
             (cats as { error?: string } | null)?.error ||
             (brnds as { error?: string } | null)?.error ||
-            "Failed to load categories/brands";
+            (scales as { error?: string } | null)?.error ||
+            "Failed to load categories/brands/scales";
           throw new Error(msg);
         }
         setCategories(Array.isArray(cats) ? cats : []);
         setBrands(Array.isArray(brnds) ? brnds : []);
+        setDiecastScales(Array.isArray(scales) ? scales : []);
       } catch (err: unknown) {
         setCategories([]);
         setBrands([]);
-        toast.error(err instanceof Error ? err.message : "Failed to load categories/brands");
+        setDiecastScales([]);
+        toast.error(err instanceof Error ? err.message : "Failed to load categories/brands/scales");
       }
     })();
   }, []);
-
-  function autoSlug(name: string) {
-    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  }
 
   async function handleAddFiles(files: FileList) {
     const fileArr = Array.from(files);
@@ -144,6 +148,7 @@ export default function NewProductPage() {
           category_id: form.category_id || null,
           brand_id: form.brand_id || null,
           age_group: form.age_group || null,
+          diecast_scale_id: form.diecast_scale_id || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -186,7 +191,7 @@ export default function NewProductPage() {
               value={form.name}
               onChange={(e) => {
                 const name = e.target.value;
-                setForm((f) => ({ ...f, name, slug: autoSlug(name) }));
+                setForm((f) => ({ ...f, name, slug: slugFromProductName(name) }));
               }}
               className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
             />
@@ -258,7 +263,7 @@ export default function NewProductPage() {
           <h2 className="text-base font-semibold text-dark">Classification</h2>
           <p className="text-xs text-meta-4">Used for filtering products by category, brand and age on the storefront.</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <SelectWithCreate
               label="Category"
               value={form.category_id}
@@ -288,6 +293,17 @@ export default function NewProductPage() {
                 {AGE_GROUPS.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
             </label>
+
+            <SelectWithCreate
+              label="Diecast scale"
+              value={form.diecast_scale_id}
+              onChange={(id) => setForm((f) => ({ ...f, diecast_scale_id: id }))}
+              options={diecastScales}
+              onCreated={(opt) =>
+                setDiecastScales((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))
+              }
+              createEndpoint="/api/admin/diecast-scales"
+            />
           </div>
         </section>
 

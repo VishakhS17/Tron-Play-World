@@ -11,6 +11,8 @@ export type Product = {
   reviews: number;
   shortDescription: string;
   ageGroup?: string | null;
+  /** Diecast model scale, e.g. 1:64 */
+  diecastScale?: string | null;
   /** Cover image URL for thumbnails/cards (first product_image by sort_order). */
   image?: string;
   productVariants: {
@@ -31,6 +33,7 @@ export type IProductByDetails = {
   title: string;
   shortDescription: string;
   ageGroup?: string | null;
+  diecastScale?: string | null;
   description: string | null;
   price: number;
   discountedPrice?: number | null;

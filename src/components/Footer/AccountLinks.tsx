@@ -4,7 +4,7 @@ const accountLinks = [
   {
     id: 1,
     label: "Login / Register",
-    href: "/signin",
+    href: "/login",
   },
   {
     id: 2,

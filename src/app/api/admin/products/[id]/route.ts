@@ -30,6 +30,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       short_description: true,
       is_active: true,
       age_group: true,
+      diecast_scale_id: true,
       category_id: true,
       brand_id: true,
       product_images: {
@@ -99,13 +100,13 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (body.description !== undefined) {
     if (body.description !== null && typeof body.description !== "string") return bad();
     const description = cleanOptionalText(body.description, 10000);
-    if (hasSuspiciousInput(description)) return bad();
+    if (hasSuspiciousInput(description ?? "")) return bad();
     data.description = description;
   }
   if (body.short_description !== undefined) {
     if (body.short_description !== null && typeof body.short_description !== "string") return bad();
     const short_description = cleanOptionalText(body.short_description, 2000);
-    if (hasSuspiciousInput(short_description)) return bad();
+    if (hasSuspiciousInput(short_description ?? "")) return bad();
     data.short_description = short_description;
   }
   if (body.is_active !== undefined) {
@@ -117,6 +118,15 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     const age_group = cleanOptionalText(body.age_group, 50);
     if (age_group && hasSuspiciousInput(age_group)) return bad();
     data.age_group = age_group;
+  }
+  if (body.diecast_scale_id !== undefined) {
+    if (body.diecast_scale_id === null || body.diecast_scale_id === "") {
+      data.diecast_scale_id = null;
+    } else if (typeof body.diecast_scale_id === "string" && isUuid(cleanText(body.diecast_scale_id, 64))) {
+      data.diecast_scale_id = cleanText(body.diecast_scale_id, 64);
+    } else {
+      return bad();
+    }
   }
   if (body.category_id !== undefined) {
     if (body.category_id === null || body.category_id === "") {

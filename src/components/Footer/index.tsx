@@ -5,12 +5,44 @@ import {
   LinkedInIcon,
   TwitterIcon,
 } from "@/assets/icons/social";
+import type { StoreContactDisplay } from "@/lib/marketing/storeContactDisplay";
+import { phoneToTelHref } from "@/lib/marketing/storeContactDisplay";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import AccountLinks from "./AccountLinks";
 import FooterBottom from "./FooterBottom";
 import QuickLinks from "./QuickLinks";
 
-const Footer = () => {
+function SocialLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: ReactNode;
+}) {
+  if (!href.trim()) {
+    return (
+      <span className="flex text-meta-4 cursor-not-allowed opacity-40" aria-hidden>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex duration-200 ease-out hover:text-blue"
+    >
+      <span className="sr-only">{label}</span>
+      {children}
+    </Link>
+  );
+}
+
+export default function Footer({ storeContact }: { storeContact: StoreContactDisplay }) {
   return (
     <footer className="overflow-hidden border-t border-gray-3">
       <div className="px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
@@ -18,73 +50,55 @@ const Footer = () => {
         <div className="flex flex-wrap xl:flex-nowrap gap-10 xl:gap-19 xl:justify-between pt-17.5 xl:pt-22.5 pb-10 xl:pb-20">
           <div className="max-w-[330px] w-full">
             <h2 className="mb-7.5 text-xl font-semibold text-dark">
-              Help & Support
+              {storeContact.helpSupportTitle}
             </h2>
 
             <ul className="flex flex-col gap-3">
-              <li className="flex gap-4.5 text-base">
+              <li className="flex gap-4.5 text-base text-meta-3">
                 <span className="shrink-0">
                   <MapIcon className="fill-blue" width={24} height={24} />
                 </span>
-                24, Basement, 21st Main Rd, Banashankari Stage II,
-                Banashankari, Bengaluru, Karnataka 560070
+                {storeContact.contactAddress}
               </li>
 
               <li>
                 <Link
-                  href="tel:+919844716214"
-                  className="flex items-center gap-4.5 text-base"
+                  href={phoneToTelHref(storeContact.contactPhone)}
+                  className="flex items-center gap-4.5 text-base text-meta-3"
                 >
                   <CallIcon className="fill-blue" width={24} height={24} />
-                  +91 98447 16214
+                  {storeContact.contactPhone}
                 </Link>
               </li>
 
               <li>
                 <Link
-                  href="mailto:support@example.com"
-                  className="flex items-center gap-4.5 text-base"
+                  href={`mailto:${storeContact.contactEmail}`}
+                  className="flex items-center gap-4.5 text-base text-meta-3"
                 >
                   <EmailIcon className="fill-blue" width={24} height={24} />
-                  support@example.com
+                  {storeContact.contactEmail}
                 </Link>
               </li>
             </ul>
 
             {/* <!-- Social Links start --> */}
             <div className="flex items-center gap-4 mt-7.5">
-              <Link
-                href="#"
-                className="flex duration-200 ease-out hover:text-blue"
-              >
-                <span className="sr-only">Facebook link</span>
+              <SocialLink href={storeContact.socialFacebookUrl} label="Facebook">
                 <FacebookIcon />
-              </Link>
+              </SocialLink>
 
-              <Link
-                href="#"
-                className="flex duration-200 ease-out hover:text-blue"
-              >
-                <span className="sr-only">Twitter link</span>
+              <SocialLink href={storeContact.socialTwitterUrl} label="Twitter">
                 <TwitterIcon />
-              </Link>
+              </SocialLink>
 
-              <Link
-                href="#"
-                className="flex duration-200 ease-out hover:text-blue"
-              >
-                <span className="sr-only">Instagram link</span>
+              <SocialLink href={storeContact.socialInstagramUrl} label="Instagram">
                 <InstagramIcon />
-              </Link>
+              </SocialLink>
 
-              <Link
-                href="#"
-                aria-label="Linkedin Social Link"
-                className="flex duration-200 ease-out hover:text-blue"
-              >
-                <span className="sr-only">LinkedIn link</span>
+              <SocialLink href={storeContact.socialLinkedInUrl} label="LinkedIn">
                 <LinkedInIcon />
-              </Link>
+              </SocialLink>
             </div>
             {/* <!-- Social Links end --> */}
           </div>
@@ -125,6 +139,4 @@ const Footer = () => {
       <FooterBottom />
     </footer>
   );
-};
-
-export default Footer;
+}

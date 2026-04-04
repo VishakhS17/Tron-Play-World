@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prismaDB";
 import { requireAdminWrite } from "@/lib/admin/rbac";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
-import { cleanText, readJsonBody } from "@/lib/validation/input";
+import { readJsonBody, sanitizeCsvPayload } from "@/lib/validation/input";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
+import { upsertProductLevelInventory } from "@/lib/inventory/productLevelInventory";
 
 function parseCsv(csv: string) {
   const lines = csv
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   const body = parsed.body;
   if (!body.csv) return NextResponse.json({ error: "csv is required" }, { status: 400 });
 
-  const rows = parseCsv(cleanText(body.csv, 2_000_000));
+  const rows = parseCsv(sanitizeCsvPayload(body.csv, 2_000_000));
   let count = 0;
   const touchedProductIds = new Set<string>();
 
@@ -54,17 +55,9 @@ export async function POST(req: NextRequest) {
     if (!product) continue;
     touchedProductIds.add(product.id);
 
-    await prisma.inventory.upsert({
-      where: { product_id_product_variant_id: { product_id: product.id, product_variant_id: null } } as any,
-      update: { available_quantity: available, low_stock_threshold: threshold },
-      create: {
-        product_id: product.id,
-        product_variant_id: null,
-        available_quantity: available,
-        reserved_quantity: 0,
-        sold_quantity: 0,
-        low_stock_threshold: threshold,
-      },
+    await upsertProductLevelInventory(product.id, {
+      available_quantity: available,
+      low_stock_threshold: threshold,
     });
 
     count++;

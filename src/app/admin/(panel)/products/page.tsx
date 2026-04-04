@@ -18,6 +18,7 @@ export default async function AdminProductsPage() {
       discounted_price: true,
       is_active: true,
       created_at: true,
+      diecast_scales: { select: { ratio: true } },
     },
   });
 
@@ -38,6 +39,7 @@ export default async function AdminProductsPage() {
           <thead>
             <tr className="text-left text-meta-3 border-b border-gray-3">
               <th className="py-3 px-4">Name</th>
+              <th className="py-3 px-4">Scale</th>
               <th className="py-3 px-4">Price</th>
               <th className="py-3 px-4">Active</th>
               <th className="py-3 px-4">Actions</th>
@@ -49,6 +51,9 @@ export default async function AdminProductsPage() {
                 <td className="py-3 px-4">
                   <div className="font-semibold text-dark">{p.name}</div>
                   <div className="text-xs text-meta-4">{p.slug}</div>
+                </td>
+                <td className="py-3 px-4 text-meta-3 text-sm">
+                  {p.diecast_scales?.ratio ?? "—"}
                 </td>
                 <td className="py-3 px-4 text-dark">
                   {formatPrice(Number(p.discounted_price ?? p.base_price))}
@@ -76,7 +81,7 @@ export default async function AdminProductsPage() {
             ))}
             {products.length === 0 ? (
               <tr>
-                <td className="py-6 px-4 text-sm text-meta-3" colSpan={4}>
+                <td className="py-6 px-4 text-sm text-meta-3" colSpan={5}>
                   No products yet.
                 </td>
               </tr>

@@ -25,6 +25,7 @@ export default function EditProductPage() {
   const [imgBusy, setImgBusy] = useState(false);
   const [categories, setCategories] = useState<Option[]>([]);
   const [brands, setBrands] = useState<Option[]>([]);
+  const [diecastScales, setDiecastScales] = useState<Option[]>([]);
 
   useEffect(() => {
     const readJsonSafe = async (res: Response) => {
@@ -39,21 +40,24 @@ export default function EditProductPage() {
 
     (async () => {
       try {
-        const [productRes, catRes, brandRes] = await Promise.all([
+        const [productRes, catRes, brandRes, scaleRes] = await Promise.all([
           fetch(`/api/admin/products/${id}`),
           fetch("/api/admin/categories"),
           fetch("/api/admin/brands"),
+          fetch("/api/admin/diecast-scales"),
         ]);
-        const [product, cats, brnds] = await Promise.all([
+        const [product, cats, brnds, scales] = await Promise.all([
           readJsonSafe(productRes),
           readJsonSafe(catRes),
           readJsonSafe(brandRes),
+          readJsonSafe(scaleRes),
         ]);
-        if (!catRes.ok || !brandRes.ok) {
+        if (!catRes.ok || !brandRes.ok || !scaleRes.ok) {
           const msg =
             (cats as { error?: string } | null)?.error ||
             (brnds as { error?: string } | null)?.error ||
-            "Failed to load categories/brands";
+            (scales as { error?: string } | null)?.error ||
+            "Failed to load categories/brands/scales";
           throw new Error(msg);
         }
 
@@ -63,10 +67,12 @@ export default function EditProductPage() {
         }
         setCategories(Array.isArray(cats) ? cats : []);
         setBrands(Array.isArray(brnds) ? brnds : []);
+        setDiecastScales(Array.isArray(scales) ? scales : []);
       } catch (err: unknown) {
         setCategories([]);
         setBrands([]);
-        toast.error(err instanceof Error ? err.message : "Failed to load categories/brands");
+        setDiecastScales([]);
+        toast.error(err instanceof Error ? err.message : "Failed to load categories/brands/scales");
       }
     })();
   }, [id]);
@@ -83,6 +89,7 @@ export default function EditProductPage() {
           discounted_price: form.discounted_price ? Number(form.discounted_price) : null,
           available_quantity: Number(form.available_quantity),
           low_stock_threshold: Number(form.low_stock_threshold),
+          diecast_scale_id: form.diecast_scale_id || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -292,7 +299,7 @@ export default function EditProductPage() {
         <h2 className="text-base font-semibold text-dark">Classification</h2>
         <p className="text-xs text-meta-4">Used for filtering products by category, brand and age on the storefront.</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <SelectWithCreate
             label="Category"
             value={form.category_id ?? ""}
@@ -322,6 +329,17 @@ export default function EditProductPage() {
               {AGE_GROUPS.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </label>
+
+          <SelectWithCreate
+            label="Diecast scale"
+            value={form.diecast_scale_id ?? ""}
+            onChange={(scaleId) => setForm((f: any) => ({ ...f, diecast_scale_id: scaleId }))}
+            options={diecastScales}
+            onCreated={(opt) =>
+              setDiecastScales((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))
+            }
+            createEndpoint="/api/admin/diecast-scales"
+          />
         </div>
       </section>
 

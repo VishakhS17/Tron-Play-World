@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { isSyntheticPhoneSignupEmail } from "@/lib/auth/signupIdentifier";
 import LogoutButton from "@/components/Auth/LogoutButton";
 import ChangePasswordCard from "@/components/Auth/ChangePasswordCard";
+import WishlistAccountCard from "@/components/Account/WishlistAccountCard";
 
 export const metadata = {
   title: "Account | i-Robox",
@@ -75,31 +76,38 @@ export default async function AccountPage() {
             <ChangePasswordCard userId={session.sub} />
           </div>
 
-          <aside className="rounded-2xl border border-gray-3 bg-white p-6 h-fit">
-            <h2 className="text-lg font-semibold text-dark">Addresses</h2>
-            {addresses.length === 0 ? (
-              <p className="mt-3 text-sm text-meta-3">No saved addresses yet.</p>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {addresses.map((a) => (
-                  <div key={a.id} className="rounded-xl border border-gray-3 p-4">
-                    <div className="font-semibold text-dark">{a.full_name}</div>
-                    <div className="mt-1 text-sm text-meta-3">
-                      {a.line1}
-                      {a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} {a.postal_code}
+          <div className="flex flex-col gap-8">
+            <aside className="h-fit rounded-2xl border border-gray-3 bg-white p-6">
+              <h2 className="text-lg font-semibold text-dark">Addresses</h2>
+              {addresses.length === 0 ? (
+                <p className="mt-3 text-sm text-meta-3">No saved addresses yet.</p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {addresses.map((a) => (
+                    <div key={a.id} className="rounded-xl border border-gray-3 p-4">
+                      <div className="font-semibold text-dark">{a.full_name}</div>
+                      <div className="mt-1 text-sm text-meta-3">
+                        {a.line1}
+                        {a.line2 ? `, ${a.line2}` : ""}, {a.city}, {a.state} {a.postal_code}
+                      </div>
+                      <div className="mt-1 text-sm text-meta-3">{a.phone}</div>
                     </div>
-                    <div className="mt-1 text-sm text-meta-3">{a.phone}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Link
-              href="/checkout"
-              className="mt-6 inline-flex w-full justify-center rounded-lg bg-blue px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition"
-            >
-              Use checkout to add address
-            </Link>
-          </aside>
+                  ))}
+                </div>
+              )}
+
+              <Link
+                href="/checkout"
+                className="mt-6 inline-flex w-full justify-center rounded-lg bg-blue px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition"
+              >
+                Use checkout to add address
+              </Link>
+            </aside>
+
+            <section className="h-fit rounded-2xl border border-gray-3 bg-white p-6">
+              <WishlistAccountCard />
+            </section>
+          </div>
         </div>
       </div>
     </section>

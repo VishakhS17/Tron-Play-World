@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
+import { getStoreContactDisplay } from "@/lib/marketing/storeContactDisplay";
 import Home, {
   type HomeBrandRailItem,
   type HomeCategoryTile,
@@ -47,21 +48,29 @@ export default async function HomePage() {
       })
     );
 
-  const [slidesRaw, highlightsRaw, brandRailRaw, categoriesRaw] = await Promise.all([
-    prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }),
-    highlightsPromise,
-    prisma.homepage_brand_rail
-      .findMany({
-        orderBy: { sort_order: "asc" },
-        include: { brands: { select: { slug: true, name: true } } },
-      })
-      .catch(() => []),
-    prisma.categories.findMany({
-      orderBy: { name: "asc" },
-      take: 8,
-      select: { id: true, name: true, slug: true },
-    }),
-  ]);
+  const [slidesRaw, highlightsRaw, brandRailRaw, categoryTilesRaw, categoriesRaw, storeContact] =
+    await Promise.all([
+      prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }),
+      highlightsPromise,
+      prisma.homepage_brand_rail
+        .findMany({
+          orderBy: { sort_order: "asc" },
+          include: { brands: { select: { slug: true, name: true } } },
+        })
+        .catch(() => []),
+      prisma.homepage_category_tiles
+        .findMany({
+          orderBy: { sort_order: "asc" },
+          include: { categories: { select: { id: true, name: true, slug: true } } },
+        })
+        .catch(() => []),
+      prisma.categories.findMany({
+        orderBy: { name: "asc" },
+        take: 8,
+        select: { id: true, name: true, slug: true },
+      }),
+      getStoreContactDisplay(),
+    ]);
 
   const heroSlides: HeroSlide[] = slidesRaw
     .filter((s) => isActiveInWindow(s.is_active, s.active_from, s.active_until, now))
@@ -104,11 +113,28 @@ export default async function HomePage() {
       };
     });
 
-  const categories: HomeCategoryTile[] = categoriesRaw.map((c) => ({
-    id: c.id,
-    name: c.name,
-    slug: c.slug,
-  }));
+  const fromCategoryTiles = categoryTilesRaw
+    .filter(
+      (row) =>
+        row.categories &&
+        isActiveInWindow(row.is_active, row.active_from, row.active_until, now)
+    )
+    .map((row) => ({
+      id: row.id,
+      name: row.label_override?.trim() || row.categories!.name,
+      slug: row.categories!.slug,
+      image: row.image_url,
+    }));
+
+  const categories: HomeCategoryTile[] =
+    fromCategoryTiles.length > 0
+      ? fromCategoryTiles
+      : categoriesRaw.map((c) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+          image: null,
+        }));
 
   const brandRail: HomeBrandRailItem[] = brandRailRaw
     .filter(
@@ -130,6 +156,7 @@ export default async function HomePage() {
       highlights={highlights}
       brandRail={brandRail}
       categories={categories}
+      storeContact={storeContact}
     />
   );
 }

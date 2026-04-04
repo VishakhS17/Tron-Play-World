@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   const short_description = cleanOptionalText(body.short_description, 2000);
   const is_active = Boolean(body.is_active);
   const age_group = cleanOptionalText(body.age_group, 50);
+  const diecast_scale_id = cleanOptionalText(body.diecast_scale_id, 64);
   const category_id = cleanOptionalText(body.category_id, 64);
   const brand_id = cleanOptionalText(body.brand_id, 64);
   const available_quantity = body.available_quantity !== undefined ? Math.max(0, Number(body.available_quantity)) : 0;
@@ -54,7 +55,11 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
-  if ((category_id && !isUuid(category_id)) || (brand_id && !isUuid(brand_id))) {
+  if (
+    (category_id && !isUuid(category_id)) ||
+    (brand_id && !isUuid(brand_id)) ||
+    (diecast_scale_id && !isUuid(diecast_scale_id))
+  ) {
     return NextResponse.json({ error: "Invalid relations" }, { status: 400 });
   }
 
@@ -65,6 +70,7 @@ export async function POST(req: NextRequest) {
       base_price,
       discounted_price,
       sku,
+      diecast_scale_id,
       description,
       short_description,
       is_active,
