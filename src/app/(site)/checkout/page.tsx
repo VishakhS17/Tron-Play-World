@@ -6,6 +6,14 @@ import toast from "react-hot-toast";
 import { useCart } from "@/hooks/useCart";
 import { formatPrice } from "@/utils/formatePrice";
 
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+    };
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { cartDetails, totalPrice, clearCart } = useCart();
@@ -51,6 +59,20 @@ export default function CheckoutPage() {
     country: "India",
   });
 
+  async function ensureRazorpayScript() {
+    if (typeof window === "undefined") return false;
+    if (window.Razorpay) return true;
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Could not load Razorpay checkout"));
+      document.body.appendChild(script);
+    });
+    return Boolean(window.Razorpay);
+  }
+
   async function handlePlaceOrder() {
     if (!items.length) {
       toast.error("Your cart is empty");
@@ -58,40 +80,78 @@ export default function CheckoutPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/checkout", {
+      const payload = {
+        items: items.map((i) => ({ productId: String(i.id), quantity: i.quantity })),
+        address,
+        guestCheckout,
+        couponCode: couponCode.trim() || undefined,
+        isGift,
+        giftMessage: giftMessage.trim() || undefined,
+      };
+
+      const ready = await ensureRazorpayScript();
+      if (!ready || !window.Razorpay) throw new Error("Razorpay checkout is unavailable");
+
+      const createRes = await fetch("/api/payment/razorpay/order", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({ productId: String(i.id), quantity: i.quantity })),
-          address,
-          guestCheckout,
-          couponCode: couponCode.trim() || undefined,
-          isGift,
-          giftMessage: giftMessage.trim() || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Checkout failed");
-      if (data?.passwordSetupIncluded) {
-        toast.success("We emailed you a link to set your password — same message as your order.", {
-          duration: 6500,
-        });
-      } else if (data?.newAccountCreated) {
-        toast.error(
-          "Order placed, but we could not attach a password link (server config). Use Forgot password with this email or contact us.",
-          { duration: 9000 }
-        );
-      }
-      clearCart();
-      const tokenQuery =
-        typeof data?.accessToken === "string" && data.accessToken
-          ? `?access=${encodeURIComponent(data.accessToken)}`
-          : "";
-      router.push(`/payment/${data.orderId}${tokenQuery}`);
+      const createData = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) throw new Error(createData?.error || "Could not initiate payment");
+
+      const rz = new window.Razorpay({
+        key: createData.keyId,
+        amount: createData.amount,
+        currency: createData.currency || "INR",
+        order_id: createData.razorpayOrderId,
+        name: "i-Robox",
+        description: "Order payment",
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch("/api/payment/razorpay/verify", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                ...payload,
+                razorpayOrderId: response?.razorpay_order_id,
+                razorpayPaymentId: response?.razorpay_payment_id,
+                razorpaySignature: response?.razorpay_signature,
+              }),
+            });
+            const verifyData = await verifyRes.json().catch(() => ({}));
+            if (!verifyRes.ok) throw new Error(verifyData?.error || "Payment verification failed");
+            if (verifyData?.passwordSetupIncluded) {
+              toast.success("We emailed you a password setup link with your order details.", {
+                duration: 6500,
+              });
+            }
+            clearCart();
+            const tokenQuery =
+              typeof verifyData?.accessToken === "string" && verifyData.accessToken
+                ? `?access=${encodeURIComponent(verifyData.accessToken)}`
+                : "";
+            router.push(`/orders/${verifyData.orderId}${tokenQuery}`);
+            router.refresh();
+          } catch (err: any) {
+            toast.error(err?.message || "Payment was received but verification failed");
+          } finally {
+            setLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+            toast.error("Payment cancelled");
+          },
+        },
+      });
+      rz.open();
     } catch (e: any) {
       toast.error(e?.message || "Checkout failed");
-    } finally {
       setLoading(false);
+    } finally {
+      // Keep loading while Razorpay modal is open.
     }
   }
 
@@ -198,10 +258,10 @@ export default function CheckoutPage() {
               onClick={handlePlaceOrder}
               className="mt-6 inline-flex w-full justify-center rounded-lg bg-blue px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition disabled:opacity-60"
             >
-              {loading ? "Placing order…" : "Place order"}
+              {loading ? "Starting payment…" : "Pay now"}
             </button>
             <p className="mt-3 text-xs text-meta-4">
-              Payment is a placeholder right now. Next screen will simulate success/failure with server confirmation.
+              You will be redirected to Razorpay to complete payment securely.
             </p>
           </aside>
         </div>

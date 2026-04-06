@@ -1,0 +1,261 @@
+import { prisma } from "@/lib/prismaDB";
+import { validateCommonEmailProvider } from "@/lib/validateEmai";
+import {
+  cleanOptionalText,
+  cleanText,
+  hasSuspiciousInput,
+  isUuid,
+  normalizeEmail,
+  normalizePhone,
+} from "@/lib/validation/input";
+import { flashSalePriceMap, unitPriceWithFlashSale } from "@/lib/pricing/flashSale";
+import {
+  categoryScopeError,
+  computeCouponDiscount,
+  couponTimingError,
+  couponUsageErrors,
+  fetchCouponForCart,
+} from "@/lib/coupons/cartCoupon";
+import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
+import { getSiteBaseUrl } from "@/lib/siteUrl";
+import { generatePasswordSetupSecret, PASSWORD_SETUP_TTL_MS } from "@/lib/auth/passwordSetupToken";
+import bcrypt from "bcrypt";
+
+type CheckoutItem = {
+  productId: string;
+  quantity: number;
+};
+
+type SessionLike = {
+  sub?: string | null;
+  email?: string | null;
+} | null;
+
+export type CheckoutContext = {
+  checkoutUserId: string | null;
+  checkoutEmail: string;
+  checkoutLinkedAs: "session" | "existing_customer" | "new_customer";
+  newAccountPasswordSetup: { setupUrl: string } | null;
+  lineItems: {
+    productId: string;
+    productName: string;
+    sku: string | null;
+    unitPrice: number;
+    quantity: number;
+    subtotal: number;
+  }[];
+  coupon: { id: string; code: string } | null;
+  shipping: number;
+  subtotal: number;
+  discount: number;
+  total: number;
+  address: {
+    full_name: string;
+    phone: string;
+    email: string;
+    line1: string;
+    line2: string | null;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  };
+  isGift: boolean;
+  giftMessage: string | null;
+};
+
+export async function buildCheckoutContext(input: {
+  body: Record<string, unknown>;
+  session: SessionLike;
+}) {
+  const { body, session } = input;
+  const items = (Array.isArray(body.items) ? body.items : []) as CheckoutItem[];
+  const address = (body.address ?? {}) as Record<string, unknown>;
+  const isGift = Boolean(body.isGift);
+  const giftMessage = cleanOptionalText(body.giftMessage, 500);
+  const couponCode = cleanText(body.couponCode, 80);
+
+  if (items.length === 0) throw new Error("CART_EMPTY");
+
+  const full_name = cleanText(address.full_name, 150);
+  const phone = normalizePhone(address.phone);
+  const email = normalizeEmail(address.email);
+  const line1 = cleanText(address.line1, 255);
+  const line2 = cleanOptionalText(address.line2, 255);
+  const city = cleanText(address.city, 120);
+  const state = cleanText(address.state, 120);
+  const postal_code = cleanText(address.postal_code, 20);
+  const country = cleanText(address.country ?? "India", 80);
+
+  if (!full_name || !phone || !email || !line1 || !city || !state || !postal_code || !country) {
+    throw new Error("ADDRESS_INCOMPLETE");
+  }
+  if (!validateCommonEmailProvider(email)) {
+    throw new Error("EMAIL_PROVIDER_INVALID");
+  }
+
+  if (
+    [full_name, phone, email, line1, city, state, postal_code, country, couponCode]
+      .filter(Boolean)
+      .some((v) => hasSuspiciousInput(v))
+  ) {
+    throw new Error("INVALID_INPUT");
+  }
+
+  const productIds = items.map((i) => i.productId);
+  const dbProducts = await prisma.products.findMany({
+    where: { id: { in: productIds }, is_active: true },
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      base_price: true,
+      discounted_price: true,
+      category_id: true,
+    },
+  });
+  const productMap = new Map(dbProducts.map((p) => [p.id, p]));
+  for (const item of items) {
+    if (!isUuid(String(item.productId ?? "")) || !productMap.has(item.productId)) {
+      throw new Error("INVALID_ITEMS");
+    }
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error("INVALID_QUANTITY");
+    }
+  }
+
+  let checkoutUserId: string | null = null;
+  let checkoutEmail = email;
+  let checkoutLinkedAs: "session" | "existing_customer" | "new_customer";
+
+  const guestCheckoutRequested = body.guestCheckout === true || body.guestCheckout === "true";
+  const sessionEmailNorm = session?.email ? normalizeEmail(session.email) : "";
+  const emailMismatch =
+    Boolean(session?.sub) && sessionEmailNorm.length > 0 && sessionEmailNorm !== email;
+  const guestCheckout = guestCheckoutRequested || emailMismatch;
+
+  if (!guestCheckout && session?.sub) {
+    checkoutLinkedAs = "session";
+    checkoutUserId = session.sub;
+    checkoutEmail = normalizeEmail(session.email ?? email);
+  } else {
+    checkoutLinkedAs = "existing_customer";
+  }
+
+  let newAccountPasswordSetup: { setupUrl: string } | null = null;
+  if (!checkoutUserId) {
+    const existingUser = await prisma.customers.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
+    if (existingUser) {
+      checkoutUserId = existingUser.id;
+      checkoutEmail = existingUser.email;
+      checkoutLinkedAs = "existing_customer";
+    } else {
+      checkoutLinkedAs = "new_customer";
+      const { raw: autoAccountSecret } = generatePasswordSetupSecret();
+      const randomPasswordHash = await bcrypt.hash(autoAccountSecret, 12);
+      const createdUser = await prisma.customers.create({
+        data: {
+          email,
+          password_hash: randomPasswordHash,
+          name: full_name || null,
+          phone: phone || null,
+          is_active: true,
+        },
+        select: { id: true, email: true },
+      });
+      checkoutUserId = createdUser.id;
+      checkoutEmail = createdUser.email;
+
+      const { raw: setupRaw, token_hash } = generatePasswordSetupSecret();
+      await prisma.customer_password_setup_tokens.deleteMany({
+        where: { customer_id: createdUser.id, used_at: null },
+      });
+      await prisma.customer_password_setup_tokens.create({
+        data: {
+          customer_id: createdUser.id,
+          token_hash,
+          expires_at: new Date(Date.now() + PASSWORD_SETUP_TTL_MS),
+        },
+      });
+      newAccountPasswordSetup = {
+        setupUrl: `${getSiteBaseUrl()}/set-password?token=${encodeURIComponent(setupRaw)}`,
+      };
+    }
+  }
+
+  const coupon = couponCode ? await fetchCouponForCart(couponCode) : null;
+  const flashMap = await flashSalePriceMap(productIds);
+
+  const lineItems = items.map((i) => {
+    const p = productMap.get(i.productId)!;
+    const catalogUnit = Number(p.discounted_price ?? p.base_price);
+    const unit = unitPriceWithFlashSale(catalogUnit, p.id, flashMap);
+    return {
+      productId: p.id,
+      productName: p.name,
+      sku: p.sku ?? null,
+      unitPrice: unit,
+      quantity: i.quantity,
+      subtotal: unit * i.quantity,
+    };
+  });
+
+  const subtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
+  let discount = 0;
+
+  if (coupon) {
+    const now = new Date();
+    const timeErr = couponTimingError(coupon, now);
+    if (timeErr) throw new Error(timeErr);
+    const lineMeta = items.map((i) => {
+      const p = productMap.get(i.productId)!;
+      return { productId: p.id, categoryId: p.category_id };
+    });
+    const scopeErr = categoryScopeError(coupon.categoryIds, lineMeta);
+    if (scopeErr) throw new Error(scopeErr);
+    const minOk = coupon.min_cart_value != null ? subtotal >= coupon.min_cart_value : true;
+    if (!minOk) throw new Error("Coupon minimum not met");
+    const usageErr = await couponUsageErrors(coupon, checkoutUserId);
+    if (usageErr) throw new Error(usageErr);
+
+    if (checkoutUserId) {
+      const settings = await prisma.site_marketing_settings.findUnique({
+        where: { id: SITE_MARKETING_SETTINGS_ID },
+        select: { first_visit_coupon_code: true },
+      });
+      const firstVisitCode = (settings?.first_visit_coupon_code ?? "").trim().toUpperCase();
+      if (firstVisitCode && coupon.code.toUpperCase() === firstVisitCode) {
+        const usedFirstVisit = await prisma.coupon_usages.count({
+          where: { coupon_id: coupon.id, customer_id: checkoutUserId },
+        });
+        if (usedFirstVisit > 0) {
+          throw new Error("First-visit offer already used for this email");
+        }
+      }
+    }
+
+    discount = computeCouponDiscount(subtotal, coupon);
+  }
+
+  const shipping = subtotal >= 2000 ? 0 : 99;
+  const total = Math.max(0, subtotal - discount) + shipping;
+
+  return {
+    checkoutUserId,
+    checkoutEmail,
+    checkoutLinkedAs,
+    newAccountPasswordSetup,
+    lineItems,
+    coupon: coupon ? { id: coupon.id, code: coupon.code } : null,
+    shipping,
+    subtotal,
+    discount,
+    total,
+    address: { full_name, phone, email, line1, line2, city, state, postal_code, country },
+    isGift,
+    giftMessage,
+  } satisfies CheckoutContext;
+}
