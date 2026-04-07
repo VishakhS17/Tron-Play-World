@@ -66,6 +66,12 @@ export async function POST(req: NextRequest) {
     if (message === "INVALID_INPUT" || message === "INVALID_ITEMS" || message === "INVALID_QUANTITY") {
       return NextResponse.json({ error: "Invalid checkout data" }, { status: 400 });
     }
+    if (message === "OUT_OF_STOCK") {
+      return NextResponse.json(
+        { error: "One or more items are out of stock. Please refresh cart and try again." },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: message || "Could not initiate payment" }, { status: 400 });
   }
 }

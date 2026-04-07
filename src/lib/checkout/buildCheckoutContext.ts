@@ -169,20 +169,29 @@ export async function buildCheckoutContext(input: {
       checkoutUserId = createdUser.id;
       checkoutEmail = createdUser.email;
 
-      const { raw: setupRaw, token_hash } = generatePasswordSetupSecret();
-      await prisma.customer_password_setup_tokens.deleteMany({
-        where: { customer_id: createdUser.id, used_at: null },
-      });
-      await prisma.customer_password_setup_tokens.create({
-        data: {
-          customer_id: createdUser.id,
-          token_hash,
-          expires_at: new Date(Date.now() + PASSWORD_SETUP_TTL_MS),
-        },
-      });
-      newAccountPasswordSetup = {
-        setupUrl: `${getSiteBaseUrl()}/set-password?token=${encodeURIComponent(setupRaw)}`,
-      };
+      // Password-setup link is best-effort. If this fails (for example missing migration on an
+      // environment), do not block paid order creation.
+      try {
+        const { raw: setupRaw, token_hash } = generatePasswordSetupSecret();
+        await prisma.customer_password_setup_tokens.deleteMany({
+          where: { customer_id: createdUser.id, used_at: null },
+        });
+        await prisma.customer_password_setup_tokens.create({
+          data: {
+            customer_id: createdUser.id,
+            token_hash,
+            expires_at: new Date(Date.now() + PASSWORD_SETUP_TTL_MS),
+          },
+        });
+        newAccountPasswordSetup = {
+          setupUrl: `${getSiteBaseUrl()}/set-password?token=${encodeURIComponent(setupRaw)}`,
+        };
+      } catch (tokenErr) {
+        console.error(
+          "[checkout-context] password setup token failed (run prisma migrate deploy?)",
+          tokenErr
+        );
+      }
     }
   }
 
@@ -202,6 +211,27 @@ export async function buildCheckoutContext(input: {
       subtotal: unit * i.quantity,
     };
   });
+
+  // Validate product-level inventory before creating a payment order so users do not pay for
+  // items that cannot be reserved/confirmed later.
+  const qtyByProduct = new Map<string, number>();
+  for (const li of lineItems) {
+    qtyByProduct.set(li.productId, (qtyByProduct.get(li.productId) ?? 0) + li.quantity);
+  }
+  const invRows = await prisma.inventory.findMany({
+    where: {
+      product_id: { in: [...qtyByProduct.keys()] },
+      product_variant_id: null,
+    },
+    select: { product_id: true, available_quantity: true },
+  });
+  const invMap = new Map(invRows.map((r) => [r.product_id, r.available_quantity]));
+  for (const [productId, requiredQty] of qtyByProduct.entries()) {
+    const available = invMap.get(productId) ?? 0;
+    if (available < requiredQty) {
+      throw new Error("OUT_OF_STOCK");
+    }
+  }
 
   const subtotal = lineItems.reduce((s, li) => s + li.subtotal, 0);
   let discount = 0;
