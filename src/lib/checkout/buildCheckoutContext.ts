@@ -128,11 +128,7 @@ export async function buildCheckoutContext(input: {
   let checkoutEmail = email;
   let checkoutLinkedAs: "session" | "existing_customer" | "new_customer";
 
-  const guestCheckoutRequested = body.guestCheckout === true || body.guestCheckout === "true";
-  const sessionEmailNorm = session?.email ? normalizeEmail(session.email) : "";
-  const emailMismatch =
-    Boolean(session?.sub) && sessionEmailNorm.length > 0 && sessionEmailNorm !== email;
-  const guestCheckout = guestCheckoutRequested || emailMismatch;
+  const guestCheckout = false;
 
   if (!guestCheckout && session?.sub) {
     checkoutLinkedAs = "session";

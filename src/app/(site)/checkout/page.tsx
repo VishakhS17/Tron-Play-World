@@ -23,8 +23,6 @@ export default function CheckoutPage() {
   const [couponCode, setCouponCode] = useState("");
   const [isGift, setIsGift] = useState(false);
   const [giftMessage, setGiftMessage] = useState("");
-  /** Ignores storefront session so the order + password email use the shipping email (fixes hidden session cookies). */
-  const [guestCheckout, setGuestCheckout] = useState(false);
   const [signedInLabel, setSignedInLabel] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,7 +30,11 @@ export default function CheckoutPage() {
       .then((r) => r.json())
       .then((d) => {
         if (d?.user?.id) {
-          setSignedInLabel(d.user.email ?? "your account");
+          const userEmail = typeof d?.user?.email === "string" ? d.user.email.trim() : "";
+          setSignedInLabel(userEmail || "your account");
+          if (userEmail) {
+            setAddress((a) => (a.email.trim() ? a : { ...a, email: userEmail }));
+          }
         }
       })
       .catch(() => {});
@@ -83,7 +85,6 @@ export default function CheckoutPage() {
       const payload = {
         items: items.map((i) => ({ productId: String(i.id), quantity: i.quantity })),
         address,
-        guestCheckout,
         couponCode: couponCode.trim() || undefined,
         isGift,
         giftMessage: giftMessage.trim() || undefined,
@@ -168,23 +169,8 @@ export default function CheckoutPage() {
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-dark">
                   <p className="text-meta-3">
                     You appear signed in as <span className="font-medium text-dark">{signedInLabel}</span>.
-                    Orders attach to that account by default. If the shipping email below is{" "}
-                    <span className="font-medium">different</span>, checkout automatically uses that email for the
-                    order and new-account password link. Otherwise check the box to force guest checkout for this
-                    address.
+                    Orders from this checkout are linked to your signed-in account.
                   </p>
-                  <label className="mt-2 flex cursor-pointer items-start gap-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={guestCheckout}
-                      onChange={(e) => setGuestCheckout(e.target.checked)}
-                    />
-                    <span>
-                      Order using <strong>only</strong> the shipping email below (ignore my sign-in). Use this for a
-                      new email and the password-setup message in your order email.
-                    </span>
-                  </label>
                 </div>
               ) : null}
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
