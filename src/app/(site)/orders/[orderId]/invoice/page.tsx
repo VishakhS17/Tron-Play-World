@@ -4,6 +4,19 @@ import { getSession } from "@/lib/auth/session";
 import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
 import { formatPrice } from "@/utils/formatePrice";
 
+function formatDateTimeIst(value: Date | string) {
+  const d = value instanceof Date ? value : new Date(value);
+  return d.toLocaleString("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 type Props = {
   params: Promise<{ orderId: string }>;
   searchParams: Promise<{ access?: string }>;
@@ -62,7 +75,7 @@ export default async function InvoicePage({ params, searchParams }: Props) {
               <div className="text-sm text-meta-3">Invoice for order</div>
               <div className="text-lg font-semibold text-dark">{order.id}</div>
               <div className="mt-2 text-sm text-meta-3">
-                Date: {new Date(order.created_at).toLocaleString()}
+                Date: {formatDateTimeIst(order.created_at)}
               </div>
             </div>
 

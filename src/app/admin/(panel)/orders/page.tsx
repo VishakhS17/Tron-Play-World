@@ -2,6 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prismaDB";
 import { formatPrice } from "@/utils/formatePrice";
 
+function formatDateTimeIst(value: Date | string) {
+  const d = value instanceof Date ? value : new Date(value);
+  return d.toLocaleString("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export const metadata = {
   title: "Admin Orders | i-Robox",
 };
@@ -43,7 +56,7 @@ export default async function AdminOrdersPage() {
                 <td className="py-3 px-4">
                   <div className="font-semibold text-dark">{o.id}</div>
                   <div className="text-xs text-meta-4">
-                    {new Date(o.created_at).toLocaleString()}
+                    {formatDateTimeIst(o.created_at)}
                   </div>
                 </td>
                 <td className="py-3 px-4 text-dark">
