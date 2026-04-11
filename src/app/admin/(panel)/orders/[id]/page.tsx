@@ -32,12 +32,15 @@ function DelhiveryShipmentNote({ shipment }: { shipment: any }) {
   } else {
     body = (
       <p>
-        No Delhivery diagnostic was saved for this order. That usually means the server did not have all of{" "}
+        No Delhivery diagnostic was saved for this order. That usually means the server did not have every required
+        env var when payment completed:{" "}
         <code className="rounded bg-gray-2 px-1">DELHIVERY_API_TOKEN</code>,{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_CLIENT_NAME</code>, and{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_PICKUP_LOCATION</code> set when payment completed, so the
-        integration exited without calling Delhivery. Set them on Vercel (Production), redeploy, then place a new test
-        order.
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_CLIENT_NAME</code>,{" "}
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_PICKUP_LOCATION</code>,{" "}
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_SELLER_GST_TIN</code> (15-character GSTIN), and{" "}
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_HSN_CODE</code>. The integration then skips Delhivery
+        entirely. Set all five on Vercel (Production), redeploy, then place a new test order (old orders are not
+        re-booked automatically).
       </p>
     );
   }
