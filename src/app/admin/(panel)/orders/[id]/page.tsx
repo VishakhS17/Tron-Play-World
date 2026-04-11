@@ -1,8 +1,54 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+
+function DelhiveryShipmentNote({ shipment }: { shipment: any }) {
+  const d = shipment?.delhivery;
+  const hasCarrier = Boolean((shipment?.carrier ?? "").trim());
+  const hasTracking = Boolean((shipment?.tracking_number ?? "").trim());
+  if (hasCarrier && hasTracking) return null;
+
+  let body: ReactNode;
+  if (d && typeof d === "object") {
+    const status = "status" in d ? String((d as Record<string, unknown>).status ?? "") : "";
+    const reason = "reason" in d ? String((d as Record<string, unknown>).reason ?? "") : "";
+    const message = "message" in d ? String((d as Record<string, unknown>).message ?? "") : "";
+    const rmk = "rmk" in d ? String((d as Record<string, unknown>).rmk ?? "") : "";
+    const parts = [status && `Status: ${status}`, reason && `Reason: ${reason}`, message && message, rmk && `Delhivery: ${rmk}`].filter(
+      Boolean
+    );
+    body =
+      parts.length > 0 ? (
+        <ul className="list-disc pl-4 space-y-0.5">
+          {parts.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      ) : (
+        <pre className="text-xs overflow-x-auto whitespace-pre-wrap break-words">{JSON.stringify(d, null, 2)}</pre>
+      );
+  } else {
+    body = (
+      <p>
+        No Delhivery diagnostic was saved for this order. That usually means the server did not have all of{" "}
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_API_TOKEN</code>,{" "}
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_CLIENT_NAME</code>, and{" "}
+        <code className="rounded bg-gray-2 px-1">DELHIVERY_PICKUP_LOCATION</code> set when payment completed, so the
+        integration exited without calling Delhivery. Set them on Vercel (Production), redeploy, then place a new test
+        order.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-dark">
+      <div className="font-medium text-dark mb-1">Why carrier / tracking may be empty</div>
+      {body}
+    </div>
+  );
+}
 
 export default function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -144,6 +190,7 @@ export default function AdminOrderDetailPage() {
             />
           </label>
         </div>
+        <DelhiveryShipmentNote shipment={data.shipment} />
       </div>
 
       <div className="rounded-2xl border border-gray-3 bg-white p-6 space-y-3">

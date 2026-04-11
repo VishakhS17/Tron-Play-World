@@ -27,11 +27,20 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       status: true,
       customer_id: true,
       customers: { select: { email: true } },
-      shipments: { select: { id: true, carrier: true, tracking_number: true, status: true } },
+      shipments: {
+        select: { id: true, carrier: true, tracking_number: true, status: true, metadata: true },
+      },
       order_items: { select: { id: true, product_name: true, quantity: true } },
     },
   });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const delhiveryFromMeta = (() => {
+    const m = order.shipments?.metadata;
+    if (!m || typeof m !== "object" || Array.isArray(m)) return null;
+    const d = (m as Record<string, unknown>).delhivery;
+    return d && typeof d === "object" ? d : null;
+  })();
 
   return NextResponse.json(
     {
@@ -44,8 +53,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
             carrier: order.shipments.carrier ?? "",
             tracking_number: order.shipments.tracking_number ?? "",
             status: String(order.shipments.status),
+            delhivery: delhiveryFromMeta,
           }
-        : { id: null, carrier: "", tracking_number: "", status: "PENDING" },
+        : { id: null, carrier: "", tracking_number: "", status: "PENDING", delhivery: null },
       items: order.order_items,
     },
     { status: 200 }
