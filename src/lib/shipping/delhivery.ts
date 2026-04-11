@@ -8,9 +8,30 @@ export function isDelhiveryConfigured() {
     process.env.DELHIVERY_API_TOKEN?.trim() &&
       process.env.DELHIVERY_CLIENT_NAME?.trim() &&
       process.env.DELHIVERY_PICKUP_LOCATION?.trim() &&
-      process.env.DELHIVERY_SELLER_GST_TIN?.trim() &&
-      process.env.DELHIVERY_HSN_CODE?.trim()
+      process.env.DELHIVERY_SELLER_GST_TIN?.trim()
   );
+}
+
+/** Unique HSN codes from order line products (order preserved); falls back to DELHIVERY_HSN_CODE env. */
+function aggregateHsnForDelhivery(
+  items: { products: { hsn_code: string | null } | null }[],
+  envFallback: string
+): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const it of items) {
+    const raw = it.products?.hsn_code?.trim();
+    if (!raw) continue;
+    for (const part of raw.split(",")) {
+      const norm = part.trim().replace(/[^0-9]/g, "");
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
+      out.push(norm);
+    }
+  }
+  const fromProducts = out.join(",");
+  if (fromProducts) return sanitizeHsnCode(fromProducts, 80);
+  return sanitizeHsnCode(envFallback, 80);
 }
 
 function delhiveryBaseUrl() {
@@ -151,7 +172,13 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
           country: true,
         },
       },
-      order_items: { select: { product_name: true, quantity: true } },
+      order_items: {
+        select: {
+          product_name: true,
+          quantity: true,
+          products: { select: { hsn_code: true } },
+        },
+      },
     },
   });
   const addr = order?.addresses_orders_shipping_address_idToaddresses;
@@ -177,8 +204,8 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const client = process.env.DELHIVERY_CLIENT_NAME!.trim();
   const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
   const sellerGst = sanitizeSellerGstTin(process.env.DELHIVERY_SELLER_GST_TIN ?? "");
-  const hsn = sanitizeHsnCode(process.env.DELHIVERY_HSN_CODE ?? "", 80);
-  if (sellerGst.length !== 15 || !hsn) {
+  const hsn = aggregateHsnForDelhivery(order.order_items ?? [], process.env.DELHIVERY_HSN_CODE ?? "");
+  if (sellerGst.length !== 15) {
     const row = await prisma.shipments.findUnique({
       where: { order_id: orderId },
       select: { metadata: true },
@@ -191,14 +218,35 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
           ...prev,
           delhivery: {
             status: "skipped",
-            reason: "invalid_gst_or_hsn_env",
+            reason: "invalid_seller_gst_env",
             seller_gst_len: sellerGst.length,
-            hsn_empty: !hsn,
           },
         } as object,
       },
     });
-    console.warn("[delhivery] invalid DELHIVERY_SELLER_GST_TIN or DELHIVERY_HSN_CODE", orderId);
+    console.warn("[delhivery] invalid DELHIVERY_SELLER_GST_TIN", orderId);
+    return;
+  }
+  if (!hsn) {
+    const row = await prisma.shipments.findUnique({
+      where: { order_id: orderId },
+      select: { metadata: true },
+    });
+    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+    await prisma.shipments.updateMany({
+      where: { order_id: orderId },
+      data: {
+        metadata: {
+          ...prev,
+          delhivery: {
+            status: "skipped",
+            reason: "missing_hsn",
+            hint: "Set hsn_code on each product and/or DELHIVERY_HSN_CODE on the server",
+          },
+        } as object,
+      },
+    });
+    console.warn("[delhivery] no HSN from products or env", orderId);
     return;
   }
 

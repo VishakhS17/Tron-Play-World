@@ -26,6 +26,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       base_price: true,
       discounted_price: true,
       sku: true,
+      hsn_code: true,
       description: true,
       short_description: true,
       is_active: true,
@@ -96,6 +97,15 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     const sku = cleanOptionalText(body.sku, 100);
     if (sku && hasSuspiciousInput(sku)) return bad();
     data.sku = sku;
+  }
+  if (body.hsn_code !== undefined) {
+    if (body.hsn_code !== null && typeof body.hsn_code !== "string") return bad();
+    if (body.hsn_code === null || body.hsn_code === "") {
+      data.hsn_code = null;
+    } else {
+      const h = String(body.hsn_code).replace(/\s/g, "").replace(/[^0-9,]/g, "").slice(0, 32);
+      data.hsn_code = h || null;
+    }
   }
   if (body.description !== undefined) {
     if (body.description !== null && typeof body.description !== "string") return bad();

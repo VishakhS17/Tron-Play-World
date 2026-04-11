@@ -34,6 +34,7 @@ export async function GET() {
       escapeCsvField(String(Number(p.base_price))),
       discounted === "" ? "" : escapeCsvField(discounted),
       p.sku ? escapeCsvField(p.sku) : "",
+      p.hsn_code ? escapeCsvField(p.hsn_code) : "",
       p.diecast_scales?.ratio ? escapeCsvField(p.diecast_scales.ratio) : "",
       p.is_active ? "true" : "false",
       String(available),

@@ -265,6 +265,20 @@ export default function EditProductPage() {
         </label>
 
         <label className="block">
+          <span className="mb-1 block text-sm font-medium text-dark">HSN (GST)</span>
+          <input
+            value={form.hsn_code ?? ""}
+            onChange={(e) => setForm((f: any) => ({ ...f, hsn_code: e.target.value }))}
+            placeholder="e.g. 95030010"
+            inputMode="numeric"
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          />
+          <span className="mt-1 block text-xs text-meta-4">
+            Digits only (comma-separated if multiple codes on this SKU). Used for Delhivery / invoicing.
+          </span>
+        </label>
+
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-dark">Short description</span>
           <textarea
             value={form.short_description ?? ""}

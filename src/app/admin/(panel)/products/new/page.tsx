@@ -32,6 +32,7 @@ export default function NewProductPage() {
     base_price: "",
     discounted_price: "",
     sku: "",
+    hsn_code: "",
     description: "",
     short_description: "",
     is_active: true,
@@ -226,6 +227,20 @@ export default function NewProductPage() {
               onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
               className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
             />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-dark">HSN (optional)</span>
+            <input
+              value={form.hsn_code}
+              onChange={(e) => setForm((f) => ({ ...f, hsn_code: e.target.value }))}
+              placeholder="e.g. 95030010"
+              inputMode="numeric"
+              className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+            />
+            <span className="mt-1 block text-xs text-meta-4">
+              Digits (comma-separated if needed). Used when booking Delhivery for orders containing this product.
+            </span>
           </label>
 
           <label className="block">

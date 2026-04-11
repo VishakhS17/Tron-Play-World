@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     .filter(Boolean);
   const header = lines.length > 0 ? lines[0].split(",").map((h) => h.trim()) : [];
   const hasDiecastCol = header.includes("diecast_scale");
+  const hasHsnCol = header.includes("hsn_code");
 
   const rows = parseCsv(csvText);
   let count = 0;
@@ -71,6 +72,12 @@ export async function POST(req: NextRequest) {
     const base_price = Number(r.base_price);
     const discounted_price = r.discounted_price ? Number(r.discounted_price) : null;
     const sku = r.sku ? String(r.sku).trim() : null;
+    const hsnRaw = hasHsnCol ? String(r.hsn_code ?? "").trim() : "";
+    let hsn_code: string | null | undefined = undefined;
+    if (hasHsnCol) {
+      if (hsnRaw === "") hsn_code = null;
+      else hsn_code = hsnRaw.replace(/\s/g, "").replace(/[^0-9,]/g, "").slice(0, 32) || null;
+    }
     const is_active = String(r.is_active ?? "true").toLowerCase() !== "false";
     if (!name || !slug || !Number.isFinite(base_price)) continue;
 
@@ -92,6 +99,7 @@ export async function POST(req: NextRequest) {
       sku,
       is_active,
       ...(hasDiecastCol ? { diecast_scale_id: diecast_scale_id ?? null } : {}),
+      ...(hasHsnCol ? { hsn_code: hsn_code ?? null } : {}),
     };
     const createPayload = {
       name,
@@ -101,6 +109,7 @@ export async function POST(req: NextRequest) {
       sku,
       is_active,
       diecast_scale_id: hasDiecastCol ? diecast_scale_id ?? null : null,
+      ...(hasHsnCol ? { hsn_code: hsn_code ?? null } : {}),
     };
 
     const created = await prisma.products.upsert({

@@ -42,6 +42,14 @@ export async function POST(req: NextRequest) {
   const diecast_scale_id = cleanOptionalText(body.diecast_scale_id, 64);
   const category_id = cleanOptionalText(body.category_id, 64);
   const brand_id = cleanOptionalText(body.brand_id, 64);
+  let hsn_code: string | null = null;
+  if (body.hsn_code !== undefined && body.hsn_code !== null && body.hsn_code !== "") {
+    if (typeof body.hsn_code !== "string") {
+      return NextResponse.json({ error: "Invalid hsn_code" }, { status: 400 });
+    }
+    const h = body.hsn_code.replace(/\s/g, "").replace(/[^0-9,]/g, "").slice(0, 32);
+    hsn_code = h || null;
+  }
   const available_quantity = body.available_quantity !== undefined ? Math.max(0, Number(body.available_quantity)) : 0;
   const low_stock_threshold = body.low_stock_threshold !== undefined ? Math.max(0, Number(body.low_stock_threshold)) : 5;
 
@@ -70,6 +78,7 @@ export async function POST(req: NextRequest) {
       base_price,
       discounted_price,
       sku,
+      hsn_code,
       diecast_scale_id,
       description,
       short_description,

@@ -320,6 +320,8 @@ model products {
   base_price             Decimal                  @db.Decimal(10, 2)
   discounted_price       Decimal?                 @db.Decimal(10, 2)
   sku                    String?                  @db.VarChar(100)
+  /// GST HSN for shipping / invoicing (digits; optional comma for multiple codes on one SKU)
+  hsn_code               String?                  @db.VarChar(32)
   diecast_scale_id       String?                  @db.Uuid
   category_id            String?                  @db.Uuid
   brand_id               String?                  @db.Uuid
