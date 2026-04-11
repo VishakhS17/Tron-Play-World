@@ -7,7 +7,9 @@ export function isDelhiveryConfigured() {
   return Boolean(
     process.env.DELHIVERY_API_TOKEN?.trim() &&
       process.env.DELHIVERY_CLIENT_NAME?.trim() &&
-      process.env.DELHIVERY_PICKUP_LOCATION?.trim()
+      process.env.DELHIVERY_PICKUP_LOCATION?.trim() &&
+      process.env.DELHIVERY_SELLER_GST_TIN?.trim() &&
+      process.env.DELHIVERY_HSN_CODE?.trim()
   );
 }
 
@@ -25,6 +27,31 @@ function sanitizeDelhiveryText(s: string, maxLen: number) {
     .replace(/\s+/g, " ")
     .trim();
   return cleaned.slice(0, maxLen);
+}
+
+/** Delhivery docs: seller_gst_tin + hsn_code are mandatory on order creation. */
+function sanitizeSellerGstTin(raw: string): string {
+  const u = raw.replace(/\s/g, "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+  return u.slice(0, 15);
+}
+
+/** Single default HSN or comma-separated list (digits/commas only). */
+function sanitizeHsnCode(raw: string, maxLen: number): string {
+  const u = raw.replace(/\s/g, "").replace(/[^0-9,]/g, "");
+  return u.slice(0, maxLen);
+}
+
+/** Ensure JSON fields are scalars — never arrays (Delhivery server expects dict + string fields). */
+function coerceDelhiveryString(value: unknown, maxLen: number): string {
+  let s: string;
+  if (Array.isArray(value)) {
+    s = value.length > 0 ? String(value[0]) : "";
+  } else if (value == null) {
+    s = "";
+  } else {
+    s = String(value);
+  }
+  return s.slice(0, maxLen);
 }
 
 function normalizeIndiaPhone(raw: string): string {
@@ -66,6 +93,30 @@ function extractWaybill(data: unknown): string | null {
     return null;
   };
   return walk(data, 0);
+}
+
+/**
+ * Delhivery CMU expects `data` JSON root to be an object with `shipments` array (not a bare array),
+ * otherwise their stack can raise 'list' object has no attribute 'get'.
+ * Each shipment uses `pickup_location: { name }` per Delhivery FAQ (warehouse name).
+ */
+export type DelhiveryCreateDataPayload = {
+  shipments: Array<Record<string, string | { name: string }>>;
+};
+
+function logDelhiveryPayload(orderId: string, payload: DelhiveryCreateDataPayload) {
+  if (process.env.DELHIVERY_DEBUG_PAYLOAD === "1") {
+    console.info("[delhivery] create payload (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, JSON.stringify(payload));
+    return;
+  }
+  const first = payload.shipments[0];
+  const keys = first && typeof first === "object" && !Array.isArray(first) ? Object.keys(first) : [];
+  console.info("[delhivery] create payload summary", {
+    orderId,
+    shipmentCount: payload.shipments.length,
+    topLevelKeys: Object.keys(payload),
+    firstShipmentKeys: keys,
+  });
 }
 
 /**
@@ -125,6 +176,32 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const token = process.env.DELHIVERY_API_TOKEN!.trim();
   const client = process.env.DELHIVERY_CLIENT_NAME!.trim();
   const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
+  const sellerGst = sanitizeSellerGstTin(process.env.DELHIVERY_SELLER_GST_TIN ?? "");
+  const hsn = sanitizeHsnCode(process.env.DELHIVERY_HSN_CODE ?? "", 80);
+  if (sellerGst.length !== 15 || !hsn) {
+    const row = await prisma.shipments.findUnique({
+      where: { order_id: orderId },
+      select: { metadata: true },
+    });
+    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+    await prisma.shipments.updateMany({
+      where: { order_id: orderId },
+      data: {
+        metadata: {
+          ...prev,
+          delhivery: {
+            status: "skipped",
+            reason: "invalid_gst_or_hsn_env",
+            seller_gst_len: sellerGst.length,
+            hsn_empty: !hsn,
+          },
+        } as object,
+      },
+    });
+    console.warn("[delhivery] invalid DELHIVERY_SELLER_GST_TIN or DELHIVERY_HSN_CODE", orderId);
+    return;
+  }
+
   const defaultWeightG = Math.max(
     1,
     Math.min(30_000, Number(process.env.DELHIVERY_DEFAULT_WEIGHT_G ?? "500") || 500)
@@ -150,24 +227,31 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     return;
   }
   const addParts = [addr.line1, addr.line2].filter(Boolean).join(", ");
-  const add = sanitizeDelhiveryText(addParts || addr.line1, 240);
-  const name = sanitizeDelhiveryText(addr.full_name || "Customer", 100);
-  const city = sanitizeDelhiveryText(addr.city, 80);
-  const state = sanitizeDelhiveryText(addr.state, 80);
-  const pin = sanitizeDelhiveryText(addr.postal_code, 12);
-  const country = sanitizeDelhiveryText(addr.country || "India", 40);
+  const add = sanitizeDelhiveryText(coerceDelhiveryString(addParts || addr.line1, 500), 240);
+  const name = sanitizeDelhiveryText(coerceDelhiveryString(addr.full_name || "Customer", 200), 100);
+  const city = sanitizeDelhiveryText(coerceDelhiveryString(addr.city, 200), 80);
+  const state = sanitizeDelhiveryText(coerceDelhiveryString(addr.state, 200), 80);
+  const pin = sanitizeDelhiveryText(coerceDelhiveryString(addr.postal_code, 50), 12);
+  const country = sanitizeDelhiveryText(coerceDelhiveryString(addr.country || "India", 100), 40);
 
   const qtyTotal =
     order.order_items?.reduce((s, it) => s + (Number.isFinite(it.quantity) ? it.quantity : 0), 0) || 1;
-  const descParts = (order.order_items ?? []).map((it) => `${it.product_name} x${it.quantity}`);
+  const descParts = (order.order_items ?? []).map((it) => {
+    const pn = coerceDelhiveryString(it.product_name, 300);
+    const q = Number.isFinite(it.quantity) ? it.quantity : 0;
+    return `${pn} x${q}`;
+  });
   const products_desc = sanitizeDelhiveryText(descParts.join(", ") || "Order items", 199);
 
   const total = Number(order.total_amount);
   const total_amount = Number.isFinite(total) ? total.toFixed(2) : "0.00";
 
-  const shipment: Record<string, string> = {
+  const shipment: Record<string, string | { name: string }> = {
     name,
     order: order.id.replace(/-/g, "").slice(0, 32),
+    seller_gst_tin: sellerGst,
+    hsn_code: hsn,
+    invoice_reference: order.id.replace(/-/g, "").slice(0, 32),
     phone,
     add,
     pin,
@@ -178,11 +262,11 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     cod_amount: "0",
     order_date: orderDateIst(),
     total_amount,
-    seller_name: (process.env.SITE_NAME ?? "i-Robox").slice(0, 80),
+    seller_name: coerceDelhiveryString(process.env.SITE_NAME ?? "i-Robox", 200).slice(0, 80),
     quantity: String(qtyTotal),
     products_desc,
     weight: String(defaultWeightG),
-    pickup_location: pickup,
+    pickup_location: { name: pickup },
     client,
     return_pin: "",
     return_city: "",
@@ -195,13 +279,15 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     waybill: "",
     shipment_width: "",
     shipment_height: "",
-    hsn_code: "",
   };
+
+  const dataPayload: DelhiveryCreateDataPayload = { shipments: [shipment] };
+  logDelhiveryPayload(orderId, dataPayload);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
   const body = new URLSearchParams();
   body.set("format", "json");
-  body.set("data", JSON.stringify([shipment]));
+  body.set("data", JSON.stringify(dataPayload));
 
   let rawJson: unknown;
   try {
