@@ -124,6 +124,33 @@ export function orderPendingCustomerEmailText(input: {
   return t;
 }
 
+/** Sent after a successful payment confirmation (e.g. Razorpay verified). */
+export function orderConfirmedCustomerEmailHtml(input: {
+  orderId: string;
+  passwordSetup?: { email: string; setupUrl: string };
+}) {
+  const orderPart = orderEmailTemplate({
+    heading: "Order placed successfully",
+    message: "Your payment was successful and your order is now confirmed.",
+    orderId: input.orderId,
+  });
+  if (!input.passwordSetup) return orderPart;
+  return `${orderPart}
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0" />
+  ${passwordSetupInviteEmailHtml(input.passwordSetup)}`;
+}
+
+export function orderConfirmedCustomerEmailText(input: {
+  orderId: string;
+  passwordSetup?: { email: string; setupUrl: string };
+}) {
+  let t = `Order placed successfully. Payment received and order confirmed.\n\nOrder id: ${input.orderId}\n`;
+  if (input.passwordSetup) {
+    t += `\n---\nWe created an account for ${input.passwordSetup.email}.\nSet your password (one-time link, 7 days):\n${input.passwordSetup.setupUrl}\n`;
+  }
+  return t;
+}
+
 export function passwordSetupInviteEmailHtml(input: { email: string; setupUrl: string }) {
   const safeEmail = input.email
     .replace(/&/g, "&amp;")

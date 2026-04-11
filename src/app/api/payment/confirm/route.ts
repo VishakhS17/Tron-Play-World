@@ -8,6 +8,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
 import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
+import { bookDelhiveryShipmentForOrder } from "@/lib/shipping/delhivery";
 
 export async function POST(req: NextRequest) {
   try {
@@ -166,17 +167,33 @@ export async function POST(req: NextRequest) {
 
   if (recipient && !result.already && !isSyntheticPhoneSignupEmail(recipient)) {
     try {
+      try {
+        await bookDelhiveryShipmentForOrder(orderId);
+      } catch (delErr) {
+        console.error("[payment/confirm] Delhivery booking failed", delErr);
+      }
+      const shipRow = await prisma.shipments.findUnique({
+        where: { order_id: orderId },
+        select: { status: true, carrier: true, tracking_number: true },
+      });
+      const nextShipment = shipRow
+        ? {
+            status: String(shipRow.status),
+            carrier: shipRow.carrier,
+            tracking_number: shipRow.tracking_number,
+          }
+        : result.nextShipment ?? {
+            status: "CREATED",
+            carrier: null,
+            tracking_number: null,
+          };
       await notifyCustomerOrderOrShipmentUpdate({
         to: recipient,
         orderId,
         previousOrderStatus: result.previousStatus ?? "PENDING",
         nextOrderStatus: "CONFIRMED",
         previousShipment: result.previousShipment ?? null,
-        nextShipment: result.nextShipment ?? {
-          status: "CREATED",
-          carrier: null,
-          tracking_number: null,
-        },
+        nextShipment,
       });
     } catch (err) {
       console.error("[payment/confirm] customer notify email failed", err);

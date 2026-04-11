@@ -9,7 +9,12 @@ import { cleanText, readJsonBody } from "@/lib/validation/input";
 import { buildCheckoutContext } from "@/lib/checkout/buildCheckoutContext";
 import { getRazorpayClient, verifyRazorpayPaymentSignature } from "@/lib/payments/razorpay";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
-import { sendEmail, orderPendingCustomerEmailHtml, orderPendingCustomerEmailText } from "@/lib/email";
+import {
+  sendEmail,
+  orderConfirmedCustomerEmailHtml,
+  orderConfirmedCustomerEmailText,
+} from "@/lib/email";
+import { bookDelhiveryShipmentForOrder } from "@/lib/shipping/delhivery";
 
 export async function POST(req: NextRequest) {
   try {
@@ -180,6 +185,12 @@ export async function POST(req: NextRequest) {
       console.error("[payment/razorpay/verify] low stock alert sync failed", err);
     });
 
+    try {
+      await bookDelhiveryShipmentForOrder(created.id);
+    } catch (delErr) {
+      console.error("[payment/razorpay/verify] Delhivery booking failed", delErr);
+    }
+
     await writeAuditLog({
       customerId: ctx.checkoutUserId,
       entityType: "ORDER",
@@ -200,11 +211,11 @@ export async function POST(req: NextRequest) {
           subject: ctx.newAccountPasswordSetup
             ? "Order placed — set your password (see email)"
             : "Order placed successfully",
-          html: orderPendingCustomerEmailHtml({
+          html: orderConfirmedCustomerEmailHtml({
             orderId: created.id,
             passwordSetup,
           }),
-          text: orderPendingCustomerEmailText({
+          text: orderConfirmedCustomerEmailText({
             orderId: created.id,
             passwordSetup,
           }),
