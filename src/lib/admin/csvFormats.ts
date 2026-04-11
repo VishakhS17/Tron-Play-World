@@ -1,4 +1,4 @@
-/** Column order must match POST /api/admin/csv/products import. Slug may be blank — derived from name like the admin new-product form. */
+/** Column order must match POST /api/admin/csv/products import and the admin CSV page. Slug may be blank — derived from name like the admin new-product form. */
 export const PRODUCTS_CSV_COLUMNS = [
   "name",
   "slug",

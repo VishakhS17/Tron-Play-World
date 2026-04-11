@@ -1,5 +1,6 @@
 "use client";
 
+import { PRODUCTS_CSV_COLUMNS } from "@/lib/admin/csvFormats";
 import { fileToCsvText } from "@/lib/admin/fileToCsvText";
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -114,10 +115,11 @@ export default function AdminCsvPage() {
       <div className="rounded-2xl border border-gray-3 bg-white p-6 space-y-3">
         <h2 className="text-lg font-semibold text-dark">Products</h2>
         <p className="text-sm text-meta-3">
-          Columns:{" "}
-          <b className="text-dark">
-            name,slug,base_price,discounted_price,sku,diecast_scale,is_active,available_quantity,low_stock_threshold
-          </b>
+          Columns: <b className="text-dark font-mono text-xs">{PRODUCTS_CSV_COLUMNS.join(",")}</b>
+        </p>
+        <p className="text-xs text-meta-4">
+          <b className="text-dark">hsn_code</b> optional — digits (and commas if multiple codes on one SKU). Used for
+          Delhivery / GST. Omit the column to leave existing product HSN unchanged on update.
         </p>
         <p className="text-xs text-meta-4">
           <b className="text-dark">diecast_scale</b> optional — denominator (<b className="text-dark">64</b>) or ratio (
@@ -179,7 +181,7 @@ export default function AdminCsvPage() {
           }}
           rows={8}
           className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue font-mono"
-          placeholder={`Paste CSV here, or use “Choose file” above.\n\nname,slug,base_price,discounted_price,sku,diecast_scale,is_active,available_quantity,low_stock_threshold\nToy Car,,199,149,SKU-1,64,true,50,5`}
+          placeholder={`Paste CSV here, or use “Choose file” above.\n\n${PRODUCTS_CSV_COLUMNS.join(",")}\nToy Car,,199,149,SKU-1,95030010,64,true,50,5`}
         />
         <button
           type="button"
