@@ -316,7 +316,6 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   const token = process.env.DELHIVERY_API_TOKEN!.trim();
   const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
-  const client = process.env.DELHIVERY_CLIENT_NAME!.trim();
 
   const defaultWeightG = Math.max(
     1,
@@ -384,9 +383,14 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   const orderRef = order.id.replace(/-/g, "").slice(0, 32);
   const weightGramsStr = String(defaultWeightG);
+  const sellerGstTin = (process.env.DELHIVERY_SELLER_GST_TIN ?? "")
+    .replace(/\s/g, "")
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, "")
+    .slice(0, 15);
 
+  // Forward Prepaid sample in Delhivery doc has no per-row `client` — account is from `Authorization: Token …`.
   const shipmentRow: Record<string, unknown> = {
-    client,
     name,
     add,
     pin: pin6,
@@ -403,7 +407,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     return_state: "",
     return_country: "",
     products_desc,
-    hsn_code: "",
+    hsn_code: (process.env.DELHIVERY_HSN_CODE ?? "").replace(/\s/g, "").replace(/[^0-9,]/g, "").slice(0, 80),
     cod_amount: "0",
     order_date: null,
     total_amount,
@@ -417,6 +421,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     weight: weightGramsStr,
     shipping_mode: "Surface",
     address_type: "",
+    ...(sellerGstTin.length === 15 ? { seller_gst_tin: sellerGstTin } : {}),
   };
 
   const dataValue = {
