@@ -163,7 +163,8 @@ function validateDelhiveryShipmentRow(s: MinimalDelhiveryShipmentRow): { ok: tru
 
 /**
  * CMU create: **application/x-www-form-urlencoded** with `format=json` and `data=JSON.stringify(payload)`.
- * Payload: `{ pickup_location, shipments: [ minimal row ] }`. `cleanDelhiveryJsonValue` strips null/"".
+ * `pickup_location` must be **`{ "name": "<warehouse>" }`**, not a bare string — Delhivery otherwise raises `'str' object has no attribute 'get'`.
+ * Payload: `{ pickup_location: { name }, shipments: [ minimal row ] }`. `cleanDelhiveryJsonValue` strips null/"".
  */
 
 /**
@@ -435,8 +436,8 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     weight: weightGramsToDelhiveryKgString(defaultWeightG),
   };
 
-  const dataValue: { pickup_location: string; shipments: MinimalDelhiveryShipmentRow[] } = {
-    pickup_location: pickup,
+  const dataValue: { pickup_location: { name: string }; shipments: MinimalDelhiveryShipmentRow[] } = {
+    pickup_location: { name: pickup },
     shipments: [minimalShipment],
   };
 
