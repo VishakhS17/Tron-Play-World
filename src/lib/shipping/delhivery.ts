@@ -238,12 +238,12 @@ function logDelhiveryCmuVerboseRequest(
   console.log("REQUEST_METHOD:", "POST");
   console.log("REQUEST_HEADERS:", {
     Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
-    "Content-Type": "(omitted — fetch sets application/x-www-form-urlencoded when body is URLSearchParams)",
+    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
   });
   console.log(
     "REQUEST_BODY_TYPE:",
     typeof requestBodyString,
-    "(URLSearchParams serialized for log only; fetch body is URLSearchParams; data = single JSON.stringify(payload))"
+    "(application/x-www-form-urlencoded string; format + data from URLSearchParams; data = single JSON.stringify(payload))"
   );
   console.log("REQUEST_BODY_RAW:", requestBodyString);
   try {
@@ -486,9 +486,10 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     lastResponse = await fetch(url, {
       method: "POST",
       headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Authorization: `Token ${token}`,
       },
-      body,
+      body: requestBodyString,
     });
     responseText = await lastResponse.text();
     logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
