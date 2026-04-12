@@ -353,7 +353,6 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   }
 
   const token = process.env.DELHIVERY_API_TOKEN!.trim();
-  const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
 
   const defaultWeightG = Math.max(
     1,
@@ -437,7 +436,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   };
 
   const dataValue: { pickup_location: { name: string }; shipments: MinimalDelhiveryShipmentRow[] } = {
-    pickup_location: { name: pickup },
+    pickup_location: { name: "test surface" },
     shipments: [minimalShipment],
   };
 
