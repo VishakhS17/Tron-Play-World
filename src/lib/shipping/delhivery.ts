@@ -117,27 +117,35 @@ function extractWaybill(data: unknown): string | null {
 }
 
 /**
- * Delhivery CMU expects `data` JSON root to be an object with `shipments` array (not a bare array),
- * otherwise their stack can raise 'list' object has no attribute 'get'.
- * Each shipment uses `pickup_location: { name }` per Delhivery FAQ (warehouse name).
+ * CMU `data` body: Delhivery’s public examples almost always use a JSON **array** of shipment objects
+ * with **string** fields, including `pickup_location` as the warehouse name string.
+ * Wrong shapes often yield `shipment list contains no data` or odd Python tracebacks on their side.
+ *
+ * - Default **legacy**: `data` = `[{ ...all strings..., pickup_location: "Warehouse Name" }]`
+ * - **wrapped**: `data` = `{ shipments: [{ ..., pickup_location: { name: "..." } }] }` — set only if Delhivery asks for it.
  */
-export type DelhiveryCreateDataPayload = {
-  shipments: Array<Record<string, string | { name: string }>>;
-};
+function delhiveryCmuDataStyle(): "legacy" | "wrapped" {
+  return (process.env.DELHIVERY_CMU_DATA_STYLE ?? "").trim().toLowerCase() === "wrapped" ? "wrapped" : "legacy";
+}
 
-function logDelhiveryPayload(orderId: string, payload: DelhiveryCreateDataPayload) {
+function logDelhiveryPayload(orderId: string, dataValue: unknown) {
   if (process.env.DELHIVERY_DEBUG_PAYLOAD === "1") {
-    console.info("[delhivery] create payload (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, JSON.stringify(payload));
+    console.info("[delhivery] create payload (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, JSON.stringify(dataValue));
     return;
   }
-  const first = payload.shipments[0];
-  const keys = first && typeof first === "object" && !Array.isArray(first) ? Object.keys(first) : [];
-  console.info("[delhivery] create payload summary", {
-    orderId,
-    shipmentCount: payload.shipments.length,
-    topLevelKeys: Object.keys(payload),
-    firstShipmentKeys: keys,
-  });
+  const style = delhiveryCmuDataStyle();
+  const keys =
+    Array.isArray(dataValue) && dataValue[0] && typeof dataValue[0] === "object"
+      ? Object.keys(dataValue[0] as object)
+      : typeof dataValue === "object" &&
+          dataValue &&
+          "shipments" in (dataValue as object) &&
+          Array.isArray((dataValue as { shipments: unknown[] }).shipments) &&
+          (dataValue as { shipments: unknown[] }).shipments[0] &&
+          typeof (dataValue as { shipments: unknown[] }).shipments[0] === "object"
+        ? Object.keys((dataValue as { shipments: object[] }).shipments[0])
+        : [];
+  console.info("[delhivery] create payload summary", { orderId, cmuDataStyle: style, firstShipmentKeys: keys });
 }
 
 /**
@@ -294,7 +302,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const total = Number(order.total_amount);
   const total_amount = Number.isFinite(total) ? total.toFixed(2) : "0.00";
 
-  const shipment: Record<string, string | { name: string }> = {
+  const shipmentFlat: Record<string, string> = {
     name,
     order: order.id.replace(/-/g, "").slice(0, 32),
     seller_gst_tin: sellerGst,
@@ -314,7 +322,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     quantity: String(qtyTotal),
     products_desc,
     weight: String(defaultWeightG),
-    pickup_location: { name: pickup },
+    pickup_location: pickup,
     client,
     return_pin: "",
     return_city: "",
@@ -329,13 +337,20 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     shipment_height: "",
   };
 
-  const dataPayload: DelhiveryCreateDataPayload = { shipments: [shipment] };
-  logDelhiveryPayload(orderId, dataPayload);
+  const style = delhiveryCmuDataStyle();
+  const dataValue: unknown =
+    style === "wrapped"
+      ? {
+          shipments: [{ ...shipmentFlat, pickup_location: { name: pickup } }],
+        }
+      : [shipmentFlat];
+
+  logDelhiveryPayload(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
   const body = new URLSearchParams();
   body.set("format", "json");
-  body.set("data", JSON.stringify(dataPayload));
+  body.set("data", JSON.stringify(dataValue));
 
   let rawJson: unknown;
   try {
