@@ -95,6 +95,38 @@ function normalizeIndiaPin6(raw: string): string | null {
   return /^\d{6}$/.test(six) ? six : null;
 }
 
+/** Delhivery `weight` as kg decimal string (e.g. 500 g → `"0.5"`). `DELHIVERY_DEFAULT_WEIGHT_G` stays in grams. */
+function weightGramsToDelhiveryKgString(grams: number): string {
+  const g = Math.max(1, Math.min(30_000, grams));
+  const kg = g / 1000;
+  const s = kg.toFixed(4).replace(/\.?0+$/, "");
+  return s === "" ? "0.001" : s;
+}
+
+/** Prefer full state names for common abbreviations (e.g. KA → Karnataka). */
+function expandIndianStateForDelhivery(raw: string, maxLen: number): string {
+  const cleaned = sanitizeDelhiveryText(coerceDelhiveryString(raw, 200), maxLen);
+  const u = cleaned.replace(/\s+/g, " ").trim().toUpperCase();
+  const abbr: Record<string, string> = {
+    KA: "Karnataka",
+    KL: "Kerala",
+    TN: "Tamil Nadu",
+    MH: "Maharashtra",
+    DL: "Delhi",
+    TG: "Telangana",
+    TS: "Telangana",
+    AP: "Andhra Pradesh",
+    GJ: "Gujarat",
+    RJ: "Rajasthan",
+    UP: "Uttar Pradesh",
+    WB: "West Bengal",
+    HR: "Haryana",
+    PB: "Punjab",
+  };
+  if (u.length <= 3 && abbr[u]) return abbr[u];
+  return cleaned;
+}
+
 function orderDateIst(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Kolkata" }).replace("T", " ");
 }
@@ -354,7 +386,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const add = sanitizeDelhiveryText(coerceDelhiveryString(addParts || addr.line1, 500), 240);
   const name = sanitizeDelhiveryText(coerceDelhiveryString(addr.full_name || "Customer", 200), 100);
   const city = sanitizeDelhiveryText(coerceDelhiveryString(addr.city, 200), 80);
-  const state = sanitizeDelhiveryText(coerceDelhiveryString(addr.state, 200), 80);
+  const state = expandIndianStateForDelhivery(addr.state ?? "", 80);
   const country = sanitizeDelhiveryText(coerceDelhiveryString(addr.country || "India", 100), 40);
 
   const qtyTotal =
@@ -388,7 +420,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     seller_name: coerceDelhiveryString(process.env.SITE_NAME ?? "i-Robox", 200).slice(0, 80),
     quantity: String(qtyTotal),
     products_desc,
-    weight: String(defaultWeightG),
+    weight: weightGramsToDelhiveryKgString(defaultWeightG),
     pickup_location: pickup,
     client,
     return_pin: "",
