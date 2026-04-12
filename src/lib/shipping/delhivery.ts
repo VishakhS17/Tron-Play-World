@@ -599,7 +599,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   logDelhiveryPayloadSummary(orderId, dataValue);
 
-  const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
+  const url = `${delhiveryBaseUrl()}/api/cmu/create.json?format=json`;
   let payloadForSend: unknown = cleanDelhiveryJsonValue(JSON.parse(JSON.stringify(dataValue)));
   if (payloadForSend === undefined) payloadForSend = dataValue;
   if (delhiveryDebug()) {
