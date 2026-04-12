@@ -12,6 +12,10 @@ export function isDelhiveryConfigured() {
   );
 }
 
+function delhiveryDebug(): boolean {
+  return process.env.DELHIVERY_DEBUG_PAYLOAD === "1";
+}
+
 /** Unique HSN codes from order line products (order preserved); falls back to DELHIVERY_HSN_CODE env. */
 function aggregateHsnForDelhivery(
   items: { products: { hsn_code: string | null } | null }[],
@@ -62,7 +66,7 @@ function sanitizeHsnCode(raw: string, maxLen: number): string {
   return u.slice(0, maxLen);
 }
 
-/** Ensure JSON fields are scalars — never arrays (Delhivery server expects dict + string fields). */
+/** Ensure JSON fields are scalars — never arrays. */
 function coerceDelhiveryString(value: unknown, maxLen: number): string {
   let s: string;
   if (Array.isArray(value)) {
@@ -81,6 +85,14 @@ function normalizeIndiaPhone(raw: string): string {
   if (digits.length >= 11 && digits.startsWith("0")) return digits.slice(-10);
   if (digits.length >= 10) return digits.slice(-10);
   return digits.slice(0, 10);
+}
+
+/** India PIN: exactly 6 digits (digits only). */
+function normalizeIndiaPin6(raw: string): string | null {
+  const d = raw.replace(/\D/g, "");
+  if (d.length < 6) return null;
+  const six = d.length === 6 ? d : d.slice(-6);
+  return /^\d{6}$/.test(six) ? six : null;
 }
 
 function orderDateIst(): string {
@@ -116,12 +128,37 @@ function extractWaybill(data: unknown): string | null {
   return walk(data, 0);
 }
 
+type DelhiveryShipmentRow = Record<string, string>;
+
+function validateDelhiveryShipmentRow(s: DelhiveryShipmentRow): { ok: true } | { ok: false; reasons: string[] } {
+  const reasons: string[] = [];
+  if (!s.name?.trim()) reasons.push("missing_name");
+  if (!s.add?.trim()) reasons.push("missing_add");
+  if (!/^\d{6}$/.test(s.pin || "")) reasons.push("pin_must_be_6_digits");
+  if (!s.city?.trim()) reasons.push("missing_city");
+  if (!s.state?.trim()) reasons.push("missing_state");
+  if (!/^\d{10}$/.test(s.phone || "")) reasons.push("phone_must_be_10_digits");
+  if (!s.order?.trim()) reasons.push("missing_order");
+  const pm = (s.payment_mode || "").trim();
+  if (pm !== "Prepaid" && pm !== "COD") reasons.push("payment_mode_must_be_Prepaid_or_COD");
+  const total = Number(s.total_amount);
+  if (!Number.isFinite(total) || total < 0) reasons.push("invalid_total_amount");
+  if (pm === "Prepaid" && s.cod_amount !== "0") reasons.push("cod_amount_must_be_0_for_prepaid");
+  const w = Number(s.weight);
+  if (!Number.isFinite(w) || w <= 0) reasons.push("weight_must_be_gt_0");
+  const q = Number(s.quantity);
+  if (!Number.isInteger(q) || q < 1) reasons.push("quantity_must_be_int_ge_1");
+  if (!s.client?.trim()) reasons.push("missing_client");
+  return reasons.length === 0 ? { ok: true } : { ok: false, reasons };
+}
+
 /**
- * CMU `data` body shape (Delhivery’s server is picky):
- * - **Default** `object-root`: `{ "shipments": [ { ...all string fields..., "pickup_location": "WH Name" } ] }`
- *   Avoids bare-array parsing bugs and avoids nested `{ name }` pickup that caused “shipment list contains no data”.
- * - **array**: `[ { ... } ]` only if Delhivery explicitly requires a bare list (`DELHIVERY_CMU_DATA_STYLE=array`).
- * - **wrapped**: `{ "shipments": [ { ..., "pickup_location": { "name": "..." } } ] }` legacy trial (`DELHIVERY_CMU_DATA_STYLE=wrapped`).
+ * CMU `data` must be a JSON **object** (never a bare list) for the default path:
+ * `{ "pickup_location": "<exact warehouse name>", "shipments": [ { ... } ] }`
+ * Each shipment row omits `pickup_location` when root key is set (Delhivery “shipment list contains no data” fix).
+ *
+ * `DELHIVERY_CMU_DATA_STYLE=array` → legacy `[ { ..., pickup_location: "..." } ]` (bare array).
+ * `DELHIVERY_CMU_DATA_STYLE=wrapped` → `{ shipments: [{ ..., pickup_location: { name } }] }` (no root pickup).
  */
 type DelhiveryCmuDataStyle = "object-root" | "array" | "wrapped";
 
@@ -132,22 +169,28 @@ function delhiveryCmuDataStyle(): DelhiveryCmuDataStyle {
   return "object-root";
 }
 
-function logDelhiveryPayload(orderId: string, dataValue: unknown) {
-  if (process.env.DELHIVERY_DEBUG_PAYLOAD === "1") {
-    console.info("[delhivery] create payload (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, JSON.stringify(dataValue));
-    return;
+function logDelhiveryDebug(orderId: string, label: string, payload: unknown) {
+  if (!delhiveryDebug()) return;
+  try {
+    console.info(`[delhivery] ${label}`, orderId, typeof payload === "string" ? payload : JSON.stringify(payload));
+  } catch {
+    console.info(`[delhivery] ${label}`, orderId, String(payload));
   }
+}
+
+function logDelhiveryPayloadSummary(orderId: string, dataValue: unknown) {
+  if (delhiveryDebug()) return;
   const style = delhiveryCmuDataStyle();
   const keys =
-    Array.isArray(dataValue) && dataValue[0] && typeof dataValue[0] === "object"
-      ? Object.keys(dataValue[0] as object)
-      : typeof dataValue === "object" &&
-          dataValue &&
-          "shipments" in (dataValue as object) &&
-          Array.isArray((dataValue as { shipments: unknown[] }).shipments) &&
-          (dataValue as { shipments: unknown[] }).shipments[0] &&
-          typeof (dataValue as { shipments: unknown[] }).shipments[0] === "object"
-        ? Object.keys((dataValue as { shipments: object[] }).shipments[0])
+    typeof dataValue === "object" &&
+    dataValue &&
+    "shipments" in (dataValue as object) &&
+    Array.isArray((dataValue as { shipments: unknown[] }).shipments) &&
+    (dataValue as { shipments: unknown[] }).shipments[0] &&
+    typeof (dataValue as { shipments: unknown[] }).shipments[0] === "object"
+      ? Object.keys((dataValue as { shipments: object[] }).shipments[0])
+      : Array.isArray(dataValue) && dataValue[0] && typeof dataValue[0] === "object"
+        ? Object.keys(dataValue[0] as object)
         : [];
   console.info("[delhivery] create payload summary", { orderId, DELHIVERY_CMU_DATA_STYLE: style, firstShipmentKeys: keys });
 }
@@ -286,12 +329,32 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     console.warn("[delhivery] invalid phone, skipping booking", orderId, addr.phone);
     return;
   }
+
+  const pin6 = normalizeIndiaPin6(coerceDelhiveryString(addr.postal_code, 20));
+  if (!pin6) {
+    const row = await prisma.shipments.findUnique({
+      where: { order_id: orderId },
+      select: { metadata: true },
+    });
+    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+    await prisma.shipments.updateMany({
+      where: { order_id: orderId },
+      data: {
+        metadata: {
+          ...prev,
+          delhivery: { status: "skipped", reason: "invalid_pin", raw_postal_code: addr.postal_code ?? "" },
+        } as object,
+      },
+    });
+    console.warn("[delhivery] invalid India PIN (need 6 digits)", orderId, addr.postal_code);
+    return;
+  }
+
   const addParts = [addr.line1, addr.line2].filter(Boolean).join(", ");
   const add = sanitizeDelhiveryText(coerceDelhiveryString(addParts || addr.line1, 500), 240);
   const name = sanitizeDelhiveryText(coerceDelhiveryString(addr.full_name || "Customer", 200), 100);
   const city = sanitizeDelhiveryText(coerceDelhiveryString(addr.city, 200), 80);
   const state = sanitizeDelhiveryText(coerceDelhiveryString(addr.state, 200), 80);
-  const pin = sanitizeDelhiveryText(coerceDelhiveryString(addr.postal_code, 50), 12);
   const country = sanitizeDelhiveryText(coerceDelhiveryString(addr.country || "India", 100), 40);
 
   const qtyTotal =
@@ -306,7 +369,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const total = Number(order.total_amount);
   const total_amount = Number.isFinite(total) ? total.toFixed(2) : "0.00";
 
-  const shipmentFlat: Record<string, string> = {
+  const shipmentFlat: DelhiveryShipmentRow = {
     name,
     order: order.id.replace(/-/g, "").slice(0, 32),
     seller_gst_tin: sellerGst,
@@ -314,7 +377,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     invoice_reference: order.id.replace(/-/g, "").slice(0, 32),
     phone,
     add,
-    pin,
+    pin: pin6,
     city,
     state,
     country,
@@ -341,22 +404,86 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     shipment_height: "",
   };
 
-  const style = delhiveryCmuDataStyle();
-  const dataValue: unknown =
-    style === "array"
-      ? [shipmentFlat]
-      : style === "wrapped"
-        ? { shipments: [{ ...shipmentFlat, pickup_location: { name: pickup } }] }
-        : { shipments: [shipmentFlat] };
+  const { pickup_location: _rowPickup, ...shipmentWithoutPickup } = shipmentFlat;
 
-  logDelhiveryPayload(orderId, dataValue);
+  const style = delhiveryCmuDataStyle();
+  let dataValue: unknown;
+  if (style === "array") {
+    dataValue = [shipmentFlat];
+  } else if (style === "wrapped") {
+    dataValue = {
+      shipments: [{ ...shipmentWithoutPickup, pickup_location: { name: pickup } }],
+    };
+  } else {
+    dataValue = {
+      pickup_location: pickup,
+      shipments: [shipmentWithoutPickup],
+    };
+  }
+
+  const shipmentsArr =
+    typeof dataValue === "object" &&
+    dataValue !== null &&
+    "shipments" in dataValue &&
+    Array.isArray((dataValue as { shipments: unknown }).shipments)
+      ? (dataValue as { shipments: DelhiveryShipmentRow[] }).shipments
+      : Array.isArray(dataValue)
+        ? (dataValue as DelhiveryShipmentRow[])
+        : [];
+
+  if (shipmentsArr.length === 0) {
+    const row = await prisma.shipments.findUnique({
+      where: { order_id: orderId },
+      select: { metadata: true },
+    });
+    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+    await prisma.shipments.updateMany({
+      where: { order_id: orderId },
+      data: {
+        metadata: {
+          ...prev,
+          delhivery: { status: "skipped", reason: "empty_shipments_array", cmuStyle: style },
+        } as object,
+      },
+    });
+    console.error("[delhivery] empty shipments", orderId, style);
+    return;
+  }
+
+  const validation = validateDelhiveryShipmentRow(shipmentFlat);
+  if (!validation.ok) {
+    const row = await prisma.shipments.findUnique({
+      where: { order_id: orderId },
+      select: { metadata: true },
+    });
+    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+    await prisma.shipments.updateMany({
+      where: { order_id: orderId },
+      data: {
+        metadata: {
+          ...prev,
+          delhivery: {
+            status: "skipped",
+            reason: "delhivery_shipment_validation_failed",
+            reasons: validation.reasons,
+          },
+        } as object,
+      },
+    });
+    console.warn("[delhivery] shipment validation failed", orderId, validation.reasons);
+    return;
+  }
+
+  logDelhiveryDebug(orderId, "create request payload (DELHIVERY_DEBUG_PAYLOAD=1)", dataValue);
+  logDelhiveryPayloadSummary(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
   const body = new URLSearchParams();
   body.set("format", "json");
   body.set("data", JSON.stringify(dataValue));
 
-  let rawJson: unknown;
+  let rawJson: unknown = null;
+  let responseText = "";
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -366,12 +493,14 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
       },
       body: body.toString(),
     });
-    const text = await res.text();
+    responseText = await res.text();
     try {
-      rawJson = JSON.parse(text) as unknown;
+      rawJson = JSON.parse(responseText) as unknown;
     } catch {
-      rawJson = { parse_error: true, body: text.slice(0, 2000) };
+      rawJson = { parse_error: true, body: responseText.slice(0, 8000) };
     }
+    logDelhiveryDebug(orderId, "create API raw response text (DELHIVERY_DEBUG_PAYLOAD=1)", responseText.slice(0, 12000));
+    logDelhiveryDebug(orderId, "create API parsed JSON (DELHIVERY_DEBUG_PAYLOAD=1)", rawJson);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
     }
@@ -390,6 +519,9 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
             status: "error",
             message: String(err?.message ?? "request_failed"),
             at: new Date().toISOString(),
+            ...(delhiveryDebug()
+              ? { responseTextPreview: responseText.slice(0, 4000), parsedResponse: rawJson ?? null }
+              : {}),
           },
         } as object,
       },
@@ -420,6 +552,9 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
       },
     });
     console.error("[delhivery] no waybill", orderId, rawJson);
+    if (delhiveryDebug()) {
+      console.info("[delhivery] no waybill — full response (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, responseText.slice(0, 12000));
+    }
     return;
   }
 
@@ -440,4 +575,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
       } as object,
     },
   });
+  if (delhiveryDebug()) {
+    console.info("[delhivery] booked OK (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, JSON.stringify(rawJson));
+  }
 }
