@@ -185,11 +185,11 @@ function validateDelhiveryShipmentRow(s: DelhiveryShipmentRow): { ok: true } | {
 }
 
 /**
- * CMU create is sent as **raw JSON** (`Content-Type: application/json`), not form `data=` encoding.
- * Default shape is a JSON **object** (not a bare list):
+ * CMU create is sent as **application/x-www-form-urlencoded** with `format=json` and `data=<JSON.stringify(payload)>`
+ * (`URLSearchParams.append`). Default JSON shape is an **object** (not a bare list):
  * `{ "pickup_location": "<exact warehouse name>", "shipments": [ { ... } ] }`
  * Each shipment row omits `pickup_location` when root key is set (Delhivery “shipment list contains no data” fix).
- * Empty string / null keys are stripped before send (`cleanDelhiveryJsonValue`).
+ * Empty string / null keys are stripped from the payload before `data` is built (`cleanDelhiveryJsonValue`).
  *
  * `DELHIVERY_CMU_DATA_STYLE=array` → legacy `[ { ..., pickup_location: "..." } ]` (bare array).
  * `DELHIVERY_CMU_DATA_STYLE=wrapped` → `{ shipments: [{ ..., pickup_location: { name } }] }` (no root pickup).
@@ -204,7 +204,7 @@ function delhiveryCmuDataStyle(): DelhiveryCmuDataStyle {
 }
 
 /**
- * Removes `null`, `""`, and `undefined` from nested objects (Delhivery JSON body).
+ * Removes `null`, `""`, and `undefined` from nested objects (Delhivery `data` JSON before URL encoding).
  * Drops empty plain objects after cleaning. Arrays are preserved with cleaned elements.
  */
 function cleanDelhiveryJsonValue(value: unknown): unknown {
@@ -274,15 +274,29 @@ function logDelhiveryCmuVerboseRequest(
   console.log("REQUEST_URL:", url);
   console.log("REQUEST_METHOD:", "POST");
   console.log("REQUEST_HEADERS:", {
-    "Content-Type": "application/json",
+    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
     Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
   });
-  console.log("REQUEST_BODY_TYPE:", typeof requestBodyString, "(JSON.stringify(payload) — raw JSON, not form-encoded)");
+  console.log(
+    "REQUEST_BODY_TYPE:",
+    typeof requestBodyString,
+    "(URLSearchParams.toString — application/x-www-form-urlencoded; data holds JSON.stringify(payload))"
+  );
   console.log("REQUEST_BODY_RAW:", requestBodyString);
   try {
-    console.log("REQUEST_BODY_JSON_PARSE_CHECK:", JSON.stringify(JSON.parse(requestBodyString), null, 2));
+    const params = new URLSearchParams(requestBodyString);
+    const dataField = params.get("data");
+    console.log("FORM_FORMAT:", params.get("format"));
+    console.log(
+      "DATA_FIELD_IS_JSON_STRING:",
+      typeof dataField,
+      dataField ? `(length ${dataField.length}, first char ${JSON.stringify(dataField[0])})` : ""
+    );
+    if (dataField) {
+      console.log("DATA_FIELD_JSON_PARSE_CHECK:", JSON.stringify(JSON.parse(dataField), null, 2));
+    }
   } catch (e) {
-    console.log("REQUEST_BODY_JSON_PARSE_CHECK_FAILED:", String(e));
+    console.log("DATA_FIELD_JSON_PARSE_CHECK_FAILED:", String(e));
   }
   console.log("[delhivery] verbose request end", orderId);
 }
@@ -599,14 +613,18 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   logDelhiveryPayloadSummary(orderId, dataValue);
 
-  const url = `${delhiveryBaseUrl()}/api/cmu/create.json?format=json`;
+  const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
   let payloadForSend: unknown = cleanDelhiveryJsonValue(JSON.parse(JSON.stringify(dataValue)));
   if (payloadForSend === undefined) payloadForSend = dataValue;
   if (delhiveryDebug()) {
     payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadForSend)));
   }
-  const requestBodyString = JSON.stringify(payloadForSend);
+  const dataJsonString = JSON.stringify(payloadForSend);
   console.log("FINAL JSON BODY:", JSON.stringify(payloadForSend, null, 2));
+  const body = new URLSearchParams();
+  body.append("format", "json");
+  body.append("data", dataJsonString);
+  const requestBodyString = body.toString();
   logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForSend, requestBodyString);
 
   let rawJson: unknown = null;
@@ -616,7 +634,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     lastResponse = await fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Authorization: `Token ${token}`,
       },
       body: requestBodyString,
