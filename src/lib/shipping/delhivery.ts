@@ -185,9 +185,11 @@ function validateDelhiveryShipmentRow(s: DelhiveryShipmentRow): { ok: true } | {
 }
 
 /**
- * CMU `data` must be a JSON **object** (never a bare list) for the default path:
+ * CMU create is sent as **raw JSON** (`Content-Type: application/json`), not form `data=` encoding.
+ * Default shape is a JSON **object** (not a bare list):
  * `{ "pickup_location": "<exact warehouse name>", "shipments": [ { ... } ] }`
  * Each shipment row omits `pickup_location` when root key is set (Delhivery “shipment list contains no data” fix).
+ * Empty string / null keys are stripped before send (`cleanDelhiveryJsonValue`).
  *
  * `DELHIVERY_CMU_DATA_STYLE=array` → legacy `[ { ..., pickup_location: "..." } ]` (bare array).
  * `DELHIVERY_CMU_DATA_STYLE=wrapped` → `{ shipments: [{ ..., pickup_location: { name } }] }` (no root pickup).
@@ -199,6 +201,35 @@ function delhiveryCmuDataStyle(): DelhiveryCmuDataStyle {
   if (v === "array" || v === "legacy") return "array";
   if (v === "wrapped") return "wrapped";
   return "object-root";
+}
+
+/**
+ * Removes `null`, `""`, and `undefined` from nested objects (Delhivery JSON body).
+ * Drops empty plain objects after cleaning. Arrays are preserved with cleaned elements.
+ */
+function cleanDelhiveryJsonValue(value: unknown): unknown {
+  if (value === null || value === "") return undefined;
+  if (typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    const out: unknown[] = [];
+    for (const item of value) {
+      const c = cleanDelhiveryJsonValue(item);
+      if (c === undefined) continue;
+      out.push(c);
+    }
+    return out;
+  }
+  const src = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (v === null || v === "") continue;
+    if (v === undefined) continue;
+    const c = cleanDelhiveryJsonValue(v);
+    if (c === undefined) continue;
+    if (typeof c === "object" && c !== null && !Array.isArray(c) && Object.keys(c as object).length === 0) continue;
+    out[k] = c;
+  }
+  return out;
 }
 
 /** Deep-freeze parsed JSON so nothing mutates the logged/sent snapshot. */
@@ -240,28 +271,18 @@ function logDelhiveryCmuVerboseRequest(
   } else {
     console.log("SHIPMENTS LENGTH:", "n/a");
   }
-  console.log("FINAL PAYLOAD:", JSON.stringify(payload, null, 2));
   console.log("REQUEST_URL:", url);
   console.log("REQUEST_METHOD:", "POST");
   console.log("REQUEST_HEADERS:", {
+    "Content-Type": "application/json",
     Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
-    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
   });
-  console.log("REQUEST_BODY_TYPE:", typeof requestBodyString, "(URLSearchParams.toString — application/x-www-form-urlencoded)");
+  console.log("REQUEST_BODY_TYPE:", typeof requestBodyString, "(JSON.stringify(payload) — raw JSON, not form-encoded)");
   console.log("REQUEST_BODY_RAW:", requestBodyString);
   try {
-    const params = new URLSearchParams(requestBodyString);
-    const dataField = params.get("data");
-    console.log(
-      "DATA_FIELD_IS_JSON_STRING:",
-      typeof dataField,
-      dataField ? `(length ${dataField.length}, first char ${JSON.stringify(dataField[0])})` : ""
-    );
-    if (dataField) {
-      console.log("DATA_FIELD_JSON_PARSE_CHECK:", JSON.stringify(JSON.parse(dataField), null, 2));
-    }
+    console.log("REQUEST_BODY_JSON_PARSE_CHECK:", JSON.stringify(JSON.parse(requestBodyString), null, 2));
   } catch (e) {
-    console.log("DATA_FIELD_JSON_PARSE_CHECK_FAILED:", String(e));
+    console.log("REQUEST_BODY_JSON_PARSE_CHECK_FAILED:", String(e));
   }
   console.log("[delhivery] verbose request end", orderId);
 }
@@ -579,18 +600,14 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   logDelhiveryPayloadSummary(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
-  const body = new URLSearchParams();
-  body.set("format", "json");
-
-  let payloadForJson: unknown = dataValue;
+  let payloadForSend: unknown = cleanDelhiveryJsonValue(JSON.parse(JSON.stringify(dataValue)));
+  if (payloadForSend === undefined) payloadForSend = dataValue;
   if (delhiveryDebug()) {
-    payloadForJson = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(dataValue)));
+    payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadForSend)));
   }
-  const dataJsonString = JSON.stringify(payloadForJson);
-  body.set("data", dataJsonString);
-
-  const requestBodyString = body.toString();
-  logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForJson, requestBodyString);
+  const requestBodyString = JSON.stringify(payloadForSend);
+  console.log("FINAL JSON BODY:", JSON.stringify(payloadForSend, null, 2));
+  logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForSend, requestBodyString);
 
   let rawJson: unknown = null;
   let responseText = "";
@@ -599,8 +616,8 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     lastResponse = await fetch(url, {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Token ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
       },
       body: requestBodyString,
     });
