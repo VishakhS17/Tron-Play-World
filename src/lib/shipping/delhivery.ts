@@ -200,14 +200,13 @@ function logDelhiveryCmuVerboseRequest(
   console.log("REQUEST_URL:", url);
   console.log("REQUEST_METHOD:", "POST");
   console.log("REQUEST_HEADERS:", {
-    Accept: "application/json",
     Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
     "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
   });
   console.log(
     "REQUEST_BODY_TYPE:",
     typeof requestBodyString,
-    "(application/x-www-form-urlencoded string; format + data from URLSearchParams; data = single JSON.stringify(payload))"
+    "(application/x-www-form-urlencoded; literal format=json&data=encodeURIComponent(JSON))"
   );
   console.log("REQUEST_BODY_RAW:", requestBodyString);
   try {
@@ -474,12 +473,12 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(dataValue)));
   }
   // `format` is a top-level form field only — never inside the JSON `payload` (pickup_location + shipments).
+  // Build wire body explicitly: some stacks mishandle `Accept: application/json` with form bodies or URLSearchParams edge cases.
   const payload = payloadForSend;
-  const params = new URLSearchParams();
-  params.append("format", "json");
-  params.append("data", JSON.stringify(payload));
+  const dataJson = JSON.stringify(payload);
+  const formBodyStr = `format=json&data=${encodeURIComponent(dataJson)}`;
   console.log("FINAL JSON BODY:", JSON.stringify(payload, null, 2));
-  logDelhiveryCmuVerboseRequest(orderId, url, token, payload, params.toString());
+  logDelhiveryCmuVerboseRequest(orderId, url, token, payload, formBodyStr);
 
   let rawJson: unknown = null;
   let responseText = "";
@@ -488,11 +487,10 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     lastResponse = await fetch(url, {
       method: "POST",
       headers: {
-        Accept: "application/json",
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Authorization: `Token ${token}`,
       },
-      body: params.toString(),
+      body: formBodyStr,
     });
     responseText = await lastResponse.text();
     logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
