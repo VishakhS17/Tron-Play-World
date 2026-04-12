@@ -473,11 +473,11 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   if (delhiveryDebug()) {
     payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadForSend)));
   }
-  const body = new URLSearchParams();
-  body.append("format", "json");
-  body.append("data", JSON.stringify(payloadForSend));
+  const params = new URLSearchParams();
+  params.append("format", "json");
+  params.append("data", JSON.stringify(payloadForSend));
   console.log("FINAL JSON BODY:", JSON.stringify(payloadForSend, null, 2));
-  const requestBodyString = body.toString();
+  const requestBodyString = params.toString();
   logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForSend, requestBodyString);
 
   let rawJson: unknown = null;
