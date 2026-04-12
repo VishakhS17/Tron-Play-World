@@ -117,15 +117,19 @@ function extractWaybill(data: unknown): string | null {
 }
 
 /**
- * CMU `data` body: Delhivery’s public examples almost always use a JSON **array** of shipment objects
- * with **string** fields, including `pickup_location` as the warehouse name string.
- * Wrong shapes often yield `shipment list contains no data` or odd Python tracebacks on their side.
- *
- * - Default **legacy**: `data` = `[{ ...all strings..., pickup_location: "Warehouse Name" }]`
- * - **wrapped**: `data` = `{ shipments: [{ ..., pickup_location: { name: "..." } }] }` — set only if Delhivery asks for it.
+ * CMU `data` body shape (Delhivery’s server is picky):
+ * - **Default** `object-root`: `{ "shipments": [ { ...all string fields..., "pickup_location": "WH Name" } ] }`
+ *   Avoids bare-array parsing bugs and avoids nested `{ name }` pickup that caused “shipment list contains no data”.
+ * - **array**: `[ { ... } ]` only if Delhivery explicitly requires a bare list (`DELHIVERY_CMU_DATA_STYLE=array`).
+ * - **wrapped**: `{ "shipments": [ { ..., "pickup_location": { "name": "..." } } ] }` legacy trial (`DELHIVERY_CMU_DATA_STYLE=wrapped`).
  */
-function delhiveryCmuDataStyle(): "legacy" | "wrapped" {
-  return (process.env.DELHIVERY_CMU_DATA_STYLE ?? "").trim().toLowerCase() === "wrapped" ? "wrapped" : "legacy";
+type DelhiveryCmuDataStyle = "object-root" | "array" | "wrapped";
+
+function delhiveryCmuDataStyle(): DelhiveryCmuDataStyle {
+  const v = (process.env.DELHIVERY_CMU_DATA_STYLE ?? "").trim().toLowerCase();
+  if (v === "array" || v === "legacy") return "array";
+  if (v === "wrapped") return "wrapped";
+  return "object-root";
 }
 
 function logDelhiveryPayload(orderId: string, dataValue: unknown) {
@@ -145,7 +149,7 @@ function logDelhiveryPayload(orderId: string, dataValue: unknown) {
           typeof (dataValue as { shipments: unknown[] }).shipments[0] === "object"
         ? Object.keys((dataValue as { shipments: object[] }).shipments[0])
         : [];
-  console.info("[delhivery] create payload summary", { orderId, cmuDataStyle: style, firstShipmentKeys: keys });
+  console.info("[delhivery] create payload summary", { orderId, DELHIVERY_CMU_DATA_STYLE: style, firstShipmentKeys: keys });
 }
 
 /**
@@ -339,11 +343,11 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   const style = delhiveryCmuDataStyle();
   const dataValue: unknown =
-    style === "wrapped"
-      ? {
-          shipments: [{ ...shipmentFlat, pickup_location: { name: pickup } }],
-        }
-      : [shipmentFlat];
+    style === "array"
+      ? [shipmentFlat]
+      : style === "wrapped"
+        ? { shipments: [{ ...shipmentFlat, pickup_location: { name: pickup } }] }
+        : { shipments: [shipmentFlat] };
 
   logDelhiveryPayload(orderId, dataValue);
 
