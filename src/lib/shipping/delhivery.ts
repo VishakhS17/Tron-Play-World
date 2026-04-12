@@ -61,14 +61,6 @@ function normalizeIndiaPin6(raw: string): string | null {
   return /^\d{6}$/.test(six) ? six : null;
 }
 
-/** Delhivery `weight` as kg decimal string (e.g. 500 g → `"0.5"`). `DELHIVERY_DEFAULT_WEIGHT_G` stays in grams. */
-function weightGramsToDelhiveryKgString(grams: number): string {
-  const g = Math.max(1, Math.min(30_000, grams));
-  const kg = g / 1000;
-  const s = kg.toFixed(4).replace(/\.?0+$/, "");
-  return s === "" ? "0.001" : s;
-}
-
 /** Prefer full state names for common abbreviations (e.g. KA → Karnataka). */
 function expandIndianStateForDelhivery(raw: string, maxLen: number): string {
   const cleaned = sanitizeDelhiveryText(coerceDelhiveryString(raw, 200), maxLen);
@@ -155,7 +147,7 @@ function validateDelhiveryShipmentRow(s: MinimalDelhiveryShipmentRow): { ok: tru
   if (!Number.isFinite(total) || total < 0) reasons.push("invalid_total_amount");
   if (pm === "Prepaid" && s.cod_amount !== "0") reasons.push("cod_amount_must_be_0_for_prepaid");
   const w = Number(s.weight);
-  if (!Number.isFinite(w) || w <= 0) reasons.push("weight_must_be_gt_0_kg");
+  if (!Number.isFinite(w) || w <= 0) reasons.push("weight_must_be_gt_0_g");
   const q = Number(s.quantity);
   if (!Number.isInteger(q) || q < 1) reasons.push("quantity_must_be_int_ge_1");
   return reasons.length === 0 ? { ok: true } : { ok: false, reasons };
@@ -163,38 +155,8 @@ function validateDelhiveryShipmentRow(s: MinimalDelhiveryShipmentRow): { ok: tru
 
 /**
  * CMU create: **application/x-www-form-urlencoded** with `format=json` and `data=JSON.stringify(payload)`.
- * `pickup_location` must be **`{ "name": "<warehouse>" }`**, not a bare string — Delhivery otherwise raises `'str' object has no attribute 'get'`.
- * Payload: `{ pickup_location: { name }, shipments: [ minimal row ] }`. `cleanDelhiveryJsonValue` strips null/"".
+ * Aligns with Delhivery doc sample: **`shipments` first**, **`pickup_location: { name }` last**; row includes optional keys (even `""`) and `weight` in **grams** (string).
  */
-
-/**
- * Removes `null`, `""`, and `undefined` from nested objects (Delhivery `data` JSON before URL encoding).
- * Drops empty plain objects after cleaning. Arrays are preserved with cleaned elements.
- */
-function cleanDelhiveryJsonValue(value: unknown): unknown {
-  if (value === null || value === "") return undefined;
-  if (typeof value !== "object") return value;
-  if (Array.isArray(value)) {
-    const out: unknown[] = [];
-    for (const item of value) {
-      const c = cleanDelhiveryJsonValue(item);
-      if (c === undefined) continue;
-      out.push(c);
-    }
-    return out;
-  }
-  const src = value as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(src)) {
-    if (v === null || v === "") continue;
-    if (v === undefined) continue;
-    const c = cleanDelhiveryJsonValue(v);
-    if (c === undefined) continue;
-    if (typeof c === "object" && c !== null && !Array.isArray(c) && Object.keys(c as object).length === 0) continue;
-    out[k] = c;
-  }
-  return out;
-}
 
 /** Deep-freeze parsed JSON so nothing mutates the logged/sent snapshot. */
 function deepFreezeDelhiveryPayload(o: unknown): unknown {
@@ -238,6 +200,7 @@ function logDelhiveryCmuVerboseRequest(
   console.log("REQUEST_URL:", url);
   console.log("REQUEST_METHOD:", "POST");
   console.log("REQUEST_HEADERS:", {
+    Accept: "application/json",
     Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
     "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
   });
@@ -354,6 +317,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   const token = process.env.DELHIVERY_API_TOKEN!.trim();
   const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
+  const client = process.env.DELHIVERY_CLIENT_NAME!.trim();
 
   const defaultWeightG = Math.max(
     1,
@@ -419,9 +383,51 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const total = Number(order.total_amount);
   const total_amount = Number.isFinite(total) ? total.toFixed(2) : "0.00";
 
-  const minimalShipment: MinimalDelhiveryShipmentRow = {
+  const orderRef = order.id.replace(/-/g, "").slice(0, 32);
+  const weightGramsStr = String(defaultWeightG);
+
+  const shipmentRow: Record<string, unknown> = {
+    client,
     name,
-    order: order.id.replace(/-/g, "").slice(0, 32),
+    add,
+    pin: pin6,
+    city,
+    state,
+    country,
+    phone,
+    order: orderRef,
+    payment_mode: "Prepaid",
+    return_pin: "",
+    return_city: "",
+    return_phone: "",
+    return_add: "",
+    return_state: "",
+    return_country: "",
+    products_desc,
+    hsn_code: "",
+    cod_amount: "0",
+    order_date: null,
+    total_amount,
+    seller_add: "",
+    seller_name: sanitizeDelhiveryText(coerceDelhiveryString(process.env.SITE_NAME ?? "Store", 200), 80),
+    seller_inv: "",
+    quantity: String(qtyTotal),
+    waybill: "",
+    shipment_width: "",
+    shipment_height: "",
+    weight: weightGramsStr,
+    shipping_mode: "Surface",
+    address_type: "",
+  };
+
+  const dataValue = {
+    shipments: [shipmentRow],
+    pickup_location: { name: pickup },
+  };
+
+  const minimalCheck: MinimalDelhiveryShipmentRow = {
+    name,
+    order: orderRef,
     phone,
     add,
     pin: pin6,
@@ -433,15 +439,10 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     total_amount,
     quantity: String(qtyTotal),
     products_desc,
-    weight: weightGramsToDelhiveryKgString(defaultWeightG),
+    weight: weightGramsStr,
   };
 
-  const dataValue: { pickup_location: { name: string }; shipments: MinimalDelhiveryShipmentRow[] } = {
-    pickup_location: { name: pickup },
-    shipments: [minimalShipment],
-  };
-
-  const validation = validateDelhiveryShipmentRow(minimalShipment);
+  const validation = validateDelhiveryShipmentRow(minimalCheck);
   if (!validation.ok) {
     const row = await prisma.shipments.findUnique({
       where: { order_id: orderId },
@@ -468,10 +469,9 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   logDelhiveryPayloadSummary(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
-  let payloadForSend: unknown = cleanDelhiveryJsonValue(JSON.parse(JSON.stringify(dataValue)));
-  if (payloadForSend === undefined) payloadForSend = dataValue;
+  let payloadForSend: unknown = dataValue;
   if (delhiveryDebug()) {
-    payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadForSend)));
+    payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(dataValue)));
   }
   // `format` is a top-level form field only — never inside the JSON `payload` (pickup_location + shipments).
   const payload = payloadForSend;
@@ -488,6 +488,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     lastResponse = await fetch(url, {
       method: "POST",
       headers: {
+        Accept: "application/json",
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Authorization: `Token ${token}`,
       },
