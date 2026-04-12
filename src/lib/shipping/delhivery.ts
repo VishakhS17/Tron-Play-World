@@ -472,12 +472,13 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   if (delhiveryDebug()) {
     payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadForSend)));
   }
+  // `format` is a top-level form field only — never inside the JSON `payload` (pickup_location + shipments).
+  const payload = payloadForSend;
   const params = new URLSearchParams();
   params.append("format", "json");
-  params.append("data", JSON.stringify(payloadForSend));
-  console.log("FINAL JSON BODY:", JSON.stringify(payloadForSend, null, 2));
-  const requestBodyString = params.toString();
-  logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForSend, requestBodyString);
+  params.append("data", JSON.stringify(payload));
+  console.log("FINAL JSON BODY:", JSON.stringify(payload, null, 2));
+  logDelhiveryCmuVerboseRequest(orderId, url, token, payload, params.toString());
 
   let rawJson: unknown = null;
   let responseText = "";
@@ -489,7 +490,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Authorization: `Token ${token}`,
       },
-      body: requestBodyString,
+      body: params.toString(),
     });
     responseText = await lastResponse.text();
     logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
