@@ -237,13 +237,13 @@ function logDelhiveryCmuVerboseRequest(
   console.log("REQUEST_URL:", url);
   console.log("REQUEST_METHOD:", "POST");
   console.log("REQUEST_HEADERS:", {
-    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
     Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
+    "Content-Type": "(omitted — fetch sets application/x-www-form-urlencoded when body is URLSearchParams)",
   });
   console.log(
     "REQUEST_BODY_TYPE:",
     typeof requestBodyString,
-    "(URLSearchParams.toString — application/x-www-form-urlencoded; data holds JSON.stringify(payload))"
+    "(URLSearchParams serialized for log only; fetch body is URLSearchParams; data = single JSON.stringify(payload))"
   );
   console.log("REQUEST_BODY_RAW:", requestBodyString);
   try {
@@ -472,11 +472,10 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   if (delhiveryDebug()) {
     payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadForSend)));
   }
-  const dataJsonString = JSON.stringify(payloadForSend);
-  console.log("FINAL JSON BODY:", JSON.stringify(payloadForSend, null, 2));
   const body = new URLSearchParams();
   body.append("format", "json");
-  body.append("data", dataJsonString);
+  body.append("data", JSON.stringify(payloadForSend));
+  console.log("FINAL JSON BODY:", JSON.stringify(payloadForSend, null, 2));
   const requestBodyString = body.toString();
   logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForSend, requestBodyString);
 
@@ -487,10 +486,9 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     lastResponse = await fetch(url, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         Authorization: `Token ${token}`,
       },
-      body: requestBodyString,
+      body,
     });
     responseText = await lastResponse.text();
     logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
