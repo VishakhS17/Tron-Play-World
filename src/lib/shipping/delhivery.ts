@@ -16,28 +16,6 @@ function delhiveryDebug(): boolean {
   return process.env.DELHIVERY_DEBUG_PAYLOAD === "1";
 }
 
-/** Unique HSN codes from order line products (order preserved); falls back to DELHIVERY_HSN_CODE env. */
-function aggregateHsnForDelhivery(
-  items: { products: { hsn_code: string | null } | null }[],
-  envFallback: string
-): string {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const it of items) {
-    const raw = it.products?.hsn_code?.trim();
-    if (!raw) continue;
-    for (const part of raw.split(",")) {
-      const norm = part.trim().replace(/[^0-9]/g, "");
-      if (!norm || seen.has(norm)) continue;
-      seen.add(norm);
-      out.push(norm);
-    }
-  }
-  const fromProducts = out.join(",");
-  if (fromProducts) return sanitizeHsnCode(fromProducts, 80);
-  return sanitizeHsnCode(envFallback, 80);
-}
-
 function delhiveryBaseUrl() {
   const raw = (process.env.DELHIVERY_API_BASE_URL ?? "").trim();
   if (raw) return raw.replace(/\/$/, "");
@@ -52,18 +30,6 @@ function sanitizeDelhiveryText(s: string, maxLen: number) {
     .replace(/\s+/g, " ")
     .trim();
   return cleaned.slice(0, maxLen);
-}
-
-/** Delhivery docs: seller_gst_tin + hsn_code are mandatory on order creation. */
-function sanitizeSellerGstTin(raw: string): string {
-  const u = raw.replace(/\s/g, "").toUpperCase().replace(/[^0-9A-Z]/g, "");
-  return u.slice(0, 15);
-}
-
-/** Single default HSN or comma-separated list (digits/commas only). */
-function sanitizeHsnCode(raw: string, maxLen: number): string {
-  const u = raw.replace(/\s/g, "").replace(/[^0-9,]/g, "");
-  return u.slice(0, maxLen);
 }
 
 /** Ensure JSON fields are scalars — never arrays. */
@@ -127,10 +93,6 @@ function expandIndianStateForDelhivery(raw: string, maxLen: number): string {
   return cleaned;
 }
 
-function orderDateIst(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Kolkata" }).replace("T", " ");
-}
-
 function extractWaybill(data: unknown): string | null {
   const seen = new WeakSet<object>();
   const walk = (node: unknown, depth: number): string | null => {
@@ -160,9 +122,24 @@ function extractWaybill(data: unknown): string | null {
   return walk(data, 0);
 }
 
-type DelhiveryShipmentRow = Record<string, string>;
+type MinimalDelhiveryShipmentRow = {
+  name: string;
+  order: string;
+  phone: string;
+  add: string;
+  pin: string;
+  city: string;
+  state: string;
+  country: string;
+  payment_mode: string;
+  cod_amount: string;
+  total_amount: string;
+  quantity: string;
+  products_desc: string;
+  weight: string;
+};
 
-function validateDelhiveryShipmentRow(s: DelhiveryShipmentRow): { ok: true } | { ok: false; reasons: string[] } {
+function validateDelhiveryShipmentRow(s: MinimalDelhiveryShipmentRow): { ok: true } | { ok: false; reasons: string[] } {
   const reasons: string[] = [];
   if (!s.name?.trim()) reasons.push("missing_name");
   if (!s.add?.trim()) reasons.push("missing_add");
@@ -171,37 +148,23 @@ function validateDelhiveryShipmentRow(s: DelhiveryShipmentRow): { ok: true } | {
   if (!s.state?.trim()) reasons.push("missing_state");
   if (!/^\d{10}$/.test(s.phone || "")) reasons.push("phone_must_be_10_digits");
   if (!s.order?.trim()) reasons.push("missing_order");
+  if (!s.products_desc?.trim()) reasons.push("missing_products_desc");
   const pm = (s.payment_mode || "").trim();
   if (pm !== "Prepaid" && pm !== "COD") reasons.push("payment_mode_must_be_Prepaid_or_COD");
   const total = Number(s.total_amount);
   if (!Number.isFinite(total) || total < 0) reasons.push("invalid_total_amount");
   if (pm === "Prepaid" && s.cod_amount !== "0") reasons.push("cod_amount_must_be_0_for_prepaid");
   const w = Number(s.weight);
-  if (!Number.isFinite(w) || w <= 0) reasons.push("weight_must_be_gt_0");
+  if (!Number.isFinite(w) || w <= 0) reasons.push("weight_must_be_gt_0_kg");
   const q = Number(s.quantity);
   if (!Number.isInteger(q) || q < 1) reasons.push("quantity_must_be_int_ge_1");
-  if (!s.client?.trim()) reasons.push("missing_client");
   return reasons.length === 0 ? { ok: true } : { ok: false, reasons };
 }
 
 /**
- * CMU create is sent as **application/x-www-form-urlencoded** with `format=json` and `data=<JSON.stringify(payload)>`
- * (`URLSearchParams.append`). Default JSON shape is an **object** (not a bare list):
- * `{ "pickup_location": "<exact warehouse name>", "shipments": [ { ... } ] }`
- * Each shipment row omits `pickup_location` when root key is set (Delhivery “shipment list contains no data” fix).
- * Empty string / null keys are stripped from the payload before `data` is built (`cleanDelhiveryJsonValue`).
- *
- * `DELHIVERY_CMU_DATA_STYLE=array` → legacy `[ { ..., pickup_location: "..." } ]` (bare array).
- * `DELHIVERY_CMU_DATA_STYLE=wrapped` → `{ shipments: [{ ..., pickup_location: { name } }] }` (no root pickup).
+ * CMU create: **application/x-www-form-urlencoded** with `format=json` and `data=JSON.stringify(payload)`.
+ * Payload: `{ pickup_location, shipments: [ minimal row ] }`. `cleanDelhiveryJsonValue` strips null/"".
  */
-type DelhiveryCmuDataStyle = "object-root" | "array" | "wrapped";
-
-function delhiveryCmuDataStyle(): DelhiveryCmuDataStyle {
-  const v = (process.env.DELHIVERY_CMU_DATA_STYLE ?? "").trim().toLowerCase();
-  if (v === "array" || v === "legacy") return "array";
-  if (v === "wrapped") return "wrapped";
-  return "object-root";
-}
 
 /**
  * Removes `null`, `""`, and `undefined` from nested objects (Delhivery `data` JSON before URL encoding).
@@ -317,7 +280,6 @@ function logDelhiveryCmuVerboseResponse(orderId: string, res: Response, response
 
 function logDelhiveryPayloadSummary(orderId: string, dataValue: unknown) {
   if (delhiveryDebug()) return;
-  const style = delhiveryCmuDataStyle();
   const keys =
     typeof dataValue === "object" &&
     dataValue &&
@@ -326,10 +288,8 @@ function logDelhiveryPayloadSummary(orderId: string, dataValue: unknown) {
     (dataValue as { shipments: unknown[] }).shipments[0] &&
     typeof (dataValue as { shipments: unknown[] }).shipments[0] === "object"
       ? Object.keys((dataValue as { shipments: object[] }).shipments[0])
-      : Array.isArray(dataValue) && dataValue[0] && typeof dataValue[0] === "object"
-        ? Object.keys(dataValue[0] as object)
-        : [];
-  console.info("[delhivery] create payload summary", { orderId, DELHIVERY_CMU_DATA_STYLE: style, firstShipmentKeys: keys });
+      : [];
+  console.info("[delhivery] create payload summary", { orderId, firstShipmentKeys: keys });
 }
 
 /**
@@ -368,7 +328,6 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
         select: {
           product_name: true,
           quantity: true,
-          products: { select: { hsn_code: true } },
         },
       },
     },
@@ -393,54 +352,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   }
 
   const token = process.env.DELHIVERY_API_TOKEN!.trim();
-  const client = process.env.DELHIVERY_CLIENT_NAME!.trim();
   const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
-  const sellerGst = sanitizeSellerGstTin(process.env.DELHIVERY_SELLER_GST_TIN ?? "");
-  const hsn = aggregateHsnForDelhivery(order.order_items ?? [], process.env.DELHIVERY_HSN_CODE ?? "");
-  if (sellerGst.length !== 15) {
-    const row = await prisma.shipments.findUnique({
-      where: { order_id: orderId },
-      select: { metadata: true },
-    });
-    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
-    await prisma.shipments.updateMany({
-      where: { order_id: orderId },
-      data: {
-        metadata: {
-          ...prev,
-          delhivery: {
-            status: "skipped",
-            reason: "invalid_seller_gst_env",
-            seller_gst_len: sellerGst.length,
-          },
-        } as object,
-      },
-    });
-    console.warn("[delhivery] invalid DELHIVERY_SELLER_GST_TIN", orderId);
-    return;
-  }
-  if (!hsn) {
-    const row = await prisma.shipments.findUnique({
-      where: { order_id: orderId },
-      select: { metadata: true },
-    });
-    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
-    await prisma.shipments.updateMany({
-      where: { order_id: orderId },
-      data: {
-        metadata: {
-          ...prev,
-          delhivery: {
-            status: "skipped",
-            reason: "missing_hsn",
-            hint: "Set hsn_code on each product and/or DELHIVERY_HSN_CODE on the server",
-          },
-        } as object,
-      },
-    });
-    console.warn("[delhivery] no HSN from products or env", orderId);
-    return;
-  }
 
   const defaultWeightG = Math.max(
     1,
@@ -506,12 +418,9 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const total = Number(order.total_amount);
   const total_amount = Number.isFinite(total) ? total.toFixed(2) : "0.00";
 
-  const shipmentFlat: DelhiveryShipmentRow = {
+  const minimalShipment: MinimalDelhiveryShipmentRow = {
     name,
     order: order.id.replace(/-/g, "").slice(0, 32),
-    seller_gst_tin: sellerGst,
-    hsn_code: hsn,
-    invoice_reference: order.id.replace(/-/g, "").slice(0, 32),
     phone,
     add,
     pin: pin6,
@@ -520,74 +429,18 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     country,
     payment_mode: "Prepaid",
     cod_amount: "0",
-    order_date: orderDateIst(),
     total_amount,
-    seller_name: coerceDelhiveryString(process.env.SITE_NAME ?? "i-Robox", 200).slice(0, 80),
     quantity: String(qtyTotal),
     products_desc,
     weight: weightGramsToDelhiveryKgString(defaultWeightG),
-    pickup_location: pickup,
-    client,
-    return_pin: "",
-    return_city: "",
-    return_phone: "",
-    return_add: "",
-    return_state: "",
-    return_country: "",
-    seller_add: "",
-    seller_inv: "",
-    waybill: "",
-    shipment_width: "",
-    shipment_height: "",
   };
 
-  const { pickup_location: _rowPickup, ...shipmentWithoutPickup } = shipmentFlat;
+  const dataValue: { pickup_location: string; shipments: MinimalDelhiveryShipmentRow[] } = {
+    pickup_location: pickup,
+    shipments: [minimalShipment],
+  };
 
-  const style = delhiveryCmuDataStyle();
-  let dataValue: unknown;
-  if (style === "array") {
-    dataValue = [shipmentFlat];
-  } else if (style === "wrapped") {
-    dataValue = {
-      shipments: [{ ...shipmentWithoutPickup, pickup_location: { name: pickup } }],
-    };
-  } else {
-    dataValue = {
-      pickup_location: pickup,
-      shipments: [shipmentWithoutPickup],
-    };
-  }
-
-  const shipmentsArr =
-    typeof dataValue === "object" &&
-    dataValue !== null &&
-    "shipments" in dataValue &&
-    Array.isArray((dataValue as { shipments: unknown }).shipments)
-      ? (dataValue as { shipments: DelhiveryShipmentRow[] }).shipments
-      : Array.isArray(dataValue)
-        ? (dataValue as DelhiveryShipmentRow[])
-        : [];
-
-  if (shipmentsArr.length === 0) {
-    const row = await prisma.shipments.findUnique({
-      where: { order_id: orderId },
-      select: { metadata: true },
-    });
-    const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
-    await prisma.shipments.updateMany({
-      where: { order_id: orderId },
-      data: {
-        metadata: {
-          ...prev,
-          delhivery: { status: "skipped", reason: "empty_shipments_array", cmuStyle: style },
-        } as object,
-      },
-    });
-    console.error("[delhivery] empty shipments", orderId, style);
-    return;
-  }
-
-  const validation = validateDelhiveryShipmentRow(shipmentFlat);
+  const validation = validateDelhiveryShipmentRow(minimalShipment);
   if (!validation.ok) {
     const row = await prisma.shipments.findUnique({
       where: { order_id: orderId },
