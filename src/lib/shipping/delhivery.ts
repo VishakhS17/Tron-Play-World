@@ -201,13 +201,83 @@ function delhiveryCmuDataStyle(): DelhiveryCmuDataStyle {
   return "object-root";
 }
 
-function logDelhiveryDebug(orderId: string, label: string, payload: unknown) {
-  if (!delhiveryDebug()) return;
-  try {
-    console.info(`[delhivery] ${label}`, orderId, typeof payload === "string" ? payload : JSON.stringify(payload));
-  } catch {
-    console.info(`[delhivery] ${label}`, orderId, String(payload));
+/** Deep-freeze parsed JSON so nothing mutates the logged/sent snapshot. */
+function deepFreezeDelhiveryPayload(o: unknown): unknown {
+  if (o === null || typeof o !== "object") return o;
+  Object.freeze(o);
+  if (Array.isArray(o)) {
+    for (const item of o) deepFreezeDelhiveryPayload(item);
+    return o;
   }
+  for (const k of Object.keys(o as object)) {
+    deepFreezeDelhiveryPayload((o as Record<string, unknown>)[k]);
+  }
+  return o;
+}
+
+function maskDelhiveryTokenForLog(token: string): string {
+  const t = token.trim();
+  if (t.length <= 6) return "******";
+  return `${t.slice(0, 6)}…`;
+}
+
+/** Verbose CMU request/response logging when DELHIVERY_DEBUG_PAYLOAD=1 (PII — disable in prod when done). */
+function logDelhiveryCmuVerboseRequest(
+  orderId: string,
+  url: string,
+  token: string,
+  payload: unknown,
+  requestBodyString: string
+) {
+  if (!delhiveryDebug()) return;
+  console.log("HTTP_CLIENT:", "fetch");
+  console.log("TYPE OF PAYLOAD:", typeof payload);
+  if (Array.isArray(payload)) {
+    console.log("SHIPMENTS LENGTH (array root):", payload.length);
+  } else if (payload && typeof payload === "object" && "shipments" in (payload as object)) {
+    const sh = (payload as { shipments?: unknown }).shipments;
+    console.log("SHIPMENTS LENGTH:", Array.isArray(sh) ? sh.length : "n/a");
+  } else {
+    console.log("SHIPMENTS LENGTH:", "n/a");
+  }
+  console.log("FINAL PAYLOAD:", JSON.stringify(payload, null, 2));
+  console.log("REQUEST_URL:", url);
+  console.log("REQUEST_METHOD:", "POST");
+  console.log("REQUEST_HEADERS:", {
+    Authorization: `Token ${maskDelhiveryTokenForLog(token)}`,
+    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+  });
+  console.log("REQUEST_BODY_TYPE:", typeof requestBodyString, "(URLSearchParams.toString — application/x-www-form-urlencoded)");
+  console.log("REQUEST_BODY_RAW:", requestBodyString);
+  try {
+    const params = new URLSearchParams(requestBodyString);
+    const dataField = params.get("data");
+    console.log(
+      "DATA_FIELD_IS_JSON_STRING:",
+      typeof dataField,
+      dataField ? `(length ${dataField.length}, first char ${JSON.stringify(dataField[0])})` : ""
+    );
+    if (dataField) {
+      console.log("DATA_FIELD_JSON_PARSE_CHECK:", JSON.stringify(JSON.parse(dataField), null, 2));
+    }
+  } catch (e) {
+    console.log("DATA_FIELD_JSON_PARSE_CHECK_FAILED:", String(e));
+  }
+  console.log("[delhivery] verbose request end", orderId);
+}
+
+function logDelhiveryCmuVerboseResponse(orderId: string, res: Response, responseText: string) {
+  if (!delhiveryDebug()) return;
+  let headersObj: Record<string, string> = {};
+  try {
+    headersObj = Object.fromEntries(res.headers.entries());
+  } catch {
+    headersObj = {};
+  }
+  console.log("DELHIVERY_RESPONSE_STATUS:", res.status);
+  console.log("DELHIVERY_RESPONSE_HEADERS:", headersObj);
+  console.log("DELHIVERY_RESPONSE_BODY_RAW:", responseText);
+  console.log("[delhivery] verbose response end", orderId);
 }
 
 function logDelhiveryPayloadSummary(orderId: string, dataValue: unknown) {
@@ -506,37 +576,58 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     return;
   }
 
-  logDelhiveryDebug(orderId, "create request payload (DELHIVERY_DEBUG_PAYLOAD=1)", dataValue);
   logDelhiveryPayloadSummary(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
   const body = new URLSearchParams();
   body.set("format", "json");
-  body.set("data", JSON.stringify(dataValue));
+
+  let payloadForJson: unknown = dataValue;
+  if (delhiveryDebug()) {
+    payloadForJson = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(dataValue)));
+  }
+  const dataJsonString = JSON.stringify(payloadForJson);
+  body.set("data", dataJsonString);
+
+  const requestBodyString = body.toString();
+  logDelhiveryCmuVerboseRequest(orderId, url, token, payloadForJson, requestBodyString);
 
   let rawJson: unknown = null;
   let responseText = "";
+  let lastResponse: Response | null = null;
   try {
-    const res = await fetch(url, {
+    lastResponse = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Token ${token}`,
         "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
       },
-      body: body.toString(),
+      body: requestBodyString,
     });
-    responseText = await res.text();
+    responseText = await lastResponse.text();
+    logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
+    if (delhiveryDebug()) {
+      try {
+        console.log("DELHIVERY_RESPONSE_BODY_PARSED:", JSON.stringify(JSON.parse(responseText), null, 2));
+      } catch {
+        console.log("DELHIVERY_RESPONSE_BODY_PARSED: (not JSON)");
+      }
+    }
     try {
       rawJson = JSON.parse(responseText) as unknown;
     } catch {
       rawJson = { parse_error: true, body: responseText.slice(0, 8000) };
     }
-    logDelhiveryDebug(orderId, "create API raw response text (DELHIVERY_DEBUG_PAYLOAD=1)", responseText.slice(0, 12000));
-    logDelhiveryDebug(orderId, "create API parsed JSON (DELHIVERY_DEBUG_PAYLOAD=1)", rawJson);
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+    if (!lastResponse.ok) {
+      throw new Error(`HTTP ${lastResponse.status}`);
     }
   } catch (err: any) {
+    if (delhiveryDebug()) {
+      console.log("DELHIVERY_FETCH_ERROR:", String(err?.message ?? err));
+      if (lastResponse) {
+        console.log("DELHIVERY_RESPONSE_STATUS (error path):", lastResponse.status);
+      }
+    }
     const row = await prisma.shipments.findUnique({
       where: { order_id: orderId },
       select: { metadata: true },
@@ -552,7 +643,11 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
             message: String(err?.message ?? "request_failed"),
             at: new Date().toISOString(),
             ...(delhiveryDebug()
-              ? { responseTextPreview: responseText.slice(0, 4000), parsedResponse: rawJson ?? null }
+              ? {
+                  responseTextPreview: responseText.slice(0, 4000),
+                  parsedResponse: rawJson ?? null,
+                  httpStatus: lastResponse?.status ?? null,
+                }
               : {}),
           },
         } as object,
