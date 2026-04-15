@@ -46,9 +46,6 @@ type StrictCmuPayload = {
   shipments: StrictShipmentRow[];
   pickup_location: { name: string };
 };
-type CmuPayloadVariant =
-  | StrictCmuPayload
-  | { shipments: Array<Record<string, unknown>>; pickup_location: string };
 
 export function isDelhiveryConfigured() {
   return Boolean(
@@ -852,15 +849,15 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   let rawJson: unknown = null;
   let responseText = "";
   let lastResponse: Response | null = null;
+  const payload = delhiveryDebug()
+    ? (deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(dataValue))) as unknown)
+    : (dataValue as unknown);
+  const dataJson = JSON.stringify(payload);
+  const formBodyStr = `format=json&data=${encodeURIComponent(dataJson)}`;
+  console.log("FINAL JSON BODY:", JSON.stringify(payload, null, 2));
+  logDelhiveryCmuVerboseRequest(orderId, url, token, payload, formBodyStr);
 
-  async function postCmuPayload(payloadInput: CmuPayloadVariant, label: string) {
-    const payload = delhiveryDebug()
-      ? (deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadInput))) as unknown)
-      : (payloadInput as unknown);
-    const dataJson = JSON.stringify(payload);
-    const formBodyStr = `format=json&data=${encodeURIComponent(dataJson)}`;
-    console.log(`FINAL JSON BODY (${label}):`, JSON.stringify(payload, null, 2));
-    logDelhiveryCmuVerboseRequest(orderId, url, token, payload, formBodyStr);
+  try {
     const retries = delhiveryMaxRetries();
     for (let attempt = 0; ; attempt += 1) {
       try {
@@ -885,7 +882,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
           continue;
         }
         if (!lastResponse.ok) throw new Error(`HTTP ${lastResponse.status}`);
-        return;
+        break;
       } catch (innerErr: any) {
         const msg = String(innerErr?.message ?? innerErr);
         const status = lastResponse?.status ?? null;
@@ -895,36 +892,6 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
           continue;
         }
         throw innerErr;
-      }
-    }
-  }
-
-  try {
-    await postCmuPayload(dataValue, "primary");
-    const primaryRmk =
-      typeof rawJson === "object" && rawJson && "rmk" in rawJson
-        ? String((rawJson as Record<string, unknown>).rmk ?? "")
-        : "";
-    const needsWarehouseFallback = /ClientWarehouse matching query does not exist/i.test(primaryRmk);
-    if (needsWarehouseFallback) {
-      logDelhiveryEvent(orderId, "warehouse_fallback_retry", { reason: primaryRmk });
-      const noClientShipments = dataValue.shipments.map((s) => {
-        const c = { ...s };
-        delete (c as Record<string, unknown>).client;
-        return c as Record<string, unknown>;
-      });
-      const variants: CmuPayloadVariant[] = [
-        { shipments: noClientShipments, pickup_location: { name: pickup } },
-        { shipments: dataValue.shipments as Array<Record<string, unknown>>, pickup_location: pickup },
-        { shipments: noClientShipments, pickup_location: pickup },
-      ];
-      for (let i = 0; i < variants.length; i += 1) {
-        await postCmuPayload(variants[i], `warehouse-fallback-${i + 1}`);
-        const retryRmk =
-          typeof rawJson === "object" && rawJson && "rmk" in rawJson
-            ? String((rawJson as Record<string, unknown>).rmk ?? "")
-            : "";
-        if (!/ClientWarehouse matching query does not exist/i.test(retryRmk)) break;
       }
     }
     if (delhiveryDebug()) {
