@@ -8,6 +8,7 @@ const breakerState = { failures: 0, openUntil: 0 };
 
 type DelhiveryOrderMode = "Prepaid" | "COD" | "Pickup" | "REPL";
 type StrictShipmentRow = {
+  client: string;
   name: string;
   add: string;
   pin: string;
@@ -430,6 +431,7 @@ async function checkServiceability(
 
 function buildStrictCmuPayload(args: {
   orderRef: string;
+  client: string;
   pickup: string;
   name: string;
   add: string;
@@ -449,6 +451,7 @@ function buildStrictCmuPayload(args: {
     .replace(/[^0-9A-Z]/g, "")
     .slice(0, 15);
   const row: StrictShipmentRow = {
+    client: args.client,
     name: args.name,
     add: args.add,
     pin: args.pin6,
@@ -611,6 +614,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   }
 
   const token = process.env.DELHIVERY_API_TOKEN!.trim();
+  const client = process.env.DELHIVERY_CLIENT_NAME!.trim();
   const pickup = process.env.DELHIVERY_PICKUP_LOCATION!.trim();
 
   const defaultWeightG = Math.max(
@@ -681,6 +685,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   const weightGramsStr = String(defaultWeightG);
   const dataValue = buildStrictCmuPayload({
     orderRef,
+    client,
     pickup,
     name,
     add,
