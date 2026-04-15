@@ -16,7 +16,20 @@ function DelhiveryShipmentNote({ shipment }: { shipment: any }) {
     const reason = "reason" in d ? String((d as Record<string, unknown>).reason ?? "") : "";
     const message = "message" in d ? String((d as Record<string, unknown>).message ?? "") : "";
     const rmk = "rmk" in d ? String((d as Record<string, unknown>).rmk ?? "") : "";
-    const parts = [status && `Status: ${status}`, reason && `Reason: ${reason}`, message && message, rmk && `Delhivery: ${rmk}`].filter(
+    const lastRequestAt =
+      "diagnostics" in d &&
+      (d as Record<string, unknown>).diagnostics &&
+      typeof (d as Record<string, unknown>).diagnostics === "object" &&
+      "lastRequestAt" in ((d as Record<string, unknown>).diagnostics as Record<string, unknown>)
+        ? String(((d as Record<string, unknown>).diagnostics as Record<string, unknown>).lastRequestAt ?? "")
+        : "";
+    const parts = [
+      status && `Status: ${status}`,
+      reason && `Reason: ${reason}`,
+      message && message,
+      rmk && `Delhivery: ${rmk}`,
+      lastRequestAt && `Last request: ${lastRequestAt}`,
+    ].filter(
       Boolean
     );
     body =

@@ -2,6 +2,49 @@ import { prisma } from "@/lib/prismaDB";
 
 const DEFAULT_BASE = "https://staging-express.delhivery.com";
 const PROD_BASE = "https://track.delhivery.com";
+const SERVICEABILITY_TTL_MS = 5 * 60 * 1000;
+const serviceabilityCache = new Map<string, { expiresAt: number; value: unknown }>();
+const breakerState = { failures: 0, openUntil: 0 };
+
+type DelhiveryOrderMode = "Prepaid" | "COD" | "Pickup" | "REPL";
+type StrictShipmentRow = {
+  name: string;
+  add: string;
+  pin: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  order: string;
+  payment_mode: DelhiveryOrderMode;
+  cod_amount: string;
+  products_desc: string;
+  total_amount: string;
+  quantity: string;
+  weight: string;
+  shipping_mode: "Surface" | "Express";
+  hsn_code: string;
+  order_date: null;
+  seller_name: string;
+  seller_add: string;
+  seller_inv: string;
+  return_pin: string;
+  return_city: string;
+  return_phone: string;
+  return_add: string;
+  return_state: string;
+  return_country: string;
+  waybill: string;
+  shipment_width: string;
+  shipment_height: string;
+  address_type: string;
+  seller_gst_tin?: string;
+};
+
+type StrictCmuPayload = {
+  shipments: StrictShipmentRow[];
+  pickup_location: { name: string };
+};
 
 export function isDelhiveryConfigured() {
   return Boolean(
@@ -16,12 +59,56 @@ function delhiveryDebug(): boolean {
   return process.env.DELHIVERY_DEBUG_PAYLOAD === "1";
 }
 
+function delhiveryEnabled(): boolean {
+  return process.env.DELHIVERY_ENABLED !== "0";
+}
+
+function delhiveryAutoPickupEnabled(): boolean {
+  return process.env.DELHIVERY_AUTO_PICKUP === "1";
+}
+
+function delhiveryMaxRetries(): number {
+  const n = Number(process.env.DELHIVERY_MAX_RETRIES ?? "2");
+  if (!Number.isFinite(n)) return 2;
+  return Math.max(0, Math.min(5, Math.trunc(n)));
+}
+
+function logDelhiveryEvent(orderId: string, event: string, details: Record<string, unknown>) {
+  const safe: Record<string, unknown> = {
+    orderId,
+    event,
+    at: new Date().toISOString(),
+    ...details,
+  };
+  console.info("[delhivery]", JSON.stringify(safe));
+}
+
 function delhiveryBaseUrl() {
   const raw = (process.env.DELHIVERY_API_BASE_URL ?? "").trim();
   if (raw) return raw.replace(/\/$/, "");
   const env = (process.env.DELHIVERY_ENV ?? "").trim().toLowerCase();
   if (env === "production" || env === "prod") return PROD_BASE;
   return DEFAULT_BASE;
+}
+
+function validateDelhiveryConfigAtRuntime(orderId: string): { ok: true } | { ok: false; reason: string } {
+  if (!delhiveryEnabled()) return { ok: false, reason: "disabled_by_flag" };
+  const base = delhiveryBaseUrl();
+  const token = (process.env.DELHIVERY_API_TOKEN ?? "").trim();
+  const pickup = (process.env.DELHIVERY_PICKUP_LOCATION ?? "").trim();
+  if (!token) return { ok: false, reason: "missing_token" };
+  if (!pickup) return { ok: false, reason: "missing_pickup_location" };
+  if (!/^https?:\/\//i.test(base)) return { ok: false, reason: "invalid_base_url" };
+  const env = (process.env.DELHIVERY_ENV ?? "").trim().toLowerCase();
+  const baseLooksProd = /track\.delhivery\.com/i.test(base);
+  const baseLooksStaging = /staging-express\.delhivery\.com/i.test(base);
+  if (env === "production" && baseLooksStaging) {
+    logDelhiveryEvent(orderId, "config_warning", { reason: "env_prod_with_staging_base", base });
+  }
+  if ((env === "staging" || env === "test") && baseLooksProd) {
+    logDelhiveryEvent(orderId, "config_warning", { reason: "env_staging_with_prod_base", base });
+  }
+  return { ok: true };
 }
 
 function sanitizeDelhiveryText(s: string, maxLen: number) {
@@ -255,12 +342,221 @@ function logDelhiveryPayloadSummary(orderId: string, dataValue: unknown) {
   console.info("[delhivery] create payload summary", { orderId, firstShipmentKeys: keys });
 }
 
+export function mapDelhiveryStatus(raw: string): "CREATED" | "IN_TRANSIT" | "DELIVERED" | "DELAYED" | "RETURNED" {
+  const s = raw.toUpperCase();
+  if (/(DELIVERED|DLVD|COMPLETED)/.test(s)) return "DELIVERED";
+  if (/(IN TRANSIT|IN_TRANSIT|DISPATCHED|OFD)/.test(s)) return "IN_TRANSIT";
+  if (/(RTO|RTS|RETURN|NDR RETURNED)/.test(s)) return "RETURNED";
+  if (/(DELAY|HOLD|PENDING)/.test(s)) return "DELAYED";
+  return "CREATED";
+}
+
+function circuitOpen(): boolean {
+  return Date.now() < breakerState.openUntil;
+}
+
+function recordFailure() {
+  breakerState.failures += 1;
+  if (breakerState.failures >= 5) {
+    breakerState.openUntil = Date.now() + 3 * 60 * 1000;
+  }
+}
+
+function recordSuccess() {
+  breakerState.failures = 0;
+  breakerState.openUntil = 0;
+}
+
+function classifyTransient(status: number | null, errMsg: string): boolean {
+  if (status !== null && (status === 429 || status >= 500)) return true;
+  return /(timeout|timed out|network|socket|econnreset|fetch failed|temporar)/i.test(errMsg);
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function checkServiceability(
+  token: string,
+  pin6: string
+): Promise<{ serviceable: boolean; codAllowed: boolean | null; raw: unknown }> {
+  const now = Date.now();
+  const cached = serviceabilityCache.get(pin6);
+  if (cached && cached.expiresAt > now) {
+    const data = cached.value as any;
+    return {
+      serviceable: Boolean(data?.serviceable),
+      codAllowed: typeof data?.codAllowed === "boolean" ? data.codAllowed : null,
+      raw: data?.raw ?? null,
+    };
+  }
+  const url = `${delhiveryBaseUrl()}/c/api/pin-codes/json/?filter_codes=${encodeURIComponent(pin6)}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Token ${token}`,
+    },
+  });
+  const txt = await res.text();
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(txt);
+  } catch {
+    parsed = txt;
+  }
+  let serviceable = false;
+  let codAllowed: boolean | null = null;
+  if (Array.isArray(parsed)) {
+    serviceable = parsed.length > 0;
+    const first = parsed[0] as Record<string, unknown> | undefined;
+    const p = String(first?.payment_type ?? first?.payment_types ?? "").toUpperCase();
+    if (p) codAllowed = /(COD|BOTH|CASH)/.test(p);
+  } else if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    if (Array.isArray(o.delivery_codes)) {
+      const arr = o.delivery_codes as unknown[];
+      serviceable = arr.length > 0;
+      const first = arr[0] as Record<string, unknown> | undefined;
+      const p = String(first?.postal_code?.payment_types ?? first?.postal_code?.pre_paid ?? "").toUpperCase();
+      if (p) codAllowed = /(COD|BOTH|Y|YES)/.test(p);
+    } else {
+      serviceable = Object.keys(o).length > 0;
+    }
+  }
+  const cacheVal = { serviceable, codAllowed, raw: parsed };
+  serviceabilityCache.set(pin6, { expiresAt: now + SERVICEABILITY_TTL_MS, value: cacheVal });
+  return cacheVal;
+}
+
+function buildStrictCmuPayload(args: {
+  orderRef: string;
+  pickup: string;
+  name: string;
+  add: string;
+  pin6: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  products_desc: string;
+  total_amount: string;
+  qtyTotal: number;
+  defaultWeightG: number;
+}): StrictCmuPayload {
+  const sellerGstTin = (process.env.DELHIVERY_SELLER_GST_TIN ?? "")
+    .replace(/\s/g, "")
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, "")
+    .slice(0, 15);
+  const row: StrictShipmentRow = {
+    name: args.name,
+    add: args.add,
+    pin: args.pin6,
+    city: args.city,
+    state: args.state,
+    country: args.country,
+    phone: args.phone,
+    order: args.orderRef,
+    payment_mode: "Prepaid",
+    return_pin: "",
+    return_city: "",
+    return_phone: "",
+    return_add: "",
+    return_state: "",
+    return_country: "",
+    products_desc: args.products_desc,
+    hsn_code: (process.env.DELHIVERY_HSN_CODE ?? "").replace(/\s/g, "").replace(/[^0-9,]/g, "").slice(0, 80),
+    cod_amount: "0",
+    order_date: null,
+    total_amount: args.total_amount,
+    seller_add: "",
+    seller_name: sanitizeDelhiveryText(coerceDelhiveryString(process.env.SITE_NAME ?? "Store", 200), 80),
+    seller_inv: "",
+    quantity: String(args.qtyTotal),
+    waybill: "",
+    shipment_width: "",
+    shipment_height: "",
+    weight: String(args.defaultWeightG),
+    shipping_mode: "Surface",
+    address_type: "",
+    ...(sellerGstTin.length === 15 ? { seller_gst_tin: sellerGstTin } : {}),
+  };
+  return {
+    shipments: [row],
+    pickup_location: { name: args.pickup },
+  };
+}
+
+async function maybeCreatePickupRequest(orderId: string, token: string, pickup: string): Promise<void> {
+  if (!delhiveryAutoPickupEnabled()) return;
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = process.env.DELHIVERY_AUTO_PICKUP_TIME ?? "17:00:00";
+  const expected = Number(process.env.DELHIVERY_AUTO_PICKUP_PACKAGE_COUNT ?? "1");
+  const payload = {
+    pickup_time: time,
+    pickup_date: date,
+    pickup_location: pickup,
+    expected_package_count: Number.isFinite(expected) && expected > 0 ? Math.trunc(expected) : 1,
+  };
+  const res = await fetch(`${delhiveryBaseUrl()}/fm/request/new/`, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const txt = await res.text();
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(txt);
+  } catch {
+    parsed = txt;
+  }
+  const row = await prisma.shipments.findUnique({ where: { order_id: orderId }, select: { metadata: true } });
+  const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+  await prisma.shipments.updateMany({
+    where: { order_id: orderId },
+    data: {
+      metadata: {
+        ...prev,
+        delhivery: {
+          ...(typeof prev.delhivery === "object" && prev.delhivery ? (prev.delhivery as object) : {}),
+          pickupRequest: { payload, ok: res.ok, response: parsed },
+        },
+      } as object,
+    },
+  });
+}
+
+async function fetchSingleWaybill(token: string): Promise<string | null> {
+  const url = `${delhiveryBaseUrl()}/waybill/api/json/?token=${encodeURIComponent(token)}`;
+  const res = await fetch(url, { method: "GET" });
+  const txt = await res.text();
+  try {
+    const parsed = JSON.parse(txt);
+    return extractWaybill(parsed);
+  } catch {
+    return extractWaybill(txt);
+  }
+}
+
 /**
  * Books a forward shipment with Delhivery after payment succeeds.
  * Safe to call multiple times: no-ops if a waybill already exists or Delhivery is not configured.
  */
 export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<void> {
+  const cfg = validateDelhiveryConfigAtRuntime(orderId);
+  if (!cfg.ok) {
+    logDelhiveryEvent(orderId, "skip", { reason: cfg.reason });
+    return;
+  }
   if (!isDelhiveryConfigured()) return;
+  if (circuitOpen()) {
+    logDelhiveryEvent(orderId, "circuit_open_skip", { openUntil: breakerState.openUntil });
+    return;
+  }
 
   const existing = await prisma.shipments.findUnique({
     where: { order_id: orderId },
@@ -383,51 +679,21 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
 
   const orderRef = order.id.replace(/-/g, "").slice(0, 32);
   const weightGramsStr = String(defaultWeightG);
-  const sellerGstTin = (process.env.DELHIVERY_SELLER_GST_TIN ?? "")
-    .replace(/\s/g, "")
-    .toUpperCase()
-    .replace(/[^0-9A-Z]/g, "")
-    .slice(0, 15);
-
-  // Forward Prepaid sample in Delhivery doc has no per-row `client` — account is from `Authorization: Token …`.
-  const shipmentRow: Record<string, unknown> = {
+  const dataValue = buildStrictCmuPayload({
+    orderRef,
+    pickup,
     name,
     add,
-    pin: pin6,
+    pin6,
     city,
     state,
     country,
     phone,
-    order: orderRef,
-    payment_mode: "Prepaid",
-    return_pin: "",
-    return_city: "",
-    return_phone: "",
-    return_add: "",
-    return_state: "",
-    return_country: "",
     products_desc,
-    hsn_code: (process.env.DELHIVERY_HSN_CODE ?? "").replace(/\s/g, "").replace(/[^0-9,]/g, "").slice(0, 80),
-    cod_amount: "0",
-    order_date: null,
     total_amount,
-    seller_add: "",
-    seller_name: sanitizeDelhiveryText(coerceDelhiveryString(process.env.SITE_NAME ?? "Store", 200), 80),
-    seller_inv: "",
-    quantity: String(qtyTotal),
-    waybill: "",
-    shipment_width: "",
-    shipment_height: "",
-    weight: weightGramsStr,
-    shipping_mode: "Surface",
-    address_type: "",
-    ...(sellerGstTin.length === 15 ? { seller_gst_tin: sellerGstTin } : {}),
-  };
-
-  const dataValue = {
-    shipments: [shipmentRow],
-    pickup_location: { name: pickup },
-  };
+    qtyTotal,
+    defaultWeightG,
+  });
 
   const minimalCheck: MinimalDelhiveryShipmentRow = {
     name,
@@ -470,6 +736,40 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     return;
   }
 
+  // Pincode guardrail before create call.
+  try {
+    const svc = await checkServiceability(token, pin6);
+    logDelhiveryEvent(orderId, "serviceability_check", {
+      pin: pin6,
+      serviceable: svc.serviceable,
+      codAllowed: svc.codAllowed,
+    });
+    if (!svc.serviceable) {
+      const row = await prisma.shipments.findUnique({
+        where: { order_id: orderId },
+        select: { metadata: true },
+      });
+      const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+      await prisma.shipments.updateMany({
+        where: { order_id: orderId },
+        data: {
+          metadata: {
+            ...prev,
+            delhivery: {
+              status: "skipped",
+              reason: "destination_pin_not_serviceable",
+              pin: pin6,
+              serviceability: svc.raw,
+            },
+          } as object,
+        },
+      });
+      return;
+    }
+  } catch (e) {
+    logDelhiveryEvent(orderId, "serviceability_warning", { error: String((e as Error)?.message ?? e) });
+  }
+
   logDelhiveryPayloadSummary(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
@@ -489,16 +789,42 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
   let responseText = "";
   let lastResponse: Response | null = null;
   try {
-    lastResponse = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        Authorization: `Token ${token}`,
-      },
-      body: formBodyStr,
-    });
-    responseText = await lastResponse.text();
-    logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
+    const retries = delhiveryMaxRetries();
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        lastResponse = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            Authorization: `Token ${token}`,
+          },
+          body: formBodyStr,
+        });
+        responseText = await lastResponse.text();
+        logDelhiveryCmuVerboseResponse(orderId, lastResponse, responseText);
+        try {
+          rawJson = JSON.parse(responseText) as unknown;
+        } catch {
+          rawJson = { parse_error: true, body: responseText.slice(0, 8000) };
+        }
+        if (!lastResponse.ok && classifyTransient(lastResponse.status, `HTTP ${lastResponse.status}`) && attempt < retries) {
+          logDelhiveryEvent(orderId, "retry", { attempt, status: lastResponse.status });
+          await sleep(300 * (attempt + 1));
+          continue;
+        }
+        if (!lastResponse.ok) throw new Error(`HTTP ${lastResponse.status}`);
+        break;
+      } catch (innerErr: any) {
+        const msg = String(innerErr?.message ?? innerErr);
+        const status = lastResponse?.status ?? null;
+        if (attempt < retries && classifyTransient(status, msg)) {
+          logDelhiveryEvent(orderId, "retry", { attempt, status, message: msg });
+          await sleep(300 * (attempt + 1));
+          continue;
+        }
+        throw innerErr;
+      }
+    }
     if (delhiveryDebug()) {
       try {
         console.log("DELHIVERY_RESPONSE_BODY_PARSED:", JSON.stringify(JSON.parse(responseText), null, 2));
@@ -506,15 +832,8 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
         console.log("DELHIVERY_RESPONSE_BODY_PARSED: (not JSON)");
       }
     }
-    try {
-      rawJson = JSON.parse(responseText) as unknown;
-    } catch {
-      rawJson = { parse_error: true, body: responseText.slice(0, 8000) };
-    }
-    if (!lastResponse.ok) {
-      throw new Error(`HTTP ${lastResponse.status}`);
-    }
   } catch (err: any) {
+    recordFailure();
     if (delhiveryDebug()) {
       console.log("DELHIVERY_FETCH_ERROR:", String(err?.message ?? err));
       if (lastResponse) {
@@ -535,13 +854,9 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
             status: "error",
             message: String(err?.message ?? "request_failed"),
             at: new Date().toISOString(),
-            ...(delhiveryDebug()
-              ? {
-                  responseTextPreview: responseText.slice(0, 4000),
-                  parsedResponse: rawJson ?? null,
-                  httpStatus: lastResponse?.status ?? null,
-                }
-              : {}),
+            responseTextPreview: responseText.slice(0, 8000),
+            parsedResponse: rawJson ?? null,
+            httpStatus: lastResponse?.status ?? null,
           },
         } as object,
       },
@@ -556,7 +871,15 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
       ? String((rawJson as Record<string, unknown>).rmk ?? "")
       : "";
 
-  if (!waybill && rmk && !/success/i.test(rmk)) {
+  const looksSuccess =
+    typeof rawJson === "object" &&
+    rawJson !== null &&
+    ((rawJson as Record<string, unknown>).success === true || /success/i.test(rmk));
+  const recoveredWaybill = !waybill && looksSuccess ? await fetchSingleWaybill(token) : null;
+  const finalWaybill = waybill ?? recoveredWaybill;
+
+  if (!finalWaybill && rmk && !/success/i.test(rmk)) {
+    recordFailure();
     const row = await prisma.shipments.findUnique({
       where: { order_id: orderId },
       select: { metadata: true },
@@ -567,7 +890,13 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
       data: {
         metadata: {
           ...prev,
-          delhivery: { status: "error", rmk, response: rawJson },
+          delhivery: {
+            status: "error",
+            rmk,
+            response: rawJson,
+            responseTextPreview: responseText.slice(0, 8000),
+            httpStatus: lastResponse?.status ?? null,
+          },
         } as object,
       },
     });
@@ -587,14 +916,29 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     where: { order_id: orderId },
     data: {
       carrier: "Delhivery",
-      tracking_number: waybill,
-      status: waybill ? "CREATED" : "PENDING",
+      tracking_number: finalWaybill,
+      status: finalWaybill ? "CREATED" : "PENDING",
       metadata: {
         ...prev,
-        delhivery: { status: waybill ? "booked" : "pending", response: rawJson },
+        delhivery: {
+          status: finalWaybill ? "booked" : "pending",
+          response: rawJson,
+          rmk,
+          responseTextPreview: responseText.slice(0, 8000),
+          httpStatus: lastResponse?.status ?? null,
+          request: { url, bodyPreview: formBodyStr.slice(0, 500) },
+          diagnostics: {
+            lastRequestAt: new Date().toISOString(),
+            payloadSummaryKeys: Object.keys(dataValue.shipments[0] ?? {}),
+          },
+        },
       } as object,
     },
   });
+  recordSuccess();
+  await maybeCreatePickupRequest(orderId, token, pickup).catch((e) =>
+    logDelhiveryEvent(orderId, "pickup_request_error", { error: String((e as Error)?.message ?? e) })
+  );
   if (delhiveryDebug()) {
     console.info("[delhivery] booked OK (DELHIVERY_DEBUG_PAYLOAD=1)", orderId, JSON.stringify(rawJson));
   }
