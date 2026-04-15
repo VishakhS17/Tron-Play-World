@@ -46,6 +46,9 @@ type StrictCmuPayload = {
   shipments: StrictShipmentRow[];
   pickup_location: { name: string };
 };
+type CmuPayloadVariant =
+  | StrictCmuPayload
+  | { shipments: Array<Record<string, unknown>>; pickup_location: string };
 
 export function isDelhiveryConfigured() {
   return Boolean(
@@ -429,6 +432,35 @@ async function checkServiceability(
   return cacheVal;
 }
 
+async function verifyWarehousePreflight(
+  token: string,
+  pickupName: string
+): Promise<{ checked: boolean; ok: boolean; details?: unknown }> {
+  const raw = (process.env.DELHIVERY_CLIENT_WAREHOUSE_LOOKUP_URL ?? "").trim();
+  if (!raw) {
+    return { checked: false, ok: true };
+  }
+  // Optional account-specific lookup endpoint. Example:
+  // DELHIVERY_CLIENT_WAREHOUSE_LOOKUP_URL=https://staging-express.delhivery.com/api/backend/clientwarehouse/list/
+  // We append `?name=<pickup>` if no query exists, else `&name=<pickup>`.
+  const sep = raw.includes("?") ? "&" : "?";
+  const url = `${raw}${sep}name=${encodeURIComponent(pickupName)}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Token ${token}` },
+  });
+  const txt = await res.text();
+  let parsed: unknown = txt;
+  try {
+    parsed = JSON.parse(txt);
+  } catch {
+    // keep raw text
+  }
+  const textHay = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+  const hasName = textHay.toLowerCase().includes(pickupName.toLowerCase());
+  return { checked: true, ok: res.ok && hasName, details: parsed };
+}
+
 function buildStrictCmuPayload(args: {
   orderRef: string;
   client: string;
@@ -775,25 +807,60 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     logDelhiveryEvent(orderId, "serviceability_warning", { error: String((e as Error)?.message ?? e) });
   }
 
+  // Optional preflight warehouse lookup (disabled unless DELHIVERY_CLIENT_WAREHOUSE_LOOKUP_URL is set).
+  try {
+    const preflight = await verifyWarehousePreflight(token, pickup);
+    if (preflight.checked) {
+      logDelhiveryEvent(orderId, "warehouse_preflight", {
+        pickup,
+        ok: preflight.ok,
+      });
+      if (!preflight.ok) {
+        const row = await prisma.shipments.findUnique({
+          where: { order_id: orderId },
+          select: { metadata: true },
+        });
+        const prev = (row?.metadata && typeof row.metadata === "object" ? row.metadata : {}) as Record<string, unknown>;
+        await prisma.shipments.updateMany({
+          where: { order_id: orderId },
+          data: {
+            metadata: {
+              ...prev,
+              delhivery: {
+                status: "error",
+                reason: "warehouse_preflight_failed",
+                message:
+                  `Preflight could not verify pickup_location '${pickup}'. ` +
+                  "Check DELHIVERY_PICKUP_LOCATION exact case/spacing and token-account warehouse mapping.",
+                warehousePreflight: preflight.details ?? null,
+              },
+            } as object,
+          },
+        });
+        return;
+      }
+    }
+  } catch (e) {
+    logDelhiveryEvent(orderId, "warehouse_preflight_warning", {
+      error: String((e as Error)?.message ?? e),
+    });
+  }
+
   logDelhiveryPayloadSummary(orderId, dataValue);
 
   const url = `${delhiveryBaseUrl()}/api/cmu/create.json`;
-  let payloadForSend: unknown = dataValue;
-  if (delhiveryDebug()) {
-    payloadForSend = deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(dataValue)));
-  }
-  // `format` is a top-level form field only — never inside the JSON `payload` (pickup_location + shipments).
-  // Build wire body explicitly: some stacks mishandle `Accept: application/json` with form bodies or URLSearchParams edge cases.
-  const payload = payloadForSend;
-  const dataJson = JSON.stringify(payload);
-  const formBodyStr = `format=json&data=${encodeURIComponent(dataJson)}`;
-  console.log("FINAL JSON BODY:", JSON.stringify(payload, null, 2));
-  logDelhiveryCmuVerboseRequest(orderId, url, token, payload, formBodyStr);
-
   let rawJson: unknown = null;
   let responseText = "";
   let lastResponse: Response | null = null;
-  try {
+
+  async function postCmuPayload(payloadInput: CmuPayloadVariant, label: string) {
+    const payload = delhiveryDebug()
+      ? (deepFreezeDelhiveryPayload(JSON.parse(JSON.stringify(payloadInput))) as unknown)
+      : (payloadInput as unknown);
+    const dataJson = JSON.stringify(payload);
+    const formBodyStr = `format=json&data=${encodeURIComponent(dataJson)}`;
+    console.log(`FINAL JSON BODY (${label}):`, JSON.stringify(payload, null, 2));
+    logDelhiveryCmuVerboseRequest(orderId, url, token, payload, formBodyStr);
     const retries = delhiveryMaxRetries();
     for (let attempt = 0; ; attempt += 1) {
       try {
@@ -818,7 +885,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
           continue;
         }
         if (!lastResponse.ok) throw new Error(`HTTP ${lastResponse.status}`);
-        break;
+        return;
       } catch (innerErr: any) {
         const msg = String(innerErr?.message ?? innerErr);
         const status = lastResponse?.status ?? null;
@@ -828,6 +895,36 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
           continue;
         }
         throw innerErr;
+      }
+    }
+  }
+
+  try {
+    await postCmuPayload(dataValue, "primary");
+    const primaryRmk =
+      typeof rawJson === "object" && rawJson && "rmk" in rawJson
+        ? String((rawJson as Record<string, unknown>).rmk ?? "")
+        : "";
+    const needsWarehouseFallback = /ClientWarehouse matching query does not exist/i.test(primaryRmk);
+    if (needsWarehouseFallback) {
+      logDelhiveryEvent(orderId, "warehouse_fallback_retry", { reason: primaryRmk });
+      const noClientShipments = dataValue.shipments.map((s) => {
+        const c = { ...s };
+        delete (c as Record<string, unknown>).client;
+        return c as Record<string, unknown>;
+      });
+      const variants: CmuPayloadVariant[] = [
+        { shipments: noClientShipments, pickup_location: { name: pickup } },
+        { shipments: dataValue.shipments as Array<Record<string, unknown>>, pickup_location: pickup },
+        { shipments: noClientShipments, pickup_location: pickup },
+      ];
+      for (let i = 0; i < variants.length; i += 1) {
+        await postCmuPayload(variants[i], `warehouse-fallback-${i + 1}`);
+        const retryRmk =
+          typeof rawJson === "object" && rawJson && "rmk" in rawJson
+            ? String((rawJson as Record<string, unknown>).rmk ?? "")
+            : "";
+        if (!/ClientWarehouse matching query does not exist/i.test(retryRmk)) break;
       }
     }
     if (delhiveryDebug()) {
@@ -875,6 +972,7 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
     typeof rawJson === "object" && rawJson && "rmk" in rawJson
       ? String((rawJson as Record<string, unknown>).rmk ?? "")
       : "";
+  const warehouseLookupFailure = /ClientWarehouse matching query does not exist/i.test(rmk);
 
   const looksSuccess =
     typeof rawJson === "object" &&
@@ -901,6 +999,14 @@ export async function bookDelhiveryShipmentForOrder(orderId: string): Promise<vo
             response: rawJson,
             responseTextPreview: responseText.slice(0, 8000),
             httpStatus: lastResponse?.status ?? null,
+            ...(warehouseLookupFailure
+              ? {
+                  reason: "warehouse_not_mapped_to_token",
+                  message:
+                    `Delhivery could not find warehouse '${pickup}' for this token/client. ` +
+                    "Verify DELHIVERY_PICKUP_LOCATION exact case/spacing and ensure the warehouse is mapped to the same API token account.",
+                }
+              : {}),
           },
         } as object,
       },
