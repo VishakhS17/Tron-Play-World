@@ -14,7 +14,7 @@ import {
   orderConfirmedCustomerEmailHtml,
   orderConfirmedCustomerEmailText,
 } from "@/lib/email";
-import { bookDelhiveryShipmentForOrder } from "@/lib/shipping/delhivery";
+import { bookShipmentForOrder } from "@/lib/shipping";
 
 export async function POST(req: NextRequest) {
   try {
@@ -186,9 +186,9 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      await bookDelhiveryShipmentForOrder(created.id);
+      await bookShipmentForOrder(created.id);
     } catch (delErr) {
-      console.error("[payment/razorpay/verify] Delhivery booking failed", delErr);
+      console.error("[payment/razorpay/verify] shipment booking failed", delErr);
     }
 
     await writeAuditLog({

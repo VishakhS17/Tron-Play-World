@@ -119,7 +119,7 @@ export default function AdminCsvPage() {
         </p>
         <p className="text-xs text-meta-4">
           <b className="text-dark">hsn_code</b> optional — digits (and commas if multiple codes on one SKU). Used for
-          Delhivery / GST. Omit the column to leave existing product HSN unchanged on update.
+          Shipmozo / GST. Omit the column to leave existing product HSN unchanged on update.
         </p>
         <p className="text-xs text-meta-4">
           <b className="text-dark">diecast_scale</b> optional — denominator (<b className="text-dark">64</b>) or ratio (

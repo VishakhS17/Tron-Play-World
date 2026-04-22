@@ -239,7 +239,7 @@ export default function NewProductPage() {
               className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
             />
             <span className="mt-1 block text-xs text-meta-4">
-              Digits (comma-separated if needed). Used when booking Delhivery for orders containing this product.
+              Digits (comma-separated if needed). Sent to Shipmozo / GST when shipping this product.
             </span>
           </label>
 

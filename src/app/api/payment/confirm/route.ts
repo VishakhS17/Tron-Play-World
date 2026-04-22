@@ -8,7 +8,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimit } from "@/lib/security/rateLimit";
 import { verifyOrderAccessToken } from "@/lib/security/orderAccess";
 import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
-import { bookDelhiveryShipmentForOrder } from "@/lib/shipping/delhivery";
+import { bookShipmentForOrder } from "@/lib/shipping";
 
 export async function POST(req: NextRequest) {
   try {
@@ -168,9 +168,9 @@ export async function POST(req: NextRequest) {
   if (recipient && !result.already && !isSyntheticPhoneSignupEmail(recipient)) {
     try {
       try {
-        await bookDelhiveryShipmentForOrder(orderId);
+        await bookShipmentForOrder(orderId);
       } catch (delErr) {
-        console.error("[payment/confirm] Delhivery booking failed", delErr);
+        console.error("[payment/confirm] shipment booking failed", delErr);
       }
       const shipRow = await prisma.shipments.findUnique({
         where: { order_id: orderId },

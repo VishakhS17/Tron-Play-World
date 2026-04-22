@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
-function DelhiveryShipmentNote({ shipment }: { shipment: any }) {
-  const d = shipment?.delhivery;
+function ShipmozoShipmentNote({ shipment }: { shipment: any }) {
+  const d = shipment?.shipmozo;
   const hasCarrier = Boolean((shipment?.carrier ?? "").trim());
   const hasTracking = Boolean((shipment?.tracking_number ?? "").trim());
   if (hasCarrier && hasTracking) return null;
@@ -27,7 +27,7 @@ function DelhiveryShipmentNote({ shipment }: { shipment: any }) {
       status && `Status: ${status}`,
       reason && `Reason: ${reason}`,
       message && message,
-      rmk && `Delhivery: ${rmk}`,
+      rmk && `Shipmozo: ${rmk}`,
       lastRequestAt && `Last request: ${lastRequestAt}`,
     ].filter(
       Boolean
@@ -45,15 +45,12 @@ function DelhiveryShipmentNote({ shipment }: { shipment: any }) {
   } else {
     body = (
       <p>
-        No Delhivery diagnostic was saved for this order. That usually means the server did not have the Delhivery
-        env vars when payment completed:{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_API_TOKEN</code>,{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_CLIENT_NAME</code>,{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_PICKUP_LOCATION</code>, and{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_SELLER_GST_TIN</code> (15-character GSTIN). HSN comes from
-        each product&apos;s <strong>HSN</strong> field in admin (or optional fallback{" "}
-        <code className="rounded bg-gray-2 px-1">DELHIVERY_HSN_CODE</code>). Set these on Vercel (Production), redeploy,
-        then place a new test order (old orders are not re-booked automatically).
+        No shipment diagnostic was saved for this order. Set Shipmozo env vars:{" "}
+        <code className="rounded bg-gray-2 px-1">SHIPMOZO_PUBLIC_KEY</code>,{" "}
+        <code className="rounded bg-gray-2 px-1">SHIPMOZO_PRIVATE_KEY</code>, and either{" "}
+        <code className="rounded bg-gray-2 px-1">SHIPMOZO_WAREHOUSE_ID</code> or{" "}
+        <code className="rounded bg-gray-2 px-1">SHIPMOZO_WAREHOUSE_TITLE</code>
+        . Redeploy/restart, then place a new test order (existing orders are not re-booked automatically).
       </p>
     );
   }
@@ -206,7 +203,7 @@ export default function AdminOrderDetailPage() {
             />
           </label>
         </div>
-        <DelhiveryShipmentNote shipment={data.shipment} />
+        <ShipmozoShipmentNote shipment={data.shipment} />
       </div>
 
       <div className="rounded-2xl border border-gray-3 bg-white p-6 space-y-3">
