@@ -2,7 +2,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/prismaDB";
 import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
 
-/** Resolved storefront strings (footer + homepage Visit us). */
+/** Resolved storefront strings used in the footer/home sections. */
 export type StoreContactDisplay = {
   helpSupportTitle: string;
   contactAddress: string;
@@ -12,9 +12,6 @@ export type StoreContactDisplay = {
   socialTwitterUrl: string;
   socialInstagramUrl: string;
   socialLinkedInUrl: string;
-  visitEyebrow: string;
-  visitHeading: string;
-  visitLocationLabel: string;
 };
 
 const DEFAULTS: StoreContactDisplay = {
@@ -27,9 +24,6 @@ const DEFAULTS: StoreContactDisplay = {
   socialTwitterUrl: "",
   socialInstagramUrl: "",
   socialLinkedInUrl: "",
-  visitEyebrow: "Visit us",
-  visitHeading: "Find us in Bengaluru.",
-  visitLocationLabel: "Location",
 };
 
 function orDefault(row: string | null | undefined, fallback: string) {
@@ -57,9 +51,6 @@ export const getStoreContactDisplay = cache(async function getStoreContactDispla
         social_twitter_url: true,
         social_instagram_url: true,
         social_linkedin_url: true,
-        visit_eyebrow: true,
-        visit_heading: true,
-        visit_location_label: true,
       },
     })
     .catch(() => null);
@@ -75,8 +66,5 @@ export const getStoreContactDisplay = cache(async function getStoreContactDispla
     socialTwitterUrl: orDefault(row.social_twitter_url, DEFAULTS.socialTwitterUrl),
     socialInstagramUrl: orDefault(row.social_instagram_url, DEFAULTS.socialInstagramUrl),
     socialLinkedInUrl: orDefault(row.social_linkedin_url, DEFAULTS.socialLinkedInUrl),
-    visitEyebrow: orDefault(row.visit_eyebrow, DEFAULTS.visitEyebrow),
-    visitHeading: orDefault(row.visit_heading, DEFAULTS.visitHeading),
-    visitLocationLabel: orDefault(row.visit_location_label, DEFAULTS.visitLocationLabel),
   };
 });

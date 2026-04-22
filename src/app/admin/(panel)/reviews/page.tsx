@@ -58,17 +58,25 @@ export default async function AdminReviewsPage() {
                 <td className="py-3 px-4 text-dark">{r.customers?.email ?? "—"}</td>
                 <td className="py-3 px-4 text-dark">{r.is_approved ? "Yes" : "No"}</td>
                 <td className="py-3 px-4">
-                  <form action={`/api/admin/reviews/${r.id}/approve`} method="post" className="inline">
-                    <button className="text-sm font-medium text-blue hover:underline">
-                      Approve
-                    </button>
-                  </form>
-                  <span className="mx-2 text-meta-4">|</span>
-                  <form action={`/api/admin/reviews/${r.id}/reject`} method="post" className="inline">
-                    <button className="text-sm font-medium text-meta-3 hover:text-dark">
-                      Reject
-                    </button>
-                  </form>
+                  {r.is_approved ? (
+                    <form action={`/api/admin/reviews/${r.id}/delete`} method="post" className="inline">
+                      <button className="text-sm font-medium text-red-600 hover:underline">Delete</button>
+                    </form>
+                  ) : (
+                    <>
+                      <form action={`/api/admin/reviews/${r.id}/approve`} method="post" className="inline">
+                        <button className="text-sm font-medium text-blue hover:underline">
+                          Approve
+                        </button>
+                      </form>
+                      <span className="mx-2 text-meta-4">|</span>
+                      <form action={`/api/admin/reviews/${r.id}/reject`} method="post" className="inline">
+                        <button className="text-sm font-medium text-meta-3 hover:text-dark">
+                          Reject
+                        </button>
+                      </form>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

@@ -42,7 +42,7 @@ export default function ReviewForm({ productId }: { productId: string }) {
           >
             {[5, 4, 3, 2, 1].map((r) => (
               <option key={r} value={r}>
-                {r} star{r === 1 ? "" : "s"}
+                {"★".repeat(r)}
               </option>
             ))}
           </select>

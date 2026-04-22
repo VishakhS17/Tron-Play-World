@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
   const cta_label = cleanOptionalText(body.cta_label, 120);
   const cta_url = cleanOptionalText(body.cta_url, 2000);
   const delay_ms = body.delay_ms !== undefined ? Number(body.delay_ms) : 0;
+  const auto_close_ms = body.auto_close_ms !== undefined ? Number(body.auto_close_ms) : 0;
   const sort_priority = body.sort_priority !== undefined ? Number(body.sort_priority) : 0;
   const is_active = Boolean(body.is_active);
   const active_from = parseOptionalDate(body.active_from);
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
       cta_label: cta_label ?? null,
       cta_url: cta_url ?? null,
       delay_ms: Number.isFinite(delay_ms) ? Math.max(0, delay_ms) : 0,
+      auto_close_ms: Number.isFinite(auto_close_ms) ? Math.max(0, auto_close_ms) : 0,
       frequency,
       audience,
       suggested_coupon_code,

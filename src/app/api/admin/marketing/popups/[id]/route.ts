@@ -80,6 +80,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const n = Number(body.delay_ms);
     if (Number.isFinite(n)) data.delay_ms = Math.max(0, n);
   }
+  if (body.auto_close_ms !== undefined) {
+    const n = Number(body.auto_close_ms);
+    if (Number.isFinite(n)) data.auto_close_ms = Math.max(0, n);
+  }
   if (body.frequency !== undefined) {
     const f = parseFrequency(cleanText(body.frequency, 40));
     if (!f) return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });

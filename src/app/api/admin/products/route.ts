@@ -19,6 +19,15 @@ function parseShippingPerUnitIn(body: Record<string, unknown>): number | { error
   return Math.round(n * 100) / 100;
 }
 
+function parseMaxOrderQuantityIn(body: Record<string, unknown>): number | { error: string } {
+  if (body.max_order_quantity === undefined || body.max_order_quantity === null || body.max_order_quantity === "") {
+    return 99;
+  }
+  const n = Number(body.max_order_quantity);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) return { error: "Invalid max_order_quantity" };
+  return n;
+}
+
 export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
@@ -65,6 +74,10 @@ export async function POST(req: NextRequest) {
   if (typeof shippingParsed === "object") {
     return NextResponse.json({ error: shippingParsed.error }, { status: 400 });
   }
+  const maxOrderQtyParsed = parseMaxOrderQuantityIn(body as Record<string, unknown>);
+  if (typeof maxOrderQtyParsed === "object") {
+    return NextResponse.json({ error: maxOrderQtyParsed.error }, { status: 400 });
+  }
 
   if (!name || !slug || !Number.isFinite(base_price)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -91,6 +104,7 @@ export async function POST(req: NextRequest) {
       base_price,
       discounted_price,
       shipping_per_unit: shippingParsed,
+      max_order_quantity: maxOrderQtyParsed,
       sku,
       hsn_code,
       diecast_scale_id,

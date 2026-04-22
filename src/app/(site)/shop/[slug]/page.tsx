@@ -6,6 +6,7 @@ import { getProductBySlug } from "@/get-api-data/product";
 import { formatPrice } from "@/utils/formatePrice";
 import ReviewForm from "@/components/Shop/ReviewForm";
 import ProductActions from "@/components/Shop/ProductActions";
+import ReviewStar from "@/components/Shop/ReviewStar";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prismaDB";
 
@@ -132,8 +133,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   {approvedReviews.map((r) => (
                     <div key={r.id} className="rounded-xl border border-gray-3 p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-dark">
-                          {r.rating} / 5
+                        <div className="flex items-center gap-2">
+                          <ReviewStar avgRating={r.rating} />
+                          <span className="text-xs font-medium text-meta-3">({r.rating}/5)</span>
                         </div>
                         {r.is_verified_purchase ? (
                           <span className="text-xs rounded-full bg-gray-1 border border-gray-3 px-3 py-1 text-dark">

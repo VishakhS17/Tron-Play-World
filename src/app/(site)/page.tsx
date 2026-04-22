@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
-import { getStoreContactDisplay } from "@/lib/marketing/storeContactDisplay";
 import Home, {
   type HomeBrandRailItem,
   type HomeCategoryTile,
@@ -48,7 +47,7 @@ export default async function HomePage() {
       })
     );
 
-  const [slidesRaw, highlightsRaw, brandRailRaw, categoryTilesRaw, categoriesRaw, storeContact] =
+  const [slidesRaw, highlightsRaw, brandRailRaw, categoryTilesRaw, categoriesRaw] =
     await Promise.all([
       prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }),
       highlightsPromise,
@@ -69,7 +68,6 @@ export default async function HomePage() {
         take: 8,
         select: { id: true, name: true, slug: true },
       }),
-      getStoreContactDisplay(),
     ]);
 
   const heroSlides: HeroSlide[] = slidesRaw
@@ -156,7 +154,6 @@ export default async function HomePage() {
       highlights={highlights}
       brandRail={brandRail}
       categories={categories}
-      storeContact={storeContact}
     />
   );
 }

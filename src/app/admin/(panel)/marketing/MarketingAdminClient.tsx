@@ -16,9 +16,6 @@ type SiteSettingsRow = {
   social_twitter_url?: string | null;
   social_instagram_url?: string | null;
   social_linkedin_url?: string | null;
-  visit_eyebrow?: string | null;
-  visit_heading?: string | null;
-  visit_location_label?: string | null;
 };
 
 type Initial = {
@@ -83,9 +80,6 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
   const [socialTwitter, setSocialTwitter] = useState(st0?.social_twitter_url ?? "");
   const [socialInstagram, setSocialInstagram] = useState(st0?.social_instagram_url ?? "");
   const [socialLinkedIn, setSocialLinkedIn] = useState(st0?.social_linkedin_url ?? "");
-  const [visitEyebrow, setVisitEyebrow] = useState(st0?.visit_eyebrow ?? "");
-  const [visitHeading, setVisitHeading] = useState(st0?.visit_heading ?? "");
-  const [visitLocationLabel, setVisitLocationLabel] = useState(st0?.visit_location_label ?? "");
   const [storefrontSaving, setStorefrontSaving] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const [highlightUploading, setHighlightUploading] = useState(false);
@@ -914,7 +908,14 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
           <ul className="divide-y divide-gray-3 text-sm">
             {popups.map((row: any) => (
               <li key={row.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
-                <span>{row.title}</span>
+                <span>
+                  {row.title}
+                  <span className="ml-2 text-xs text-meta-3">
+                    {Number(row.auto_close_ms ?? 0) > 0
+                      ? `auto-close ${(Number(row.auto_close_ms) / 1000).toFixed(1)}s`
+                      : "no auto-close"}
+                  </span>
+                </span>
                 <button
                   type="button"
                   className="text-red-600 text-sm"
@@ -962,6 +963,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                       cta_label: fd.get("cta_label") || null,
                       cta_url: fd.get("cta_url") || null,
                       delay_ms: Number(fd.get("delay_ms") || 0),
+                      auto_close_ms: Math.max(0, Number(fd.get("auto_close_seconds") || 0) * 1000),
                       frequency: fd.get("frequency"),
                       audience: fd.get("audience"),
                       suggested_coupon_code: fd.get("suggested_coupon_code") || null,
@@ -1013,6 +1015,17 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
             <label>
               <span className="text-sm font-medium">Delay (ms)</span>
               <input name="delay_ms" type="number" defaultValue={0} className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm" />
+            </label>
+            <label>
+              <span className="text-sm font-medium">Auto close after (seconds)</span>
+              <input
+                name="auto_close_seconds"
+                type="number"
+                min={0}
+                step="0.5"
+                defaultValue={0}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
             </label>
             <label>
               <span className="text-sm font-medium">Sort priority</span>
@@ -1361,39 +1374,6 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
               </label>
             </div>
 
-            <h3 className="text-base font-semibold pt-2 border-t border-gray-3">Homepage: Visit us</h3>
-            <p className="text-sm text-meta-3">
-              The card near the bottom of the homepage. The address shown is the same as the footer
-              address above.
-            </p>
-            <label className="block">
-              <span className="text-sm font-medium">Small label (uppercase in UI)</span>
-              <input
-                value={visitEyebrow}
-                onChange={(e) => setVisitEyebrow(e.target.value)}
-                placeholder="Visit us"
-                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">Main heading</span>
-              <input
-                value={visitHeading}
-                onChange={(e) => setVisitHeading(e.target.value)}
-                placeholder="Find us in Bengaluru."
-                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">Location row title</span>
-              <input
-                value={visitLocationLabel}
-                onChange={(e) => setVisitLocationLabel(e.target.value)}
-                placeholder="Location"
-                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
-              />
-            </label>
-
             <button
               type="button"
               disabled={storefrontSaving}
@@ -1414,9 +1394,6 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                         social_twitter_url: socialTwitter.trim() || null,
                         social_instagram_url: socialInstagram.trim() || null,
                         social_linkedin_url: socialLinkedIn.trim() || null,
-                        visit_eyebrow: visitEyebrow.trim() || null,
-                        visit_heading: visitHeading.trim() || null,
-                        visit_location_label: visitLocationLabel.trim() || null,
                       }),
                     })
                   );
@@ -1428,9 +1405,6 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                   setSocialTwitter(row.social_twitter_url ?? "");
                   setSocialInstagram(row.social_instagram_url ?? "");
                   setSocialLinkedIn(row.social_linkedin_url ?? "");
-                  setVisitEyebrow(row.visit_eyebrow ?? "");
-                  setVisitHeading(row.visit_heading ?? "");
-                  setVisitLocationLabel(row.visit_location_label ?? "");
                   toast.success("Storefront contact saved");
                   router.refresh();
                 } catch (err: unknown) {
@@ -1440,7 +1414,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
                 }
               }}
             >
-              {storefrontSaving ? "Saving…" : "Save footer & Visit us"}
+              {storefrontSaving ? "Saving…" : "Save footer"}
             </button>
           </section>
         </div>

@@ -114,6 +114,7 @@ export async function buildCheckoutContext(input: {
       base_price: true,
       discounted_price: true,
       shipping_per_unit: true,
+      max_order_quantity: true,
       category_id: true,
     },
   });
@@ -124,6 +125,11 @@ export async function buildCheckoutContext(input: {
     }
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
       throw new Error("INVALID_QUANTITY");
+    }
+    const p = productMap.get(item.productId)!;
+    const maxOrderQty = Math.max(1, Number(p.max_order_quantity ?? 99));
+    if (item.quantity > maxOrderQty) {
+      throw new Error(`MAX_ORDER_QTY_EXCEEDED:${p.name}:${maxOrderQty}`);
     }
   }
 

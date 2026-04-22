@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
       base_price: true,
       discounted_price: true,
       shipping_per_unit: true,
+      max_order_quantity: true,
       category_id: true,
     },
   });
@@ -117,6 +118,11 @@ export async function POST(req: NextRequest) {
     }
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
       return NextResponse.json({ error: "Invalid quantity" }, { status: 400 });
+    }
+    const p = productMap.get(item.productId)!;
+    const maxOrderQty = Math.max(1, Number(p.max_order_quantity ?? 99));
+    if (item.quantity > maxOrderQty) {
+      return NextResponse.json({ error: `${p.name} allows max ${maxOrderQty} per order` }, { status: 400 });
     }
   }
 

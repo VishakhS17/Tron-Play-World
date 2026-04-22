@@ -66,6 +66,7 @@ export async function GET() {
           cta_label: popup.cta_label,
           cta_url: popup.cta_url,
           delay_ms: popup.delay_ms,
+          auto_close_ms: popup.auto_close_ms,
           frequency: popup.frequency,
           suggested_coupon_code: popup.suggested_coupon_code,
         }

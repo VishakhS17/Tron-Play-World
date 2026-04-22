@@ -15,6 +15,7 @@ type PopupPayload = {
   cta_label: string | null;
   cta_url: string | null;
   delay_ms: number;
+  auto_close_ms: number;
   frequency: string;
   suggested_coupon_code: string | null;
 };
@@ -56,6 +57,14 @@ export default function MarketingSiteEffects() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!open || !popup) return;
+    const autoCloseMs = Math.max(0, Number(popup.auto_close_ms) || 0);
+    if (autoCloseMs <= 0) return;
+    const t = window.setTimeout(() => setOpen(false), autoCloseMs);
+    return () => window.clearTimeout(t);
+  }, [open, popup]);
 
   if (!open || !popup) return null;
 

@@ -241,7 +241,20 @@ export async function POST(req: NextRequest) {
     if (String(e?.message ?? "") === "OUT_OF_STOCK") {
       return NextResponse.json({ error: "Item went out of stock while paying" }, { status: 409 });
     }
-    const message = String(e?.message ?? "Could not verify payment");
+    const msg = String(e?.message ?? "");
+    if (msg.startsWith("MAX_ORDER_QTY_EXCEEDED:")) {
+      const [, productName, maxRaw] = msg.split(":");
+      const maxQty = Number(maxRaw);
+      return NextResponse.json(
+        {
+          error: Number.isFinite(maxQty)
+            ? `${productName || "This item"} allows max ${maxQty} per order`
+            : "One or more items exceed the per-order quantity limit",
+        },
+        { status: 400 }
+      );
+    }
+    const message = msg || "Could not verify payment";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

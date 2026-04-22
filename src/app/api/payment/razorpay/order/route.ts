@@ -72,6 +72,18 @@ export async function POST(req: NextRequest) {
     if (message === "INVALID_INPUT" || message === "INVALID_ITEMS" || message === "INVALID_QUANTITY") {
       return NextResponse.json({ error: "Invalid checkout data" }, { status: 400 });
     }
+    if (message.startsWith("MAX_ORDER_QTY_EXCEEDED:")) {
+      const [, productName, maxRaw] = message.split(":");
+      const maxQty = Number(maxRaw);
+      return NextResponse.json(
+        {
+          error: Number.isFinite(maxQty)
+            ? `${productName || "This item"} allows max ${maxQty} per order`
+            : "One or more items exceed the per-order quantity limit",
+        },
+        { status: 400 }
+      );
+    }
     if (message === "OUT_OF_STOCK") {
       return NextResponse.json(
         { error: "One or more items are out of stock. Please refresh cart and try again." },

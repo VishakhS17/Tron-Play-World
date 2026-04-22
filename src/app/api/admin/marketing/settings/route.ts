@@ -73,15 +73,6 @@ export async function PATCH(req: NextRequest) {
   if (body.social_linkedin_url !== undefined) {
     data.social_linkedin_url = cleanOptionalText(body.social_linkedin_url, 500);
   }
-  if (body.visit_eyebrow !== undefined) {
-    data.visit_eyebrow = cleanOptionalText(body.visit_eyebrow, 120);
-  }
-  if (body.visit_heading !== undefined) {
-    data.visit_heading = cleanOptionalText(body.visit_heading, 255);
-  }
-  if (body.visit_location_label !== undefined) {
-    data.visit_location_label = cleanOptionalText(body.visit_location_label, 120);
-  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No recognized fields to update" }, { status: 400 });
@@ -98,9 +89,6 @@ export async function PATCH(req: NextRequest) {
     social_twitter_url: null as string | null,
     social_instagram_url: null as string | null,
     social_linkedin_url: null as string | null,
-    visit_eyebrow: null as string | null,
-    visit_heading: null as string | null,
-    visit_location_label: null as string | null,
   };
 
   const updated = await prisma.site_marketing_settings.upsert({

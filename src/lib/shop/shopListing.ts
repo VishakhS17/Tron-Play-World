@@ -40,6 +40,50 @@ function toInt(value: string | null, fallback: number) {
   return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : fallback;
 }
 
+function normalizeLooseSearchText(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function fuzzySearchScore(query: string, fields: Array<string | null | undefined>): number {
+  const q = normalizeLooseSearchText(query);
+  if (!q) return 0;
+  let best = 0;
+  for (const raw of fields) {
+    const t = normalizeLooseSearchText(raw ?? "");
+    if (!t) continue;
+    if (t.includes(q) || q.includes(t)) {
+      best = Math.max(best, 1);
+      continue;
+    }
+    const windowLen = Math.min(Math.max(q.length, 4), t.length);
+    let localBest = 0;
+    for (let i = 0; i + windowLen <= t.length; i++) {
+      const win = t.slice(i, i + windowLen);
+      const d = levenshteinDistance(q, win);
+      const score = 1 - d / Math.max(q.length, windowLen);
+      if (score > localBest) localBest = score;
+    }
+    best = Math.max(best, localBest);
+  }
+  return best;
+}
+
 /**
  * Price filter matches what the customer sees: active flash sale price, else discounted/base.
  */
@@ -265,23 +309,34 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
 
   const where: Record<string, unknown> = { is_active: true };
   if (q) {
+    const compact = normalizeLooseSearchText(q);
     const tokens = q
       .split(/\s+/)
       .map((token) => token.trim())
       .filter(Boolean)
       .slice(0, 8);
-    where.AND = [
-      ...((where.AND as unknown[]) ?? []),
-      ...tokens.map((token) => ({
-        OR: [
-          { name: { contains: token, mode: "insensitive" } },
-          { description: { contains: token, mode: "insensitive" } },
-          { short_description: { contains: token, mode: "insensitive" } },
-          { sku: { contains: token, mode: "insensitive" } },
-          { brands: { is: { name: { contains: token, mode: "insensitive" } } } },
-          { categories: { is: { name: { contains: token, mode: "insensitive" } } } },
-        ],
-      })),
+    where.AND = [...((where.AND as unknown[]) ?? [])];
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
+      { short_description: { contains: q, mode: "insensitive" } },
+      { sku: { contains: q, mode: "insensitive" } },
+      { brands: { is: { name: { contains: q, mode: "insensitive" } } } },
+      { categories: { is: { name: { contains: q, mode: "insensitive" } } } },
+      ...(compact
+        ? [
+            { name: { contains: compact, mode: "insensitive" as const } },
+            { sku: { contains: compact, mode: "insensitive" as const } },
+          ]
+        : []),
+      ...tokens.flatMap((token) => [
+        { name: { contains: token, mode: "insensitive" as const } },
+        { description: { contains: token, mode: "insensitive" as const } },
+        { short_description: { contains: token, mode: "insensitive" as const } },
+        { sku: { contains: token, mode: "insensitive" as const } },
+        { brands: { is: { name: { contains: token, mode: "insensitive" as const } } } },
+        { categories: { is: { name: { contains: token, mode: "insensitive" as const } } } },
+      ]),
     ];
   }
   if (ageGroup) where.age_group = ageGroup;
@@ -419,6 +474,45 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
   }
 
   const items = mapProductsToItems(products, flashMap);
+  let finalItems = items;
+  let finalTotal = total;
+
+  if (q && items.length === 0) {
+    const fuzzyWhere = { ...(where as Record<string, unknown>) };
+    delete fuzzyWhere.OR;
+    const fuzzyCandidates = await prisma.products.findMany({
+      where: fuzzyWhere as never,
+      take: 400,
+      select: {
+        id: true,
+        name: true,
+        short_description: true,
+        description: true,
+        base_price: true,
+        discounted_price: true,
+        age_group: true,
+        diecast_scales: { select: { ratio: true } },
+        slug: true,
+        updated_at: true,
+        sku: true,
+        product_images: { select: { url: true, sort_order: true } },
+        product_variants: { select: { color: true, size: true, is_default: true } },
+        inventory: { select: { available_quantity: true } },
+      },
+    });
+    const scored = fuzzyCandidates
+      .map((p) => ({
+        p,
+        score: fuzzySearchScore(q, [p.name, p.short_description, p.description, p.sku]),
+      }))
+      .filter((x) => x.score >= 0.66)
+      .sort((a, b) => b.score - a.score || b.p.updated_at.getTime() - a.p.updated_at.getTime());
+    if (scored.length > 0) {
+      const paged = scored.slice(skip, skip + pageSize).map((x) => x.p);
+      finalItems = mapProductsToItems(paged, flashMap);
+      finalTotal = scored.length;
+    }
+  }
 
   let brandsForUi = brandsRaw.map((b) => ({ slug: b.slug, name: b.name }));
   const brandFilterTrimmed = brand.trim();
@@ -440,8 +534,8 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
     data: {
       page,
       pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      total: finalTotal,
+      totalPages: Math.max(1, Math.ceil(finalTotal / pageSize)),
       ageGroups: ageGroupsRaw
         .map((x) => x.age_group)
         .filter((v): v is string => typeof v === "string" && v.trim().length > 0),
@@ -455,7 +549,7 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
         });
       })(),
       brands: brandsForUi,
-      items,
+      items: finalItems,
     },
   };
 }

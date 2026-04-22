@@ -20,6 +20,7 @@ export default function EditProductPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState<any>(null);
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [imgBusy, setImgBusy] = useState(false);
@@ -91,6 +92,10 @@ export default function EditProductPage() {
             form.shipping_per_unit === "" || form.shipping_per_unit == null
               ? 0
               : Number(form.shipping_per_unit),
+          max_order_quantity:
+            form.max_order_quantity === "" || form.max_order_quantity == null
+              ? 99
+              : Number(form.max_order_quantity),
           available_quantity: Number(form.available_quantity),
           low_stock_threshold: Number(form.low_stock_threshold),
           diecast_scale_id: form.diecast_scale_id || null,
@@ -104,6 +109,27 @@ export default function EditProductPage() {
       toast.error(err?.message || "Failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function deleteProduct() {
+    const label = String(form?.name ?? "this product");
+    const ok = window.confirm(
+      `Delete "${label}"? This will remove the product and its product images. This action cannot be undone.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to delete product");
+      toast.success("Product deleted");
+      router.push("/admin/products");
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -202,13 +228,23 @@ export default function EditProductPage() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-dark">Edit product</h1>
-        <button
-          onClick={save}
-          disabled={loading}
-          className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition disabled:opacity-60"
-        >
-          {loading ? "Saving…" : "Save changes"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={deleteProduct}
+            disabled={deleting || loading}
+            className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-60"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+          <button
+            onClick={save}
+            disabled={loading || deleting}
+            className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition disabled:opacity-60"
+          >
+            {loading ? "Saving…" : "Save changes"}
+          </button>
+        </div>
       </div>
 
       {/* Low-stock banner */}
@@ -271,6 +307,19 @@ export default function EditProductPage() {
           <span className="mt-1 block text-xs text-meta-4">
             Order shipping includes quantity × this amount per SKU. Leave 0 to use the default flat fee when below
             free shipping.
+          </span>
+        </label>
+        <label className="block max-w-md">
+          <span className="mb-1 block text-sm font-medium text-dark">Max order quantity</span>
+          <input
+            value={form.max_order_quantity ?? ""}
+            onChange={(e) => setForm((f: any) => ({ ...f, max_order_quantity: e.target.value }))}
+            inputMode="numeric"
+            placeholder="99"
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          />
+          <span className="mt-1 block text-xs text-meta-4">
+            Per-product cap per order. Checkout is blocked if quantity exceeds this limit.
           </span>
         </label>
 
@@ -423,7 +472,7 @@ export default function EditProductPage() {
 
       <button
         onClick={save}
-        disabled={loading}
+        disabled={loading || deleting}
         className="rounded-lg bg-blue px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-dark transition disabled:opacity-60"
       >
         {loading ? "Saving…" : "Save changes"}

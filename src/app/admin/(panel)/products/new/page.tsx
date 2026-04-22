@@ -43,6 +43,7 @@ export default function NewProductPage() {
     available_quantity: "0",
     low_stock_threshold: "5",
     shipping_per_unit: "0",
+    max_order_quantity: "99",
   });
 
   useEffect(() => {
@@ -146,6 +147,7 @@ export default function NewProductPage() {
           base_price: Number(form.base_price),
           discounted_price: form.discounted_price ? Number(form.discounted_price) : null,
           shipping_per_unit: form.shipping_per_unit.trim() === "" ? 0 : Number(form.shipping_per_unit),
+          max_order_quantity: form.max_order_quantity.trim() === "" ? 99 : Number(form.max_order_quantity),
           available_quantity: Number(form.available_quantity),
           low_stock_threshold: Number(form.low_stock_threshold),
           category_id: form.category_id || null,
@@ -232,6 +234,19 @@ export default function NewProductPage() {
               <span className="mt-1 block text-xs text-meta-4">
                 Added to order shipping as (quantity × this rate). Use 0 for each unit to use the default flat fee
                 (₹99) when the cart is below the free-shipping threshold.
+              </span>
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-sm font-medium text-dark">Max order quantity</span>
+              <input
+                value={form.max_order_quantity}
+                onChange={(e) => setForm((f) => ({ ...f, max_order_quantity: e.target.value }))}
+                inputMode="numeric"
+                placeholder="99"
+                className="w-full max-w-xs rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+              />
+              <span className="mt-1 block text-xs text-meta-4">
+                Per-product cap per order. Checkout is blocked if quantity exceeds this limit.
               </span>
             </label>
           </div>

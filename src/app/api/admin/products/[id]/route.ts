@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prismaDB";
 import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
+import { v2 as cloudinary } from "cloudinary";
 
 function parseShippingPerUnitIn(body: Record<string, unknown>): number | { error: string } | undefined {
   if (body.shipping_per_unit === undefined) return undefined;
@@ -15,8 +17,37 @@ function parseShippingPerUnitIn(body: Record<string, unknown>): number | { error
   return Math.round(n * 100) / 100;
 }
 
+function parseMaxOrderQuantityIn(body: Record<string, unknown>): number | { error: string } | undefined {
+  if (body.max_order_quantity === undefined) return undefined;
+  if (body.max_order_quantity === null || body.max_order_quantity === "") return 99;
+  const n = Number(body.max_order_quantity);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) return { error: "Invalid max_order_quantity" };
+  return n;
+}
+
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
+}
+
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+function cloudinaryPublicIdFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const marker = "/upload/";
+    const idx = u.pathname.indexOf(marker);
+    if (idx < 0) return null;
+    let tail = u.pathname.slice(idx + marker.length);
+    tail = tail.replace(/^([^/]+\/)*v\d+\//, "");
+    if (!tail) return null;
+    return tail.replace(/\.[^.\/]+$/, "");
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -34,6 +65,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       base_price: true,
       discounted_price: true,
       shipping_per_unit: true,
+      max_order_quantity: true,
       sku: true,
       hsn_code: true,
       description: true,
@@ -184,6 +216,11 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
     if (typeof sp === "object" && sp && "error" in sp) return NextResponse.json({ error: sp.error }, { status: 400 });
     if (typeof sp === "number") data.shipping_per_unit = sp;
   }
+  if (body.max_order_quantity !== undefined) {
+    const mq = parseMaxOrderQuantityIn(body as Record<string, unknown>);
+    if (typeof mq === "object" && mq && "error" in mq) return NextResponse.json({ error: mq.error }, { status: 400 });
+    if (typeof mq === "number") data.max_order_quantity = mq;
+  }
 
   let updatedId = id;
   if (Object.keys(data).length > 0) {
@@ -232,4 +269,51 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
   }
 
   return NextResponse.json({ ok: true, id: updatedId }, { status: 200 });
+}
+
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    assertSameOrigin(req);
+    await rateLimitStrict(`admin_products_delete:${req.ip ?? "unknown"}`, 1);
+  } catch (e: any) {
+    if (e?.message === "BAD_ORIGIN") {
+      return NextResponse.json({ error: "Bad origin" }, { status: 403 });
+    }
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
+  const session = await getAdminSession();
+  if (!session || !isAllowed(session.roles)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const imageRows = await prisma.product_images.findMany({
+    where: { product_id: id },
+    select: { url: true },
+  });
+
+  try {
+    await prisma.products.delete({ where: { id } });
+  } catch (e: unknown) {
+    if (e instanceof PrismaClientKnownRequestError && e.code === "P2003") {
+      return NextResponse.json(
+        {
+          error:
+            "This product is already referenced by orders/reviews and cannot be deleted. Set it inactive instead.",
+        },
+        { status: 409 }
+      );
+    }
+    throw e;
+  }
+
+  const publicIds = imageRows
+    .map((r) => cloudinaryPublicIdFromUrl(r.url))
+    .filter((v): v is string => Boolean(v));
+  if (publicIds.length > 0) {
+    cloudinary.api.delete_resources(publicIds, { resource_type: "image" }).catch(() => {});
+  }
+
+  return NextResponse.json({ ok: true }, { status: 200 });
 }

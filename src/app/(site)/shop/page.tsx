@@ -1,4 +1,5 @@
 import ProductItem from "@/components/Common/ProductItem";
+import LiveShopFilters from "@/components/Shop/LiveShopFilters";
 import { getCategories } from "@/get-api-data/category";
 import Link from "next/link";
 import { getShopListing } from "@/lib/shop/shopListing";
@@ -148,7 +149,8 @@ export default async function ShopPage({ searchParams }: Props) {
         <div className="flex flex-col gap-8 lg:flex-row">
           <aside className="w-full shrink-0 lg:w-64">
             <div className="rounded-xl border border-gray-3 bg-white p-5">
-              <form className="mb-5 space-y-3" action="/shop" method="get">
+              <form id="shop-filters-form" className="mb-5 space-y-3" action="/shop" method="get">
+                <LiveShopFilters formId="shop-filters-form" />
                 <input
                   name="q"
                   defaultValue={q}

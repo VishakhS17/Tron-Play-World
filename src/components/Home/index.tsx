@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { StoreContactDisplay } from "@/lib/marketing/storeContactDisplay";
 import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
 import HomeHighlightsSection from "./HomeHighlightsSection";
 
@@ -34,7 +33,6 @@ type HomeProps = {
   highlights?: HomeHighlightCard[];
   brandRail?: HomeBrandRailItem[];
   categories?: HomeCategoryTile[];
-  storeContact: StoreContactDisplay;
 };
 
 function isRemoteImage(url: string) {
@@ -46,7 +44,6 @@ const Home = ({
   highlights,
   brandRail,
   categories,
-  storeContact,
 }: HomeProps) => {
   const spotlightItems =
     highlights && highlights.length > 0
@@ -195,27 +192,6 @@ const Home = ({
         </div>
       </section>
 
-      <section className="py-16 bg-white">
-        <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
-          <div className="rounded-2xl border border-gray-3 bg-gray-1 p-6 sm:p-8">
-            <div className="max-w-2xl">
-              <p className="mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
-                {storeContact.visitEyebrow}
-              </p>
-              <h2 className="mb-3 text-2xl font-semibold sm:text-3xl text-dark">
-                {storeContact.visitHeading}
-              </h2>
-
-              <dl className="space-y-4 text-sm rounded-xl border border-gray-3 bg-white p-5">
-                <div>
-                  <dt className="font-semibold text-dark">{storeContact.visitLocationLabel}</dt>
-                  <dd className="mt-1 text-meta-3">{storeContact.contactAddress}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   );
 };

@@ -2,9 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prismaDB";
 import { getAdminSession } from "@/lib/auth/session";
 import { cleanText, isUuid, readJsonBody } from "@/lib/validation/input";
+import { v2 as cloudinary } from "cloudinary";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
+}
+
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+function cloudinaryPublicIdFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const marker = "/upload/";
+    const idx = u.pathname.indexOf(marker);
+    if (idx < 0) return null;
+    let tail = u.pathname.slice(idx + marker.length);
+    // Optional transformation / version segments (e.g. c_fill/.../v171234/folder/name.webp)
+    tail = tail.replace(/^([^/]+\/)*v\d+\//, "");
+    if (!tail) return null;
+    return tail.replace(/\.[^.\/]+$/, "");
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -93,8 +116,14 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
     return NextResponse.json({ error: "imageId required" }, { status: 400 });
   }
 
-  await prisma.product_images.deleteMany({
+  const row = await prisma.product_images.findFirst({
     where: { id: imageId, product_id: productId },
+    select: { url: true },
   });
+  await prisma.product_images.deleteMany({ where: { id: imageId, product_id: productId } });
+  const pid = row?.url ? cloudinaryPublicIdFromUrl(row.url) : null;
+  if (pid) {
+    cloudinary.uploader.destroy(pid, { resource_type: "image" }).catch(() => {});
+  }
   return NextResponse.json({ ok: true });
 }
