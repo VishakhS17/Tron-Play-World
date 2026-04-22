@@ -149,8 +149,9 @@ export default function ImageGallery({
                 <button
                   type="button"
                   onClick={() => !disabled && onDelete(img, i)}
-                  className="absolute top-1 right-1 rounded-full bg-black/60 text-white w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600 transition"
+                  className="absolute top-1 right-1 z-20 rounded-full border border-white/40 bg-black/75 text-white w-6 h-6 flex items-center justify-center text-sm leading-none hover:bg-red-600 transition"
                   title="Remove image"
+                  aria-label="Remove image"
                 >
                   ×
                 </button>
