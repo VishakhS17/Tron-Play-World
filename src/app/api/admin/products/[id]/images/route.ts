@@ -111,8 +111,8 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const { id: productId } = await ctx.params;
   if (!isUuid(productId)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { searchParams } = new URL(req.url);
-  const imageId = searchParams.get("imageId");
-  if (!imageId || !isUuid(imageId)) {
+  const imageId = cleanText(searchParams.get("imageId") ?? "", 128);
+  if (!imageId) {
     return NextResponse.json({ error: "imageId required" }, { status: 400 });
   }
 
@@ -120,7 +120,15 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
     where: { id: imageId, product_id: productId },
     select: { url: true },
   });
-  await prisma.product_images.deleteMany({ where: { id: imageId, product_id: productId } });
+  if (!row) {
+    return NextResponse.json({ error: "Image not found for this product" }, { status: 404 });
+  }
+
+  const deleted = await prisma.product_images.deleteMany({ where: { id: imageId, product_id: productId } });
+  if (deleted.count === 0) {
+    return NextResponse.json({ error: "Image could not be deleted" }, { status: 409 });
+  }
+
   const pid = row?.url ? cloudinaryPublicIdFromUrl(row.url) : null;
   if (pid) {
     cloudinary.uploader.destroy(pid, { resource_type: "image" }).catch(() => {});

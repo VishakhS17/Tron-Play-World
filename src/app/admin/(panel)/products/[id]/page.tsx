@@ -187,7 +187,8 @@ export default function EditProductPage() {
         `/api/admin/products/${id}/images?imageId=${img.id}`,
         { method: "DELETE" }
       );
-      if (!res.ok) throw new Error("Delete failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Delete failed");
       setImages((prev) => prev.filter((m) => m.id !== img.id));
       toast.success("Image removed");
     } catch (err: any) {
