@@ -87,6 +87,10 @@ export default function EditProductPage() {
           ...form,
           base_price: Number(form.base_price),
           discounted_price: form.discounted_price ? Number(form.discounted_price) : null,
+          shipping_per_unit:
+            form.shipping_per_unit === "" || form.shipping_per_unit == null
+              ? 0
+              : Number(form.shipping_per_unit),
           available_quantity: Number(form.available_quantity),
           low_stock_threshold: Number(form.low_stock_threshold),
           diecast_scale_id: form.diecast_scale_id || null,
@@ -254,6 +258,21 @@ export default function EditProductPage() {
             />
           </label>
         </div>
+
+        <label className="block max-w-md">
+          <span className="mb-1 block text-sm font-medium text-dark">Shipping per unit (₹)</span>
+          <input
+            value={form.shipping_per_unit ?? ""}
+            onChange={(e) => setForm((f: any) => ({ ...f, shipping_per_unit: e.target.value }))}
+            inputMode="decimal"
+            placeholder="0"
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          />
+          <span className="mt-1 block text-xs text-meta-4">
+            Order shipping includes quantity × this amount per SKU. Leave 0 to use the default flat fee when below
+            free shipping.
+          </span>
+        </label>
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-dark">SKU</span>

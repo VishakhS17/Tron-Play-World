@@ -2,6 +2,17 @@ import { prisma } from "@/lib/prismaDB";
 
 const SHIPMOZO_BASE_DEFAULT = "https://shipping-api.com/app/api/v1";
 
+/** Shipmozo rejects ref / order_id longer than this (e.g. auto-assign, schedule pickup). */
+const SHIPMOZO_ORDER_ID_MAX_LEN = 30;
+
+function toShipmozoOrderIdRef(orderUuid: string): string {
+  return orderUuid.replace(/-/g, "").slice(0, SHIPMOZO_ORDER_ID_MAX_LEN);
+}
+
+function normalizeShipmozoOrderIdRef(value: string): string {
+  return String(value).replace(/-/g, "").slice(0, SHIPMOZO_ORDER_ID_MAX_LEN);
+}
+
 type ShipmozoResponse = {
   result?: string;
   message?: string;
@@ -181,7 +192,7 @@ export async function bookShipmozoShipmentForOrder(orderId: string): Promise<voi
   }));
 
   const pushPayload: Record<string, unknown> = {
-    order_id: order.id.replace(/-/g, "").slice(0, 40),
+    order_id: toShipmozoOrderIdRef(order.id),
     order_date: new Date().toISOString().slice(0, 10),
     consignee_name: String(addr.full_name ?? "Customer").slice(0, 120),
     consignee_phone: Number(phone),
@@ -207,10 +218,11 @@ export async function bookShipmozoShipmentForOrder(orderId: string): Promise<voi
   await appendShipmozoMetadata(orderId, { pushOrder: { ok: push.ok, status: push.status, response: push.parsed } });
   if (!push.ok) return;
 
-  const createdOrderId =
+  const createdOrderId = normalizeShipmozoOrderIdRef(
     typeof push.parsed === "object" && push.parsed && "data" in push.parsed
       ? String((push.parsed as ShipmozoResponse).data?.order_id ?? pushPayload.order_id)
-      : String(pushPayload.order_id);
+      : String(pushPayload.order_id)
+  );
 
   const autoAssign = await callShipmozo("/auto-assign-order", "POST", { order_id: createdOrderId });
   await appendShipmozoMetadata(orderId, { autoAssign: { ok: autoAssign.ok, status: autoAssign.status, response: autoAssign.parsed } });

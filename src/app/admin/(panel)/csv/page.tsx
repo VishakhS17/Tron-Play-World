@@ -118,6 +118,11 @@ export default function AdminCsvPage() {
           Columns: <b className="text-dark font-mono text-xs">{PRODUCTS_CSV_COLUMNS.join(",")}</b>
         </p>
         <p className="text-xs text-meta-4">
+          <b className="text-dark">shipping_per_unit</b> optional — INR added to order shipping per unit sold (omit
+          column to leave existing value on update). <b className="text-dark">0</b> uses the default flat fee when the
+          cart is below the free-shipping threshold.
+        </p>
+        <p className="text-xs text-meta-4">
           <b className="text-dark">hsn_code</b> optional — digits (and commas if multiple codes on one SKU). Used for
           Shipmozo / GST. Omit the column to leave existing product HSN unchanged on update.
         </p>

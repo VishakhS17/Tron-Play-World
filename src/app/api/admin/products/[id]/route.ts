@@ -7,6 +7,14 @@ import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
 
+function parseShippingPerUnitIn(body: Record<string, unknown>): number | { error: string } | undefined {
+  if (body.shipping_per_unit === undefined) return undefined;
+  if (body.shipping_per_unit === null || body.shipping_per_unit === "") return 0;
+  const n = Number(body.shipping_per_unit);
+  if (!Number.isFinite(n) || n < 0 || n > 50_000) return { error: "Invalid shipping_per_unit" };
+  return Math.round(n * 100) / 100;
+}
+
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
 }
@@ -25,6 +33,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       slug: true,
       base_price: true,
       discounted_price: true,
+      shipping_per_unit: true,
       sku: true,
       hsn_code: true,
       description: true,
@@ -169,6 +178,11 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
       if (!Number.isFinite(n)) return bad();
       data.discounted_price = n;
     }
+  }
+  if (body.shipping_per_unit !== undefined) {
+    const sp = parseShippingPerUnitIn(body as Record<string, unknown>);
+    if (typeof sp === "object" && sp && "error" in sp) return NextResponse.json({ error: sp.error }, { status: 400 });
+    if (typeof sp === "number") data.shipping_per_unit = sp;
   }
 
   let updatedId = id;

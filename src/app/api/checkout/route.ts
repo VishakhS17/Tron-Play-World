@@ -29,6 +29,7 @@ import {
 } from "@/lib/coupons/cartCoupon";
 import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
+import { orderShippingInrFromLines } from "@/lib/checkout/orderShipping";
 
 type CheckoutItem = {
   productId: string;
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
       sku: true,
       base_price: true,
       discounted_price: true,
+      shipping_per_unit: true,
       category_id: true,
     },
   });
@@ -196,6 +198,7 @@ export async function POST(req: NextRequest) {
       unitPrice: unit,
       quantity: i.quantity,
       subtotal: unit * i.quantity,
+      shippingPerUnit: Math.max(0, Number(p.shipping_per_unit ?? 0)),
     };
   });
 
@@ -241,7 +244,12 @@ export async function POST(req: NextRequest) {
 
     discount = computeCouponDiscount(subtotal, coupon);
   }
-  const total = Math.max(0, subtotal - discount);
+  const totalBeforeShip = Math.max(0, subtotal - discount);
+  const shippingAmount = orderShippingInrFromLines({
+    subtotalBeforeDiscount: subtotal,
+    lines: lineItems.map((li) => ({ quantity: li.quantity, shippingPerUnit: li.shippingPerUnit })),
+  });
+  const total = totalBeforeShip + shippingAmount;
 
   // Transaction: create address, order, items, reserve inventory.
   const order = await prisma.$transaction(async (tx) => {
@@ -269,9 +277,9 @@ export async function POST(req: NextRequest) {
         payment_status: "PENDING",
         subtotal_amount: subtotal,
         discount_amount: discount,
-        shipping_amount: subtotal >= 2000 ? 0 : 99,
+        shipping_amount: shippingAmount,
         tax_amount: 0,
-        total_amount: Math.max(0, total + (subtotal >= 2000 ? 0 : 99)),
+        total_amount: total,
         currency: "INR",
         coupon_id: coupon?.id ?? null,
         shipping_address_id: addr.id,

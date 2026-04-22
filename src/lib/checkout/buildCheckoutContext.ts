@@ -18,6 +18,7 @@ import {
 } from "@/lib/coupons/cartCoupon";
 import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
 import { getSiteBaseUrl } from "@/lib/siteUrl";
+import { orderShippingInrFromLines } from "@/lib/checkout/orderShipping";
 import { generatePasswordSetupSecret, PASSWORD_SETUP_TTL_MS } from "@/lib/auth/passwordSetupToken";
 import bcrypt from "bcrypt";
 
@@ -43,6 +44,7 @@ export type CheckoutContext = {
     unitPrice: number;
     quantity: number;
     subtotal: number;
+    shippingPerUnit: number;
   }[];
   coupon: { id: string; code: string } | null;
   shipping: number;
@@ -111,6 +113,7 @@ export async function buildCheckoutContext(input: {
       sku: true,
       base_price: true,
       discounted_price: true,
+      shipping_per_unit: true,
       category_id: true,
     },
   });
@@ -205,6 +208,7 @@ export async function buildCheckoutContext(input: {
       unitPrice: unit,
       quantity: i.quantity,
       subtotal: unit * i.quantity,
+      shippingPerUnit: Math.max(0, Number(p.shipping_per_unit ?? 0)),
     };
   });
 
@@ -266,7 +270,10 @@ export async function buildCheckoutContext(input: {
     discount = computeCouponDiscount(subtotal, coupon);
   }
 
-  const shipping = subtotal >= 2000 ? 0 : 99;
+  const shipping = orderShippingInrFromLines({
+    subtotalBeforeDiscount: subtotal,
+    lines: lineItems.map((li) => ({ quantity: li.quantity, shippingPerUnit: li.shippingPerUnit })),
+  });
   const total = Math.max(0, subtotal - discount) + shipping;
 
   return {

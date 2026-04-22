@@ -5,7 +5,7 @@ export const metadata = {
 const FAQS = [
   {
     q: "What is the minimum order value for free shipping?",
-    a: "Free shipping is available on orders over ₹2000. Otherwise, a flat ₹99 shipping fee may apply.",
+    a: "Free shipping is available on orders over ₹2000. Below that, we charge the sum of each product's configured per-unit shipping, or a default flat fee if none is set.",
   },
   {
     q: "How do I track my order?",

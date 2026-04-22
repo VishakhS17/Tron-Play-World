@@ -10,6 +10,15 @@ function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
 }
 
+function parseShippingPerUnitIn(body: Record<string, unknown>): number | { error: string } {
+  if (body.shipping_per_unit === undefined || body.shipping_per_unit === null || body.shipping_per_unit === "") {
+    return 0;
+  }
+  const n = Number(body.shipping_per_unit);
+  if (!Number.isFinite(n) || n < 0 || n > 50_000) return { error: "Invalid shipping_per_unit" };
+  return Math.round(n * 100) / 100;
+}
+
 export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
@@ -52,6 +61,10 @@ export async function POST(req: NextRequest) {
   }
   const available_quantity = body.available_quantity !== undefined ? Math.max(0, Number(body.available_quantity)) : 0;
   const low_stock_threshold = body.low_stock_threshold !== undefined ? Math.max(0, Number(body.low_stock_threshold)) : 5;
+  const shippingParsed = parseShippingPerUnitIn(body as Record<string, unknown>);
+  if (typeof shippingParsed === "object") {
+    return NextResponse.json({ error: shippingParsed.error }, { status: 400 });
+  }
 
   if (!name || !slug || !Number.isFinite(base_price)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -77,6 +90,7 @@ export async function POST(req: NextRequest) {
       slug,
       base_price,
       discounted_price,
+      shipping_per_unit: shippingParsed,
       sku,
       hsn_code,
       diecast_scale_id,

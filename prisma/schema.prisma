@@ -319,6 +319,8 @@ model products {
   age_group              String?                  @db.VarChar(50)
   base_price             Decimal                  @db.Decimal(10, 2)
   discounted_price       Decimal?                 @db.Decimal(10, 2)
+  /// INR added to order shipping per unit sold (qty × rate). If cart sum is 0 and subtotal is below the free-shipping threshold, flat default applies.
+  shipping_per_unit      Decimal                  @default(0) @db.Decimal(10, 2)
   sku                    String?                  @db.VarChar(100)
   /// GST HSN for shipping / invoicing (digits; optional comma for multiple codes on one SKU)
   hsn_code               String?                  @db.VarChar(32)

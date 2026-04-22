@@ -43,6 +43,12 @@ export async function POST(req: NextRequest) {
         razorpayOrderId: razorpayOrder.id,
         amount: amountPaise,
         currency: "INR",
+        pricing: {
+          subtotal: ctx.subtotal,
+          discount: ctx.discount,
+          shipping: ctx.shipping,
+          total: ctx.total,
+        },
       },
       { status: 201 }
     );
