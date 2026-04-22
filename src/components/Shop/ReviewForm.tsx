@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { EmptyStarIcon, FullStarIcon } from "@/assets/icons";
 
 export default function ReviewForm({ productId }: { productId: string }) {
   const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,17 +37,31 @@ export default function ReviewForm({ productId }: { productId: string }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="sm:col-span-1">
           <span className="mb-1 block text-sm font-medium text-dark">Rating</span>
-          <select
-            value={rating}
-            onChange={(e) => setRating(Number(e.target.value))}
-            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          <div
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-3 bg-white px-3 py-2"
+            onMouseLeave={() => setHoverRating(null)}
           >
-            {[5, 4, 3, 2, 1].map((r) => (
-              <option key={r} value={r}>
-                {"★".repeat(r)}
-              </option>
-            ))}
-          </select>
+            {[1, 2, 3, 4, 5].map((star) => {
+              const activeValue = hoverRating ?? rating;
+              const filled = star <= activeValue;
+              return (
+                <button
+                  key={star}
+                  type="button"
+                  onMouseEnter={() => setHoverRating(star)}
+                  onFocus={() => setHoverRating(star)}
+                  onBlur={() => setHoverRating(null)}
+                  onClick={() => setRating(star)}
+                  className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-blue/40"
+                  aria-label={`${star} star${star === 1 ? "" : "s"}`}
+                  aria-pressed={rating === star}
+                >
+                  {filled ? <FullStarIcon /> : <EmptyStarIcon />}
+                </button>
+              );
+            })}
+            <span className="ml-1 text-xs text-meta-3">{rating}/5</span>
+          </div>
         </label>
         <label className="sm:col-span-2">
           <span className="mb-1 block text-sm font-medium text-dark">Title (optional)</span>
