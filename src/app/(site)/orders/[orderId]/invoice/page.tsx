@@ -61,12 +61,20 @@ export default async function InvoicePage({ params, searchParams }: Props) {
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
         <div className="flex items-center justify-between gap-4 print:hidden">
           <h1 className="text-2xl font-semibold text-dark">Invoice</h1>
-          <button
-            onClick={() => window.print()}
-            className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition"
-          >
-            Print / Save as PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={access ? `/orders/${order.id}/invoice/download?access=${encodeURIComponent(access)}` : `/orders/${order.id}/invoice/download`}
+              className="rounded-lg border border-gray-3 bg-white px-4 py-2 text-sm font-medium text-dark hover:bg-gray-1 transition"
+            >
+              Download PDF
+            </a>
+            <button
+              onClick={() => window.print()}
+              className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition"
+            >
+              Print / Save as PDF
+            </button>
+          </div>
         </div>
 
         <div className="mt-6 rounded-2xl border border-gray-3 bg-white p-6">

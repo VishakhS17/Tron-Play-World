@@ -130,12 +130,12 @@ export default async function OrderDetailPage({ params, searchParams }: Props) {
               <Link
                 href={
                   access
-                    ? `/orders/${order.id}/invoice?access=${encodeURIComponent(access)}`
-                    : `/orders/${order.id}/invoice`
+                    ? `/orders/${order.id}/invoice/download?access=${encodeURIComponent(access)}`
+                    : `/orders/${order.id}/invoice/download`
                 }
                 className="mt-4 inline-flex w-full justify-center rounded-lg border border-gray-3 bg-white px-5 py-2.5 text-sm font-medium text-dark hover:bg-gray-1 transition"
               >
-                Download invoice (HTML)
+                Download invoice (PDF)
               </Link>
             </div>
 
