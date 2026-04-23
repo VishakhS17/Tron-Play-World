@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
+import { getBestSellingProducts, getNewArrivalsProduct } from "@/get-api-data/product";
 import Home, {
   type HomeBrandRailItem,
   type HomeCategoryTile,
   type HomeHighlightCard,
+  type HomeProductCard,
 } from "@/components/Home";
 import type { HeroSlide } from "@/components/Home/HeroBannerCarousel";
 
@@ -47,7 +49,7 @@ export default async function HomePage() {
       })
     );
 
-  const [slidesRaw, highlightsRaw, brandRailRaw, categoryTilesRaw, categoriesRaw] =
+  const [slidesRaw, highlightsRaw, brandRailRaw, categoryTilesRaw, categoriesRaw, newArrivalsRaw, bestSellersRaw] =
     await Promise.all([
       prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }),
       highlightsPromise,
@@ -68,6 +70,8 @@ export default async function HomePage() {
         take: 8,
         select: { id: true, name: true, slug: true },
       }),
+      getNewArrivalsProduct(),
+      getBestSellingProducts(),
     ]);
 
   const heroSlides: HeroSlide[] = slidesRaw
@@ -148,12 +152,32 @@ export default async function HomePage() {
       alt: row.brands!.name,
     }));
 
+  const newArrivals: HomeProductCard[] = newArrivalsRaw.map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    title: p.title,
+    image: p.product_images?.[0]?.url ?? "/images/products/placeholder.png",
+    price: Number(p.price),
+    discountedPrice: p.discountedPrice == null ? null : Number(p.discountedPrice),
+  }));
+
+  const bestSellers: HomeProductCard[] = bestSellersRaw.map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    title: p.title,
+    image: p.product_images?.[0]?.url ?? "/images/products/placeholder.png",
+    price: Number(p.price),
+    discountedPrice: p.discountedPrice == null ? null : Number(p.discountedPrice),
+  }));
+
   return (
     <Home
       heroSlides={heroSlides}
       highlights={highlights}
       brandRail={brandRail}
       categories={categories}
+      newArrivals={newArrivals}
+      bestSellers={bestSellers}
     />
   );
 }

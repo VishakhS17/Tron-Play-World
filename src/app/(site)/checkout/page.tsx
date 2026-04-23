@@ -21,6 +21,12 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [couponCode, setCouponCode] = useState("");
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [couponBreakdown, setCouponBreakdown] = useState<{
+    code: string;
+    discount: number;
+    discountedSubtotal: number;
+  } | null>(null);
   const [isGift, setIsGift] = useState(false);
   const [giftMessage, setGiftMessage] = useState("");
   const [signedInLabel, setSignedInLabel] = useState<string | null>(null);
@@ -48,6 +54,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setPricing(null);
+    setCouponBreakdown(null);
   }, [items, couponCode]);
 
   useEffect(() => {
@@ -178,6 +185,46 @@ export default function CheckoutPage() {
     }
   }
 
+  async function handleApplyCoupon() {
+    const code = couponCode.trim();
+    if (!code) {
+      toast.error("Enter a coupon code first");
+      return;
+    }
+    if (!items.length) {
+      toast.error("Your cart is empty");
+      return;
+    }
+    setCouponApplying(true);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          code,
+          subtotal: Number(totalPrice || 0),
+          lineItems: items.map((i) => ({ productId: String(i.id), quantity: i.quantity })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Coupon is not valid for this cart");
+
+      const discount = Number(data?.discount ?? 0);
+      const discountedSubtotal = Number(data?.total ?? Math.max(0, Number(totalPrice || 0) - discount));
+      setCouponBreakdown({
+        code,
+        discount: Math.max(0, discount),
+        discountedSubtotal: Math.max(0, discountedSubtotal),
+      });
+      toast.success("Coupon applied");
+    } catch (err: any) {
+      setCouponBreakdown(null);
+      toast.error(err?.message || "Could not apply coupon");
+    } finally {
+      setCouponApplying(false);
+    }
+  }
+
   return (
     <section className="pt-36 pb-16">
       <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
@@ -253,6 +300,20 @@ export default function CheckoutPage() {
                       : formatPrice(0)}
                 </span>
               </div>
+              {couponBreakdown && !pricing ? (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-meta-3">Coupon ({couponBreakdown.code.toUpperCase()})</span>
+                    <span className="font-medium text-dark">−{formatPrice(couponBreakdown.discount)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-meta-3">Discounted subtotal</span>
+                    <span className="font-semibold text-dark">
+                      {formatPrice(couponBreakdown.discountedSubtotal)}
+                    </span>
+                  </div>
+                </>
+              ) : null}
               {pricing && pricing.discount > 0 ? (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-meta-3">Discount</span>
@@ -286,6 +347,14 @@ export default function CheckoutPage() {
                   placeholder="Enter coupon code"
                 />
               </label>
+              <button
+                type="button"
+                disabled={couponApplying || !couponCode.trim() || !items.length}
+                onClick={handleApplyCoupon}
+                className="inline-flex rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm font-medium text-dark hover:bg-gray-1 transition disabled:opacity-60"
+              >
+                {couponApplying ? "Applying…" : "Apply coupon"}
+              </button>
             </div>
 
             <button

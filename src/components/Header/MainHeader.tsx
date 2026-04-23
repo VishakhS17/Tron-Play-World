@@ -11,6 +11,7 @@ import DesktopMenu from "./DesktopMenu";
 import {
   SearchIcon,
   UserIcon,
+  HeartIcon,
   CartIcon,
   MenuIcon,
   CloseIcon,
@@ -308,7 +309,7 @@ const MainHeader = ({
               <div className="flex items-center gap-2 xl:hidden">
                 <button
                   type="button"
-                  className="transition hover:text-blue focus:outline-none"
+                  className="inline-flex h-9 w-9 items-center justify-center transition hover:text-blue focus:outline-none"
                   onClick={() => setNavigationOpen(!navigationOpen)}
                   aria-label={navigationOpen ? "Close menu" : "Open menu"}
                 >
@@ -317,7 +318,7 @@ const MainHeader = ({
                 <button
                   type="button"
                   data-shop-search-ui
-                  className="transition hover:text-blue focus:outline-none"
+                  className="inline-flex h-9 w-9 items-center justify-center transition hover:text-blue focus:outline-none"
                   onClick={toggleSearch}
                   aria-label={searchOpen ? "Close search" : "Search"}
                   aria-expanded={searchOpen}
@@ -361,7 +362,7 @@ const MainHeader = ({
             </div>
 
             {/* Right: desktop search + account + cart | mobile cart + account */}
-            <div className="z-10 flex min-w-[5rem] shrink-0 items-center justify-end gap-2 xl:min-w-0 xl:gap-3">
+            <div className="z-10 flex min-w-[5rem] shrink-0 items-center justify-end gap-1 xl:min-w-0 xl:gap-2">
               {/* Desktop: input expands to the left of the search icon */}
               <form
                 data-shop-search-ui
@@ -387,7 +388,7 @@ const MainHeader = ({
                 </div>
                 <button
                   type="button"
-                  className="shrink-0 transition hover:text-blue focus:outline-none"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center transition hover:text-blue focus:outline-none"
                   onClick={toggleSearch}
                   aria-label={searchOpen ? "Close search" : "Open search"}
                   aria-expanded={searchOpen}
@@ -398,7 +399,7 @@ const MainHeader = ({
 
               <button
                 type="button"
-                className="relative text-gray-700 transition hover:text-blue focus:outline-none"
+                className="relative inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-blue focus:outline-none"
                 onClick={handleOpenCartModal}
                 aria-label="Cart"
               >
@@ -407,6 +408,19 @@ const MainHeader = ({
                   {cartCount || 0}
                 </span>
               </button>
+
+              <Link
+                href="/wishlist"
+                className="relative inline-flex h-9 w-9 items-center justify-center text-gray-700 transition hover:text-blue focus:outline-none"
+                aria-label="Wishlist"
+              >
+                <HeartIcon />
+                {wishlistCount ? (
+                  <span className="absolute -top-1.5 -right-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-0.5 text-[10px] font-normal text-white">
+                    {wishlistCount}
+                  </span>
+                ) : null}
+              </Link>
 
               <div
                 className="relative"
@@ -419,7 +433,7 @@ const MainHeader = ({
               >
                 <button
                   type="button"
-                  className="transition hover:text-blue focus:outline-none"
+                  className="inline-flex h-9 w-9 items-center justify-center transition hover:text-blue focus:outline-none"
                   aria-label="Account"
                   onClick={(e) => {
                     e.stopPropagation();

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { formatPrice } from "@/utils/formatePrice";
 import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
 import HomeHighlightsSection from "./HomeHighlightsSection";
 
@@ -28,11 +29,22 @@ export type HomeCategoryTile = {
   image?: string | null;
 };
 
+export type HomeProductCard = {
+  id: string;
+  slug: string;
+  title: string;
+  image: string;
+  price: number;
+  discountedPrice?: number | null;
+};
+
 type HomeProps = {
   heroSlides?: HeroSlide[];
   highlights?: HomeHighlightCard[];
   brandRail?: HomeBrandRailItem[];
   categories?: HomeCategoryTile[];
+  newArrivals?: HomeProductCard[];
+  bestSellers?: HomeProductCard[];
 };
 
 function isRemoteImage(url: string) {
@@ -44,6 +56,8 @@ const Home = ({
   highlights,
   brandRail,
   categories,
+  newArrivals,
+  bestSellers,
 }: HomeProps) => {
   const spotlightItems =
     highlights && highlights.length > 0
@@ -72,6 +86,108 @@ const Home = ({
           </div>
 
           <HomeHighlightsSection items={spotlightItems} />
+        </div>
+      </section>
+
+      <section className="py-14 bg-gray-1 border-y border-gray-3">
+        <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
+          <div className="flex items-center justify-between gap-3 mb-8">
+            <div>
+              <p className="mb-1 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
+                New arrivals
+              </p>
+              <h2 className="text-xl font-semibold text-dark xl:text-heading-5">
+                Latest drops in store.
+              </h2>
+            </div>
+            <Link href="/shop" className="text-sm font-medium text-blue hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {(newArrivals ?? []).map((p) => (
+              <Link
+                key={p.id}
+                href={`/shop/${p.slug}`}
+                className="group overflow-hidden rounded-2xl border border-gray-3 bg-white hover:border-blue/40"
+              >
+                <div className="relative aspect-square bg-gray-2">
+                  <Image
+                    src={p.image}
+                    alt={p.title}
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover"
+                    unoptimized={isRemoteImage(p.image)}
+                  />
+                </div>
+                <div className="p-3">
+                  <h3 className="line-clamp-2 text-sm font-semibold text-dark">{p.title}</h3>
+                  <div className="mt-2 flex items-center gap-2">
+                    {p.discountedPrice != null ? (
+                      <>
+                        <span className="text-sm font-semibold text-blue">{formatPrice(p.discountedPrice)}</span>
+                        <span className="text-xs line-through text-meta-4">{formatPrice(p.price)}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm font-semibold text-dark">{formatPrice(p.price)}</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-14 bg-white">
+        <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
+          <div className="flex items-center justify-between gap-3 mb-8">
+            <div>
+              <p className="mb-1 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
+                Best sellers
+              </p>
+              <h2 className="text-xl font-semibold text-dark xl:text-heading-5">
+                Most-loved picks.
+              </h2>
+            </div>
+            <Link href="/shop" className="text-sm font-medium text-blue hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {(bestSellers ?? []).map((p) => (
+              <Link
+                key={p.id}
+                href={`/shop/${p.slug}`}
+                className="group overflow-hidden rounded-2xl border border-gray-3 bg-white hover:border-blue/40"
+              >
+                <div className="relative aspect-square bg-gray-2">
+                  <Image
+                    src={p.image}
+                    alt={p.title}
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover"
+                    unoptimized={isRemoteImage(p.image)}
+                  />
+                </div>
+                <div className="p-3">
+                  <h3 className="line-clamp-2 text-sm font-semibold text-dark">{p.title}</h3>
+                  <div className="mt-2 flex items-center gap-2">
+                    {p.discountedPrice != null ? (
+                      <>
+                        <span className="text-sm font-semibold text-blue">{formatPrice(p.discountedPrice)}</span>
+                        <span className="text-xs line-through text-meta-4">{formatPrice(p.price)}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm font-semibold text-dark">{formatPrice(p.price)}</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
