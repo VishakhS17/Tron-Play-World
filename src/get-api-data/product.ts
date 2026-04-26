@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prismaDB";
 import { unstable_cache } from "next/cache";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
+import type { Prisma } from "@prisma/client";
 
 const pickDefaultImage = (product: {
   product_images?: { url: string; sort_order: number }[];
@@ -84,61 +85,113 @@ export const getNewArrivalsProduct = unstable_cache(
   ['products'], { tags: ['products'] }
 );
 
-// get best selling products (placeholder ordering)
+const bestSellerProductSelect = {
+  id: true,
+  name: true,
+  short_description: true,
+  base_price: true,
+  discounted_price: true,
+  slug: true,
+  diecast_scales: { select: { ratio: true } },
+  updated_at: true,
+  product_variants: {
+    select: {
+      color: true,
+      size: true,
+      is_default: true,
+    },
+  },
+  inventory: { select: { available_quantity: true } },
+  product_images: { select: { url: true, sort_order: true } },
+  sku: true,
+} satisfies Prisma.productsSelect;
+
+type BestSellerProductRow = Prisma.productsGetPayload<{
+  select: typeof bestSellerProductSelect;
+}>;
+
+const mapProductToHomeCard = (item: BestSellerProductRow) => ({
+  id: item.id,
+  title: item.name,
+  shortDescription: item.short_description ?? "",
+  description: "",
+  body: "",
+  price: Number(item.base_price),
+  discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
+  slug: item.slug,
+  quantity: getInventoryQuantity(item.inventory),
+  sku: item.sku ?? "",
+  diecastScale: item.diecast_scales?.ratio ?? null,
+  tags: [],
+  offers: "",
+  updatedAt: item.updated_at,
+  product_images: item.product_images,
+  productVariants: item.product_variants.map((v) => ({
+    id: 0,
+    productId: item.id,
+    image: pickDefaultImage(item),
+    color: v.color ?? "",
+    size: v.size ?? "",
+    isDefault: v.is_default,
+  })),
+  reviews: 0,
+});
+
+// get best selling products (by total quantity on payment-succeeded orders)
 export const getBestSellingProducts = unstable_cache(
   async () => {
-    const products = await prisma.products.findMany({
-      select: {
-        id: true,
-        name: true,
-        short_description: true,
-        base_price: true,
-        discounted_price: true,
-        slug: true,
-        diecast_scales: { select: { ratio: true } },
-        updated_at: true,
-        product_variants: {
-          select: {
-            color: true,
-            size: true,
-            is_default: true,
-          }
-        },
-        inventory: { select: { available_quantity: true } },
-        product_images: { select: { url: true, sort_order: true } },
-        sku: true,
-      },
-      orderBy: { updated_at: "desc" },
-      take: 6
+    /**
+     * Rank by summed `order_items.quantity` for orders that have actually captured
+     * payment successfully. This avoids relying on `orders.status` alone, which can
+     * lag or diverge depending on fulfillment/shipping updates.
+     */
+    const soldRows = await prisma.$queryRaw<Array<{ product_id: string; qty: bigint }>>(
+      Prisma.sql`
+        SELECT
+          oi.product_id AS product_id,
+          SUM(oi.quantity)::bigint AS qty
+        FROM order_items oi
+        INNER JOIN orders o ON o.id = oi.order_id
+        WHERE o.payment_status = 'SUCCEEDED'
+          AND o.status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'REFUNDED')
+        GROUP BY oi.product_id
+        ORDER BY qty DESC
+        LIMIT 24
+      `
+    );
+
+    const rankedIds = soldRows
+      .map((row) => ({
+        id: row.product_id,
+        qty: Number(row.qty),
+      }))
+      .filter((row) => Number.isFinite(row.qty) && row.qty > 0)
+      .map((row) => row.id);
+
+    if (rankedIds.length === 0) {
+      const fallback = await prisma.products.findMany({
+        where: { is_active: true },
+        select: bestSellerProductSelect,
+        orderBy: { updated_at: "desc" },
+        take: 6,
+      });
+      return fallback.map(mapProductToHomeCard);
+    }
+
+    const rows = await prisma.products.findMany({
+      where: { id: { in: rankedIds }, is_active: true },
+      select: bestSellerProductSelect,
     });
-    return products.map((item) => ({
-      id: item.id,
-      title: item.name,
-      shortDescription: item.short_description ?? "",
-      description: "",
-      body: "",
-      price: Number(item.base_price),
-      discountedPrice: item.discounted_price ? Number(item.discounted_price) : null,
-      slug: item.slug,
-      quantity: getInventoryQuantity(item.inventory),
-      sku: item.sku ?? "",
-      diecastScale: item.diecast_scales?.ratio ?? null,
-      tags: [],
-      offers: "",
-      updatedAt: item.updated_at,
-      product_images: item.product_images,
-      productVariants: item.product_variants.map((v) => ({
-        id: 0,
-        productId: item.id,
-        image: pickDefaultImage(item),
-        color: v.color ?? "",
-        size: v.size ?? "",
-        isDefault: v.is_default,
-      })),
-      reviews: 0,
-    }));
+    const byId = new Map(rows.map((p) => [p.id, p]));
+    const ordered = rankedIds
+      .map((id) => byId.get(id))
+      .filter((p): p is NonNullable<typeof p> => p != null)
+      .slice(0, 6);
+
+    return ordered.map(mapProductToHomeCard);
   },
-  ['products'], { tags: ['products'] }
+  ["best-selling-products", "v2"],
+  { tags: ["products", "orders"] }
 );
 
 // get latest products (homepage)

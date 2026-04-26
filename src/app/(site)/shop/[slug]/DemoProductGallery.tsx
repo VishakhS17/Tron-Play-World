@@ -13,6 +13,7 @@ type Props = {
 export default function DemoProductGallery({ title, images }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  const thumbnailRailRef = useRef<HTMLDivElement>(null);
 
   const goTo = (index: number) => {
     const total = images.length;
@@ -36,6 +37,16 @@ export default function DemoProductGallery({ title, images }: Props) {
     else goTo(activeIndex - 1);
   };
 
+  const scrollThumbnails = (direction: "left" | "right") => {
+    const rail = thumbnailRailRef.current;
+    if (!rail) return;
+    const amount = Math.max(rail.clientWidth * 0.75, 180);
+    rail.scrollBy({
+      left: direction === "right" ? amount : -amount,
+      behavior: "smooth",
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div
@@ -43,6 +54,43 @@ export default function DemoProductGallery({ title, images }: Props) {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {images.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => goTo(activeIndex - 1)}
+              className="absolute left-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-3 bg-white/95 text-dark shadow-sm transition hover:bg-white"
+              aria-label="Previous image"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M10 3.5L5.5 8L10 12.5"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(activeIndex + 1)}
+              className="absolute right-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-3 bg-white/95 text-dark shadow-sm transition hover:bg-white"
+              aria-label="Next image"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M6 3.5L10.5 8L6 12.5"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </>
+        ) : null}
+
         <Image
           src={images[activeIndex]}
           alt={`${title} image ${activeIndex + 1}`}
@@ -53,27 +101,89 @@ export default function DemoProductGallery({ title, images }: Props) {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {images.slice(0, 3).map((thumbnail, index) => (
+      {images.length > 1 ? (
+        <div className="flex items-center gap-2">
           <button
-            key={thumbnail}
             type="button"
-            onClick={() => goTo(index)}
-            className={`relative aspect-square rounded-xl border overflow-hidden bg-white ${
-              activeIndex === index ? "border-blue" : "border-gray-3"
-            }`}
-            aria-label={`Show image ${index + 1}`}
+            onClick={() => scrollThumbnails("left")}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-3 bg-white text-dark shadow-sm transition hover:bg-gray-1"
+            aria-label="Scroll thumbnails left"
           >
-            <Image
-              src={thumbnail}
-              alt={`${title} thumbnail ${index + 1}`}
-              fill
-              sizes="(max-width: 1024px) 33vw, 16vw"
-              className="object-contain p-2"
-            />
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M10 3.5L5.5 8L10 12.5"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
-        ))}
-      </div>
+
+          <div className="min-w-0 flex-1">
+            <div ref={thumbnailRailRef} className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+              {images.map((thumbnail, index) => (
+                <button
+                  key={`${thumbnail}-${index}`}
+                  type="button"
+                  onClick={() => goTo(index)}
+                  className={`relative aspect-square h-24 w-24 shrink-0 overflow-hidden rounded-xl border bg-white ${
+                    activeIndex === index ? "border-blue" : "border-gray-3"
+                  }`}
+                  aria-label={`Show image ${index + 1}`}
+                >
+                  <Image
+                    src={thumbnail}
+                    alt={`${title} thumbnail ${index + 1}`}
+                    fill
+                    sizes="(max-width: 1024px) 33vw, 16vw"
+                    className="object-contain p-2"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollThumbnails("right")}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-3 bg-white text-dark shadow-sm transition hover:bg-gray-1"
+            aria-label="Scroll thumbnails right"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M6 3.5L10.5 8L6 12.5"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <div ref={thumbnailRailRef} className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+          {images.map((thumbnail, index) => (
+            <button
+              key={`${thumbnail}-${index}`}
+              type="button"
+              onClick={() => goTo(index)}
+              className={`relative aspect-square h-24 w-24 shrink-0 overflow-hidden rounded-xl border bg-white ${
+                activeIndex === index ? "border-blue" : "border-gray-3"
+              }`}
+              aria-label={`Show image ${index + 1}`}
+            >
+              <Image
+                src={thumbnail}
+                alt={`${title} thumbnail ${index + 1}`}
+                fill
+                sizes="(max-width: 1024px) 33vw, 16vw"
+                className="object-contain p-2"
+              />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -47,6 +47,29 @@ type HomeProps = {
   bestSellers?: HomeProductCard[];
 };
 
+const TRUST_BAR_ITEMS = [
+  {
+    icon: "/images/icons/icon-01.svg",
+    title: "Fast Delivery",
+    subtitle: "Across India",
+  },
+  {
+    icon: "/images/icons/icon-03.svg",
+    title: "100% Original",
+    subtitle: "Products",
+  },
+  {
+    icon: "/images/icons/icon-02.svg",
+    title: "Easy Returns",
+    subtitle: "7 Days Policy",
+  },
+  {
+    icon: "/images/icons/icon-04.svg",
+    title: "Secure Payment",
+    subtitle: "Multiple Options",
+  },
+] as const;
+
 function isRemoteImage(url: string) {
   return url.startsWith("http://") || url.startsWith("https://");
 }
@@ -68,6 +91,26 @@ const Home = ({
     <main className="bg-white">
       <section className="relative overflow-hidden pt-32">
         <HeroBannerCarousel slides={heroSlides} />
+      </section>
+
+      <section className="border-b border-gray-3 bg-white">
+        <div className="mx-auto grid w-full max-w-7xl grid-cols-2 gap-x-4 gap-y-5 px-4 py-6 sm:px-8 md:grid-cols-4 md:gap-6 md:py-7">
+          {TRUST_BAR_ITEMS.map((item) => (
+            <div key={item.title} className="flex items-center gap-3 md:justify-center md:gap-3.5">
+              <Image
+                src={item.icon}
+                alt={item.title}
+                width={28}
+                height={28}
+                className="h-7 w-7 shrink-0 md:h-9 md:w-9"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-tight text-dark md:text-[15px]">{item.title}</p>
+                <p className="text-xs font-medium leading-tight text-meta-3 md:text-[13px]">{item.subtitle}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="py-14 bg-white">

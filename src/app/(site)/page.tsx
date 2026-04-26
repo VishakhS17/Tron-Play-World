@@ -14,6 +14,13 @@ export const dynamic = "force-dynamic";
 
 const FALLBACK_HIGHLIGHT_IMAGE =
   "/images/collections/693c2377f0a417e6ed0a3758-rc-cars-1-14-all-terrain-rc-car-for.jpg";
+const FALLBACK_PRODUCT_IMAGE = "/images/products/placeholder.png";
+
+const pickCardImage = (images: { url: string; sort_order: number }[] | undefined) =>
+  images && images.length > 0
+    ? images.slice().sort((a, b) => a.sort_order - b.sort_order)[0]?.url ??
+      FALLBACK_PRODUCT_IMAGE
+    : FALLBACK_PRODUCT_IMAGE;
 
 export default async function HomePage() {
   const now = new Date();
@@ -156,7 +163,7 @@ export default async function HomePage() {
     id: p.id,
     slug: p.slug,
     title: p.title,
-    image: p.product_images?.[0]?.url ?? "/images/products/placeholder.png",
+    image: pickCardImage(p.product_images),
     price: Number(p.price),
     discountedPrice: p.discountedPrice == null ? null : Number(p.discountedPrice),
   }));
@@ -165,7 +172,7 @@ export default async function HomePage() {
     id: p.id,
     slug: p.slug,
     title: p.title,
-    image: p.product_images?.[0]?.url ?? "/images/products/placeholder.png",
+    image: pickCardImage(p.product_images),
     price: Number(p.price),
     discountedPrice: p.discountedPrice == null ? null : Number(p.discountedPrice),
   }));
