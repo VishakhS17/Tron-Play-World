@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prismaDB";
 import { unstable_cache } from "next/cache";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 const pickDefaultImage = (product: {
   product_images?: { url: string; sort_order: number }[];
