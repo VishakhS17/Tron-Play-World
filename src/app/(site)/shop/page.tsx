@@ -142,133 +142,143 @@ export default async function ShopPage({ searchParams }: Props) {
   const shopBrands: { slug: string; name: string }[] = Array.isArray(productData?.brands)
     ? productData.brands
     : [];
+  const renderFilters = (formId: string) => (
+    <div className="rounded-xl border border-gray-3 bg-white p-5">
+      <form id={formId} className="mb-5 space-y-3" action="/shop" method="get">
+        <LiveShopFilters formId={formId} />
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Search products…"
+          className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            name="minPrice"
+            defaultValue={minPrice}
+            placeholder="Min ₹"
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          />
+          <input
+            name="maxPrice"
+            defaultValue={maxPrice}
+            placeholder="Max ₹"
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          />
+        </div>
+        <select
+          name="ageGroup"
+          defaultValue={ageGroup}
+          className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+        >
+          <option value="">All age groups</option>
+          {ageGroups.map((group) => (
+            <option key={group} value={group}>
+              {group}
+            </option>
+          ))}
+        </select>
+
+        <select
+          name="brand"
+          defaultValue={brand}
+          className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+        >
+          <option value="">All brands</option>
+          {shopBrands.map((b) => (
+            <option key={b.slug} value={b.slug}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          name="diecastScale"
+          defaultValue={diecastScale}
+          className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+        >
+          <option value="">All scales</option>
+          {diecastScales.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-dark">Categories</h3>
+          <p className="mb-2 text-xs text-meta-4">Select one or more.</p>
+          <ul className="max-h-48 space-y-2 overflow-y-auto pr-1">
+            {allCategories.length > 0 ? (
+              allCategories.map((cat) => (
+                <li key={cat.id}>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm text-dark-4 hover:text-blue">
+                    <input
+                      type="checkbox"
+                      name="category"
+                      value={cat.slug}
+                      defaultChecked={categorySlugs.includes(cat.slug)}
+                      className="mt-0.5 rounded border-gray-3 text-blue focus:ring-blue"
+                    />
+                    <span className="leading-snug">
+                      {"name" in cat ? (cat as { name: string }).name : (cat as { title: string }).title}
+                    </span>
+                  </label>
+                </li>
+              ))
+            ) : (
+              <li className="text-meta-4 text-sm">No categories yet.</li>
+            )}
+          </ul>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-meta-3">
+          <input type="checkbox" name="available" value="true" defaultChecked={available === "true"} />
+          In stock only
+        </label>
+
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-dark">Sort by</label>
+          <select
+            name="sort"
+            defaultValue={sort}
+            className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
+          >
+            <option value="">Newest first</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition"
+        >
+          Apply
+        </button>
+        <Link
+          href="/shop"
+          className="block w-full rounded-lg border border-gray-3 bg-white px-4 py-2 text-center text-sm font-medium text-meta-3 hover:bg-gray-1 hover:text-dark transition"
+        >
+          Clear filters
+        </Link>
+      </form>
+    </div>
+  );
 
   return (
     <section className="overflow-hidden py-10 pb-20">
       <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
         <div className="flex flex-col gap-8 lg:flex-row">
           <aside className="w-full shrink-0 lg:w-64">
-            <div className="rounded-xl border border-gray-3 bg-white p-5">
-              <form id="shop-filters-form" className="mb-5 space-y-3" action="/shop" method="get">
-                <LiveShopFilters formId="shop-filters-form" />
-                <input
-                  name="q"
-                  defaultValue={q}
-                  placeholder="Search products…"
-                  className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    name="minPrice"
-                    defaultValue={minPrice}
-                    placeholder="Min ₹"
-                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                  />
-                  <input
-                    name="maxPrice"
-                    defaultValue={maxPrice}
-                    placeholder="Max ₹"
-                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                  />
-                </div>
-                <select
-                  name="ageGroup"
-                  defaultValue={ageGroup}
-                  className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                >
-                  <option value="">All age groups</option>
-                  {ageGroups.map((group) => (
-                    <option key={group} value={group}>
-                      {group}
-                    </option>
-                  ))}
-                </select>
+            <details className="rounded-xl border border-gray-3 bg-white lg:hidden">
+              <summary className="cursor-pointer list-none select-none px-4 py-3 text-sm font-semibold text-dark border-b border-gray-3">
+                Filters
+              </summary>
+              <div className="p-1">{renderFilters("shop-filters-form-mobile")}</div>
+            </details>
 
-                <select
-                  name="brand"
-                  defaultValue={brand}
-                  className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                >
-                  <option value="">All brands</option>
-                  {shopBrands.map((b) => (
-                    <option key={b.slug} value={b.slug}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  name="diecastScale"
-                  defaultValue={diecastScale}
-                  className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                >
-                  <option value="">All scales</option>
-                  {diecastScales.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold text-dark">Categories</h3>
-                  <p className="mb-2 text-xs text-meta-4">Select one or more.</p>
-                  <ul className="max-h-48 space-y-2 overflow-y-auto pr-1">
-                    {allCategories.length > 0 ? (
-                      allCategories.map((cat) => (
-                        <li key={cat.id}>
-                          <label className="flex cursor-pointer items-start gap-2 text-sm text-dark-4 hover:text-blue">
-                            <input
-                              type="checkbox"
-                              name="category"
-                              value={cat.slug}
-                              defaultChecked={categorySlugs.includes(cat.slug)}
-                              className="mt-0.5 rounded border-gray-3 text-blue focus:ring-blue"
-                            />
-                            <span className="leading-snug">
-                              {"name" in cat ? (cat as { name: string }).name : (cat as { title: string }).title}
-                            </span>
-                          </label>
-                        </li>
-                      ))
-                    ) : (
-                      <li className="text-meta-4 text-sm">No categories yet.</li>
-                    )}
-                  </ul>
-                </div>
-
-                <label className="flex items-center gap-2 text-sm text-meta-3">
-                  <input type="checkbox" name="available" value="true" defaultChecked={available === "true"} />
-                  In stock only
-                </label>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-dark">Sort by</label>
-                  <select
-                    name="sort"
-                    defaultValue={sort}
-                    className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
-                  >
-                    <option value="">Newest first</option>
-                    <option value="price_asc">Price: Low to High</option>
-                    <option value="price_desc">Price: High to Low</option>
-                  </select>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white hover:bg-blue-dark transition"
-                >
-                  Apply
-                </button>
-                <Link
-                  href="/shop"
-                  className="block w-full rounded-lg border border-gray-3 bg-white px-4 py-2 text-center text-sm font-medium text-meta-3 hover:bg-gray-1 hover:text-dark transition"
-                >
-                  Clear filters
-                </Link>
-              </form>
-            </div>
+            <div className="hidden lg:block">{renderFilters("shop-filters-form")}</div>
           </aside>
 
           <div className="flex-1 min-w-0">

@@ -30,6 +30,14 @@ type Props = {
   slides?: HeroSlide[];
 };
 
+const HERO_OVERLAY = {
+  eyebrow: "Tron Play World",
+  heading: "India's Ultimate Toy & RC Destination",
+  subheading: "RC cars, anime figures, diecast models, board games, and more.",
+  ctaLabel: "Shop Now",
+  ctaHref: "/shop",
+} as const;
+
 const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
   const slides = slidesProp && slidesProp.length > 0 ? slidesProp : [];
   const slidesKey = useMemo(() => slides.map((s) => s.id).join("|"), [slides]);
@@ -143,6 +151,32 @@ const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Static overlay copy: stays fixed while slides move underneath */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-[15] w-[88%] bg-gradient-to-r from-black/80 via-black/45 to-transparent sm:w-[70%] lg:w-[52%]" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-[16] flex w-full items-center">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-8 xl:px-0">
+          <div className="max-w-xl text-white">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90 sm:text-xs">
+              {HERO_OVERLAY.eyebrow}
+            </p>
+            <h1 className="text-3xl font-extrabold leading-[1.05] drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-4xl lg:text-6xl">
+              {HERO_OVERLAY.heading}
+            </h1>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/90 sm:text-base lg:text-lg">
+              {HERO_OVERLAY.subheading}
+            </p>
+            <div className="pointer-events-auto mt-5">
+              <Link
+                href={HERO_OVERLAY.ctaHref}
+                className="inline-flex items-center rounded-lg bg-red px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/25 transition hover:bg-red-dark sm:px-6 sm:py-3 sm:text-base"
+              >
+                {HERO_OVERLAY.ctaLabel}
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 

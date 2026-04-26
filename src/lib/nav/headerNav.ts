@@ -118,7 +118,6 @@ export async function getHeaderNavData(): Promise<HeaderNavData> {
           where: {
             products: {
               some: {
-                is_active: true,
                 category_id: { in: diecastIds },
               },
             },
@@ -146,7 +145,6 @@ export async function getHeaderNavData(): Promise<HeaderNavData> {
       where: {
         products: {
           some: {
-            is_active: true,
             category_id: { in: allowedIds },
           },
         },

@@ -1,10 +1,9 @@
 import type { HeaderNavData } from "@/lib/nav/headerNav";
 import type { MenuItem } from "./types";
 
-function shopBrandInCategory(brandSlug: string, categorySlug: string) {
+function shopBrandOnly(brandSlug: string) {
   const u = new URLSearchParams();
   u.set("brand", brandSlug);
-  u.set("category", categorySlug);
   return `/shop?${u.toString()}`;
 }
 
@@ -14,9 +13,7 @@ export function buildHeaderMenuData(nav: HeaderNavData): MenuItem[] {
 
   const carsItems: MenuItem[] = nav.carsBrands.map((b) => ({
     title: b.name,
-    path: diecastSlug
-      ? shopBrandInCategory(b.slug, diecastSlug)
-      : `/shop?brand=${encodeURIComponent(b.slug)}`,
+    path: shopBrandOnly(b.slug),
   }));
 
   const carsMenu: MenuItem =
@@ -40,7 +37,7 @@ export function buildHeaderMenuData(nav: HeaderNavData): MenuItem[] {
           heading: g.categoryName,
           items: g.brands.map((b) => ({
             title: b.name,
-            path: shopBrandInCategory(b.slug, g.categorySlug),
+            path: shopBrandOnly(b.slug),
           })),
         }))
       : [
