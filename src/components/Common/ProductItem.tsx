@@ -46,6 +46,7 @@ const ProductItem = ({ item, bgClr = "white" }: Props) => {
     id: item.id,
     name: displayTitle,
     price: item.discountedPrice ? item.discountedPrice : item.price,
+    shippingPerUnit: Number(item.shippingPerUnit ?? 0),
     currency: "usd",
     image: cardImage,
     slug: item?.slug,

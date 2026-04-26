@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prismaDB";
 import { isActiveInWindow } from "@/lib/marketing/isActiveInWindow";
+import { SITE_MARKETING_SETTINGS_ID } from "@/lib/marketing/siteSettingsId";
 import { getBestSellingProducts, getNewArrivalsProduct } from "@/get-api-data/product";
 import Home, {
   type HomeBrandRailItem,
@@ -56,8 +57,16 @@ export default async function HomePage() {
       })
     );
 
-  const [slidesRaw, highlightsRaw, brandRailRaw, categoryTilesRaw, categoriesRaw, newArrivalsRaw, bestSellersRaw] =
-    await Promise.all([
+  const [
+    slidesRaw,
+    highlightsRaw,
+    brandRailRaw,
+    categoryTilesRaw,
+    categoriesRaw,
+    newArrivalsRaw,
+    bestSellersRaw,
+    siteMarketingSettings,
+  ] = await Promise.all([
       prisma.homepage_hero_slides.findMany({ orderBy: { sort_order: "asc" } }),
       highlightsPromise,
       prisma.homepage_brand_rail
@@ -79,7 +88,18 @@ export default async function HomePage() {
       }),
       getNewArrivalsProduct(),
       getBestSellingProducts(),
+      prisma.site_marketing_settings
+        .findUnique({
+          where: { id: SITE_MARKETING_SETTINGS_ID },
+          select: { highlights_section_eyebrow: true, highlights_section_heading: true },
+        })
+        .catch(() => null),
     ]);
+
+  const highlightsSectionEyebrow =
+    siteMarketingSettings?.highlights_section_eyebrow?.trim() || "Highlights";
+  const highlightsSectionHeading =
+    siteMarketingSettings?.highlights_section_heading?.trim() || "Featured collections and picks.";
 
   const heroSlides: HeroSlide[] = slidesRaw
     .filter((s) => isActiveInWindow(s.is_active, s.active_from, s.active_until, now))
@@ -180,6 +200,8 @@ export default async function HomePage() {
   return (
     <Home
       heroSlides={heroSlides}
+      highlightsSectionEyebrow={highlightsSectionEyebrow}
+      highlightsSectionHeading={highlightsSectionHeading}
       highlights={highlights}
       brandRail={brandRail}
       categories={categories}

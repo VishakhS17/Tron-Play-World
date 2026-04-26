@@ -1,0 +1,16 @@
+ALTER TABLE "site_marketing_settings"
+ADD COLUMN "privacy_page_title" VARCHAR(255),
+ADD COLUMN "privacy_page_subtitle" VARCHAR(500),
+ADD COLUMN "privacy_page_content" TEXT,
+ADD COLUMN "terms_page_title" VARCHAR(255),
+ADD COLUMN "terms_page_subtitle" VARCHAR(500),
+ADD COLUMN "terms_page_content" TEXT,
+ADD COLUMN "returns_page_title" VARCHAR(255),
+ADD COLUMN "returns_page_subtitle" VARCHAR(500),
+ADD COLUMN "returns_page_content" TEXT,
+ADD COLUMN "faq_page_title" VARCHAR(255),
+ADD COLUMN "faq_page_subtitle" VARCHAR(500),
+ADD COLUMN "faq_page_content" TEXT,
+ADD COLUMN "contact_page_title" VARCHAR(255),
+ADD COLUMN "contact_page_subtitle" VARCHAR(500),
+ADD COLUMN "contact_page_content" TEXT;

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prismaDB";
 import { getAdminSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
@@ -293,14 +292,51 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
     select: { url: true },
   });
 
+  const [orderItemsCount, activeOrderRefsCount, reviewsCount, returnsCount] = await Promise.all([
+    prisma.order_items.count({ where: { product_id: id } }),
+    prisma.order_items.count({
+      where: {
+        product_id: id,
+        orders: {
+          status: {
+            in: ["PENDING", "CONFIRMED", "SHIPPED", "RETURN_REQUESTED", "RETURN_APPROVED"],
+          },
+        },
+      },
+    }),
+    prisma.reviews.count({ where: { product_id: id } }),
+    prisma.returns.count({
+      where: {
+        order_items: {
+          product_id: id,
+        },
+      },
+    }),
+  ]);
+
+  if (orderItemsCount > 0 || reviewsCount > 0 || returnsCount > 0) {
+    const reasonParts: string[] = [];
+    if (activeOrderRefsCount > 0) reasonParts.push(`${activeOrderRefsCount} active/pending order item(s)`);
+    if (orderItemsCount > 0) reasonParts.push(`${orderItemsCount} total historical order item(s)`);
+    if (reviewsCount > 0) reasonParts.push(`${reviewsCount} review(s)`);
+    if (returnsCount > 0) reasonParts.push(`${returnsCount} return record(s)`);
+    return NextResponse.json(
+      {
+        error: `Cannot delete this product because it is referenced by ${reasonParts.join(", ")}. You can set it inactive instead.`,
+      },
+      { status: 409 }
+    );
+  }
+
   try {
     await prisma.products.delete({ where: { id } });
   } catch (e: unknown) {
-    if (e instanceof PrismaClientKnownRequestError && e.code === "P2003") {
+    const code = (e as { code?: string } | null)?.code;
+    if (code === "P2003") {
       return NextResponse.json(
         {
           error:
-            "This product is already referenced by orders/reviews and cannot be deleted. Set it inactive instead.",
+            "Cannot delete this product because it has order/review references. Set it inactive instead.",
         },
         { status: 409 }
       );

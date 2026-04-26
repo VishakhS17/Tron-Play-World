@@ -289,6 +289,7 @@ export default async function ShopPage({ searchParams }: Props) {
                       shortDescription: item.shortDescription,
                       ageGroup: item.ageGroup,
                       diecastScale: item.diecastScale,
+                      shippingPerUnit: item.shippingPerUnit,
                       productVariants: item.productVariants,
                       product_images: item.product_images,
                       image: item.image,

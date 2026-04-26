@@ -115,14 +115,14 @@ export default function EditProductPage() {
   async function deleteProduct() {
     const label = String(form?.name ?? "this product");
     const ok = window.confirm(
-      `Delete "${label}"? This will remove the product and its product images. This action cannot be undone.`
+      `Delete "${label}"? This permanently removes the product only if there are no order/review references.`
     );
     if (!ok) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Failed to delete product");
+      const parsed = await parseAdminJsonResponse<{ ok?: boolean }>(res);
+      if (!parsed.ok) throw new Error(parsed.message || "Failed to delete product");
       toast.success("Product deleted");
       router.push("/admin/products");
       router.refresh();

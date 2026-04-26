@@ -15,6 +15,7 @@ type ProductActionsProps = {
   price: number;
   discountedPrice?: number | null;
   quantity: number;
+  shippingPerUnit?: number;
   color?: string;
   size?: string;
 };
@@ -40,6 +41,7 @@ export default function ProductActions(props: ProductActionsProps) {
       image: props.image,
       slug: props.slug,
       availableQuantity: props.quantity,
+      shippingPerUnit: Number(props.shippingPerUnit ?? 0),
       color: props.color ?? "",
       size: props.size ?? "",
       quantity: 1,

@@ -26,6 +26,7 @@ export default function WishlistPage() {
         name: item.title,
         price: item.price,
         quantity: 1,
+        shippingPerUnit: 0,
         currency: "INR",
         image: item.image,
         slug: item.slug,

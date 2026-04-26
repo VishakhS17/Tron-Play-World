@@ -8,6 +8,23 @@ import toast from "react-hot-toast";
 type SiteSettingsRow = {
   id?: string;
   first_visit_coupon_code?: string | null;
+  highlights_section_eyebrow?: string | null;
+  highlights_section_heading?: string | null;
+  privacy_page_title?: string | null;
+  privacy_page_subtitle?: string | null;
+  privacy_page_content?: string | null;
+  terms_page_title?: string | null;
+  terms_page_subtitle?: string | null;
+  terms_page_content?: string | null;
+  returns_page_title?: string | null;
+  returns_page_subtitle?: string | null;
+  returns_page_content?: string | null;
+  faq_page_title?: string | null;
+  faq_page_subtitle?: string | null;
+  faq_page_content?: string | null;
+  contact_page_title?: string | null;
+  contact_page_subtitle?: string | null;
+  contact_page_content?: string | null;
   help_support_title?: string | null;
   contact_address?: string | null;
   contact_phone?: string | null;
@@ -17,6 +34,8 @@ type SiteSettingsRow = {
   social_instagram_url?: string | null;
   social_linkedin_url?: string | null;
 };
+
+type QuickLinkPageAdminKey = "privacy" | "terms" | "returns" | "faq" | "contact";
 
 type Initial = {
   slides: unknown[];
@@ -80,7 +99,44 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
   const [socialTwitter, setSocialTwitter] = useState(st0?.social_twitter_url ?? "");
   const [socialInstagram, setSocialInstagram] = useState(st0?.social_instagram_url ?? "");
   const [socialLinkedIn, setSocialLinkedIn] = useState(st0?.social_linkedin_url ?? "");
+  const [quickLinkPages, setQuickLinkPages] = useState<
+    Record<QuickLinkPageAdminKey, { title: string; subtitle: string; content: string }>
+  >({
+    privacy: {
+      title: st0?.privacy_page_title ?? "",
+      subtitle: st0?.privacy_page_subtitle ?? "",
+      content: st0?.privacy_page_content ?? "",
+    },
+    terms: {
+      title: st0?.terms_page_title ?? "",
+      subtitle: st0?.terms_page_subtitle ?? "",
+      content: st0?.terms_page_content ?? "",
+    },
+    returns: {
+      title: st0?.returns_page_title ?? "",
+      subtitle: st0?.returns_page_subtitle ?? "",
+      content: st0?.returns_page_content ?? "",
+    },
+    faq: {
+      title: st0?.faq_page_title ?? "",
+      subtitle: st0?.faq_page_subtitle ?? "",
+      content: st0?.faq_page_content ?? "",
+    },
+    contact: {
+      title: st0?.contact_page_title ?? "",
+      subtitle: st0?.contact_page_subtitle ?? "",
+      content: st0?.contact_page_content ?? "",
+    },
+  });
+  const [quickLinkPageKey, setQuickLinkPageKey] = useState<QuickLinkPageAdminKey>("privacy");
+  const [quickLinkTitle, setQuickLinkTitle] = useState(st0?.privacy_page_title ?? "");
+  const [quickLinkSubtitle, setQuickLinkSubtitle] = useState(st0?.privacy_page_subtitle ?? "");
+  const [quickLinkContent, setQuickLinkContent] = useState(st0?.privacy_page_content ?? "");
+  const [highlightsEyebrow, setHighlightsEyebrow] = useState(st0?.highlights_section_eyebrow ?? "");
+  const [highlightsHeading, setHighlightsHeading] = useState(st0?.highlights_section_heading ?? "");
   const [storefrontSaving, setStorefrontSaving] = useState(false);
+  const [quickLinkSaving, setQuickLinkSaving] = useState(false);
+  const [highlightsSectionSaving, setHighlightsSectionSaving] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const [highlightUploading, setHighlightUploading] = useState(false);
   const [brandRailUploading, setBrandRailUploading] = useState(false);
@@ -95,6 +151,41 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
   const prods = initial.products;
   const brands = initial.brands;
   const coupons = initial.coupons;
+  const quickLinkFieldMap: Record<
+    QuickLinkPageAdminKey,
+    { title: keyof SiteSettingsRow; subtitle: keyof SiteSettingsRow; content: keyof SiteSettingsRow; label: string }
+  > = {
+    privacy: {
+      title: "privacy_page_title",
+      subtitle: "privacy_page_subtitle",
+      content: "privacy_page_content",
+      label: "Privacy Policy",
+    },
+    terms: {
+      title: "terms_page_title",
+      subtitle: "terms_page_subtitle",
+      content: "terms_page_content",
+      label: "Terms & Conditions",
+    },
+    returns: {
+      title: "returns_page_title",
+      subtitle: "returns_page_subtitle",
+      content: "returns_page_content",
+      label: "Return & Cancellation",
+    },
+    faq: {
+      title: "faq_page_title",
+      subtitle: "faq_page_subtitle",
+      content: "faq_page_content",
+      label: "FAQ",
+    },
+    contact: {
+      title: "contact_page_title",
+      subtitle: "contact_page_subtitle",
+      content: "contact_page_content",
+      label: "Contact",
+    },
+  };
 
   const productOptions = useMemo(
     () =>
@@ -338,6 +429,63 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
       {tab === "highlights" ? (
         <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4">
           <h2 className="text-lg font-semibold">Homepage highlights</h2>
+
+          <div className="rounded-xl border border-gray-3 bg-gray-1/40 p-4 space-y-3 max-w-2xl">
+            <h3 className="text-sm font-semibold text-dark">Section heading (homepage)</h3>
+            <p className="text-xs text-meta-3">
+              Shown above the highlight cards. Leave a field empty and save to restore the default for that line.
+            </p>
+            <label className="block">
+              <span className="text-sm font-medium">Small label</span>
+              <input
+                value={highlightsEyebrow}
+                onChange={(e) => setHighlightsEyebrow(e.target.value)}
+                placeholder="Highlights"
+                className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+              />
+              <span className="mt-1 block text-xs text-meta-4">Uses uppercase styling on the storefront.</span>
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Main heading</span>
+              <input
+                value={highlightsHeading}
+                onChange={(e) => setHighlightsHeading(e.target.value)}
+                placeholder="Featured collections and picks."
+                className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={highlightsSectionSaving}
+              className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              onClick={async () => {
+                try {
+                  setHighlightsSectionSaving(true);
+                  const row = await j<SiteSettingsRow>(
+                    await fetch("/api/admin/marketing/settings", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        highlights_section_eyebrow: highlightsEyebrow.trim() || null,
+                        highlights_section_heading: highlightsHeading.trim() || null,
+                      }),
+                    })
+                  );
+                  setHighlightsEyebrow(row.highlights_section_eyebrow ?? "");
+                  setHighlightsHeading(row.highlights_section_heading ?? "");
+                  toast.success("Highlights heading saved");
+                  router.refresh();
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : "Failed");
+                } finally {
+                  setHighlightsSectionSaving(false);
+                }
+              }}
+            >
+              {highlightsSectionSaving ? "Saving…" : "Save heading"}
+            </button>
+          </div>
+
           <ul className="divide-y divide-gray-3 text-sm">
             {highlights.map((row: any) => (
               <li key={row.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
@@ -1289,6 +1437,103 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
               }}
             >
               Save coupon
+            </button>
+          </section>
+
+          <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4 max-w-3xl">
+            <h2 className="text-lg font-semibold">Quick Links pages content</h2>
+            <p className="text-sm text-meta-3">
+              Edit the title, subtitle, and full content shown on Privacy Policy, Terms &amp; Conditions,
+              Return &amp; Cancellation, FAQ, and Contact pages.
+            </p>
+
+            <label className="block max-w-sm">
+              <span className="text-sm font-medium">Page</span>
+              <select
+                value={quickLinkPageKey}
+                onChange={(e) => {
+                  const key = e.target.value as QuickLinkPageAdminKey;
+                  setQuickLinkPageKey(key);
+                  setQuickLinkTitle(quickLinkPages[key].title);
+                  setQuickLinkSubtitle(quickLinkPages[key].subtitle);
+                  setQuickLinkContent(quickLinkPages[key].content);
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              >
+                <option value="privacy">Privacy Policy</option>
+                <option value="terms">Terms &amp; Conditions</option>
+                <option value="returns">Return &amp; Cancellation</option>
+                <option value="faq">FAQ</option>
+                <option value="contact">Contact</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium">Title</span>
+              <input
+                value={quickLinkTitle}
+                onChange={(e) => setQuickLinkTitle(e.target.value)}
+                placeholder={`${quickLinkFieldMap[quickLinkPageKey].label}`}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Subtitle</span>
+              <input
+                value={quickLinkSubtitle}
+                onChange={(e) => setQuickLinkSubtitle(e.target.value)}
+                placeholder="One-line intro below title"
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Content</span>
+              <textarea
+                value={quickLinkContent}
+                onChange={(e) => setQuickLinkContent(e.target.value)}
+                rows={12}
+                className="mt-1 w-full rounded-lg border border-gray-3 px-3 py-2 text-sm font-mono"
+                placeholder="Write full page content here. New lines are preserved."
+              />
+            </label>
+            <button
+              type="button"
+              disabled={quickLinkSaving}
+              className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              onClick={async () => {
+                try {
+                  setQuickLinkSaving(true);
+                  const map = quickLinkFieldMap[quickLinkPageKey];
+                  const row = await j<SiteSettingsRow>(
+                    await fetch("/api/admin/marketing/settings", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        [map.title]: quickLinkTitle.trim() || null,
+                        [map.subtitle]: quickLinkSubtitle.trim() || null,
+                        [map.content]: quickLinkContent.trim() || null,
+                      }),
+                    })
+                  );
+                  const next = {
+                    title: String((row[map.title] ?? "") as string),
+                    subtitle: String((row[map.subtitle] ?? "") as string),
+                    content: String((row[map.content] ?? "") as string),
+                  };
+                  setQuickLinkPages((prev) => ({ ...prev, [quickLinkPageKey]: next }));
+                  setQuickLinkTitle(next.title);
+                  setQuickLinkSubtitle(next.subtitle);
+                  setQuickLinkContent(next.content);
+                  toast.success("Page content saved");
+                  router.refresh();
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : "Failed");
+                } finally {
+                  setQuickLinkSaving(false);
+                }
+              }}
+            >
+              {quickLinkSaving ? "Saving…" : "Save page content"}
             </button>
           </section>
 

@@ -66,7 +66,7 @@ export default async function SiteLayout({
         </Providers>
 
         <ScrollToTop />
-        <WhatsAppFloatingButton />
+        <WhatsAppFloatingButton phone={storeContact.contactPhone} />
         <Footer storeContact={storeContact} />
       </>
     </div>

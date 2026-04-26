@@ -14,6 +14,7 @@ export type ShopListingItem = {
   diecastScale: string | null;
   price: number;
   discountedPrice: number | null;
+  shippingPerUnit: number;
   slug: string;
   quantity: number;
   updatedAt: Date;
@@ -213,6 +214,7 @@ function mapProductsToItems(
     slug: string;
     updated_at: Date;
     sku: string | null;
+    shipping_per_unit: { toString(): string } | number | null;
     product_images: { url: string; sort_order: number }[];
     product_variants: { color: string | null; size: string | null; is_default: boolean }[];
     inventory: { available_quantity: number }[];
@@ -237,6 +239,7 @@ function mapProductsToItems(
       diecastScale: p.diecast_scales?.ratio ?? null,
       price: basePrice,
       discountedPrice: effectiveDiscounted,
+      shippingPerUnit: Number(p.shipping_per_unit ?? 0),
       slug: p.slug,
       quantity,
       updatedAt: p.updated_at,
@@ -444,6 +447,7 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
         slug: true,
         updated_at: true,
         sku: true,
+        shipping_per_unit: true,
         product_images: { select: { url: true, sort_order: true } },
         product_variants: { select: { color: true, size: true, is_default: true } },
         inventory: { select: { available_quantity: true } },
@@ -495,6 +499,7 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
         slug: true,
         updated_at: true,
         sku: true,
+        shipping_per_unit: true,
         product_images: { select: { url: true, sort_order: true } },
         product_variants: { select: { color: true, size: true, is_default: true } },
         inventory: { select: { available_quantity: true } },

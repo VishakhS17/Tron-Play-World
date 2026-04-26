@@ -213,6 +213,15 @@ export default function AdminCsvPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() =>
+              downloadCsv("/api/admin/csv/inventory/export", `inventory-export-${exportDate}.csv`)
+            }
+            className="rounded-lg border border-gray-3 bg-white px-4 py-2 text-sm font-medium text-dark hover:bg-gray-1"
+          >
+            Download all inventory
+          </button>
+          <button
+            type="button"
             onClick={() => downloadCsv("/api/admin/csv/inventory/template", "Inventory.csv")}
             className="rounded-lg border border-gray-3 bg-white px-4 py-2 text-sm font-medium text-dark hover:bg-gray-1"
           >

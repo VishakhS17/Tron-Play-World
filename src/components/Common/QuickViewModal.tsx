@@ -55,6 +55,7 @@ const QuickViewModal = () => {
       id: product.id,
       name: product.title,
       price: product.discountedPrice ? product.discountedPrice : product.price,
+      shippingPerUnit: Number((product as any).shippingPerUnit ?? 0),
       currency: "usd",
       image: defaultVariant?.image ? defaultVariant.image : "",
       price_id: null,

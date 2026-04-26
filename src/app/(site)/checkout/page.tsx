@@ -37,6 +37,17 @@ export default function CheckoutPage() {
     total: number;
   } | null>(null);
 
+  const deliveryCharge = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const perUnit = Math.max(0, Number((item as any).shippingPerUnit ?? 0));
+      return sum + perUnit * Number(item.quantity || 0);
+    }, 0);
+  }, [items]);
+
+  const previewSubtotal = Number(totalPrice || 0);
+  const previewDiscount = couponBreakdown?.discount ?? 0;
+  const previewTotal = Math.max(0, previewSubtotal - previewDiscount) + deliveryCharge;
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -292,15 +303,9 @@ export default function CheckoutPage() {
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-meta-3">Subtotal</span>
-                <span className="font-medium text-dark">
-                  {pricing
-                    ? formatPrice(pricing.subtotal)
-                    : totalPrice
-                      ? formatPrice(totalPrice)
-                      : formatPrice(0)}
-                </span>
+                <span className="font-medium text-dark">{formatPrice(previewSubtotal)}</span>
               </div>
-              {couponBreakdown && !pricing ? (
+              {couponBreakdown ? (
                 <>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-meta-3">Coupon ({couponBreakdown.code.toUpperCase()})</span>
@@ -314,29 +319,20 @@ export default function CheckoutPage() {
                   </div>
                 </>
               ) : null}
-              {pricing && pricing.discount > 0 ? (
+              {couponBreakdown && couponBreakdown.discount > 0 ? (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-meta-3">Discount</span>
-                  <span className="font-medium text-dark">−{formatPrice(pricing.discount)}</span>
+                  <span className="font-medium text-dark">−{formatPrice(couponBreakdown.discount)}</span>
                 </div>
               ) : null}
-              {pricing ? (
-                <>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-meta-3">Shipping</span>
-                    <span className="font-medium text-dark">{formatPrice(pricing.shipping)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm border-t border-gray-3 pt-3">
-                    <span className="font-medium text-dark">Total</span>
-                    <span className="text-lg font-semibold text-dark">{formatPrice(pricing.total)}</span>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-meta-4">
-                  Final shipping and total are confirmed when you pay (free shipping over ₹2,000; otherwise default or
-                  per-product rates from the catalog).
-                </p>
-              )}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-meta-3">Delivery charge</span>
+                <span className="font-medium text-dark">{formatPrice(deliveryCharge)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm border-t border-gray-3 pt-3">
+                <span className="font-medium text-dark">Total</span>
+                <span className="text-lg font-semibold text-dark">{formatPrice(previewTotal)}</span>
+              </div>
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-dark">Coupon</span>

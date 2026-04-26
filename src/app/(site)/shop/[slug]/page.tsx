@@ -120,6 +120,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               price={product.price}
               discountedPrice={product.discountedPrice}
               quantity={product.quantity}
+              shippingPerUnit={product.shippingPerUnit ?? 0}
               color={product.productVariants?.find((v) => v.isDefault)?.color || ""}
               size={product.productVariants?.find((v) => v.isDefault)?.size || ""}
             />

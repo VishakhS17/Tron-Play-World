@@ -3,6 +3,7 @@ import Link from "next/link";
 import { formatPrice } from "@/utils/formatePrice";
 import HeroBannerCarousel, { type HeroSlide } from "./HeroBannerCarousel";
 import HomeHighlightsSection from "./HomeHighlightsSection";
+import HomeProductCarouselSection from "./HomeProductCarouselSection";
 
 export type HomeBrandRailItem = {
   id: string;
@@ -40,6 +41,10 @@ export type HomeProductCard = {
 
 type HomeProps = {
   heroSlides?: HeroSlide[];
+  /** Small label above the highlights carousel (defaults if omitted). */
+  highlightsSectionEyebrow?: string;
+  /** Main heading under the label (defaults if omitted). */
+  highlightsSectionHeading?: string;
   highlights?: HomeHighlightCard[];
   brandRail?: HomeBrandRailItem[];
   categories?: HomeCategoryTile[];
@@ -76,6 +81,8 @@ function isRemoteImage(url: string) {
 
 const Home = ({
   heroSlides,
+  highlightsSectionEyebrow = "Highlights",
+  highlightsSectionHeading = "Featured collections and picks.",
   highlights,
   brandRail,
   categories,
@@ -117,10 +124,10 @@ const Home = ({
         <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
           <div className="max-w-2xl mx-auto mb-10 text-center">
             <p className="mb-2 text-xs font-semibold tracking-[0.18em] uppercase text-blue">
-              Highlights
+              {highlightsSectionEyebrow}
             </p>
             <h2 className="mb-3 text-2xl font-semibold sm:text-3xl text-dark">
-              Featured collections and picks.
+              {highlightsSectionHeading}
             </h2>
             <p className="text-sm leading-relaxed text-meta-3 sm:text-base">
               Cards below are managed in Admin → Marketing (featured, trending, categories, or
@@ -147,39 +154,7 @@ const Home = ({
               View all
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {(newArrivals ?? []).map((p) => (
-              <Link
-                key={p.id}
-                href={`/shop/${p.slug}`}
-                className="group overflow-hidden rounded-2xl border border-gray-3 bg-white hover:border-blue/40"
-              >
-                <div className="relative aspect-square bg-gray-2">
-                  <Image
-                    src={p.image}
-                    alt={p.title}
-                    fill
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="object-cover"
-                    unoptimized={isRemoteImage(p.image)}
-                  />
-                </div>
-                <div className="p-3">
-                  <h3 className="line-clamp-2 text-sm font-semibold text-dark">{p.title}</h3>
-                  <div className="mt-2 flex items-center gap-2">
-                    {p.discountedPrice != null ? (
-                      <>
-                        <span className="text-sm font-semibold text-blue">{formatPrice(p.discountedPrice)}</span>
-                        <span className="text-xs line-through text-meta-4">{formatPrice(p.price)}</span>
-                      </>
-                    ) : (
-                      <span className="text-sm font-semibold text-dark">{formatPrice(p.price)}</span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <HomeProductCarouselSection items={newArrivals ?? null} />
         </div>
       </section>
 

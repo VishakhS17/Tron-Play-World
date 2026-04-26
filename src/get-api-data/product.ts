@@ -52,8 +52,9 @@ export const getNewArrivalsProduct = unstable_cache(
         inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
         sku: true,
+        shipping_per_unit: true,
       },
-      take: 8
+      take: 24
     });
     return products.map((item) => ({
       id: item.id,
@@ -66,6 +67,7 @@ export const getNewArrivalsProduct = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
+      shippingPerUnit: Number(item.shipping_per_unit ?? 0),
       diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",
@@ -104,6 +106,7 @@ const bestSellerProductSelect = {
   inventory: { select: { available_quantity: true } },
   product_images: { select: { url: true, sort_order: true } },
   sku: true,
+  shipping_per_unit: true,
 } satisfies Prisma.productsSelect;
 
 type BestSellerProductRow = Prisma.productsGetPayload<{
@@ -121,6 +124,7 @@ const mapProductToHomeCard = (item: BestSellerProductRow) => ({
   slug: item.slug,
   quantity: getInventoryQuantity(item.inventory),
   sku: item.sku ?? "",
+  shippingPerUnit: Number(item.shipping_per_unit ?? 0),
   diecastScale: item.diecast_scales?.ratio ?? null,
   tags: [],
   offers: "",
@@ -217,6 +221,7 @@ export const getLatestProducts = unstable_cache(
         inventory: { select: { available_quantity: true } },
         product_images: { select: { url: true, sort_order: true } },
         sku: true,
+        shipping_per_unit: true,
       },
       orderBy: [{ updated_at: "desc" }],
       take: 3
@@ -232,6 +237,7 @@ export const getLatestProducts = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: item.sku ?? "",
+      shippingPerUnit: Number(item.shipping_per_unit ?? 0),
       diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",
@@ -279,6 +285,7 @@ export const getAllProducts = unstable_cache(
           inventory: { select: { available_quantity: true } },
           product_images: { select: { url: true, sort_order: true } },
           sku: true,
+          shipping_per_unit: true,
         },
       })
       return products.map((item) => ({
@@ -292,6 +299,7 @@ export const getAllProducts = unstable_cache(
         slug: item.slug,
         quantity: getInventoryQuantity(item.inventory),
         sku: item.sku ?? "",
+        shippingPerUnit: Number(item.shipping_per_unit ?? 0),
         diecastScale: item.diecast_scales?.ratio ?? null,
         tags: [],
         offers: "",
@@ -345,6 +353,7 @@ export const getProductBySlug = async (slug: string) => {
       product_images: { select: { url: true, sort_order: true } },
       inventory: { select: { available_quantity: true } },
       sku: true,
+      shipping_per_unit: true,
     },
   });
   if (!product) return null;
@@ -370,6 +379,7 @@ export const getProductBySlug = async (slug: string) => {
     slug: product.slug,
     quantity: getInventoryQuantity(product.inventory),
     sku: product.sku ?? "",
+    shippingPerUnit: Number(product.shipping_per_unit ?? 0),
     tags: [],
     offers: "",
     updatedAt: product.updated_at,
@@ -407,6 +417,7 @@ export const getProductById = async (productId: string) => {
       slug: true,
       updated_at: true,
       sku: true,
+      shipping_per_unit: true,
       product_images: { select: { url: true, sort_order: true } },
       product_variants: { select: { color: true, size: true, is_default: true } },
       inventory: { select: { available_quantity: true } },
@@ -427,6 +438,7 @@ export const getProductById = async (productId: string) => {
     slug: product.slug,
     quantity: getInventoryQuantity(product.inventory),
     sku: product.sku ?? "",
+    shippingPerUnit: Number(product.shipping_per_unit ?? 0),
     tags: [],
     offers: "",
     updatedAt: product.updated_at,
@@ -462,6 +474,7 @@ export const getRelatedProducts = unstable_cache(
         product_images: { select: { url: true, sort_order: true } },
         product_variants: { select: { color: true, size: true, is_default: true } },
         inventory: { select: { available_quantity: true } },
+        shipping_per_unit: true,
       },
       where: {
         id: {
@@ -486,6 +499,7 @@ export const getRelatedProducts = unstable_cache(
       slug: item.slug,
       quantity: getInventoryQuantity(item.inventory),
       sku: "",
+      shippingPerUnit: Number(item.shipping_per_unit ?? 0),
       diecastScale: item.diecast_scales?.ratio ?? null,
       tags: [],
       offers: "",

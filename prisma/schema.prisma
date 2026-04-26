@@ -702,6 +702,30 @@ model flash_sale_products {
 model site_marketing_settings {
   id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   first_visit_coupon_code String?  @db.VarChar(80)
+  /// Homepage highlights block — small label above the carousel (CSS may uppercase).
+  highlights_section_eyebrow  String? @db.VarChar(120)
+  /// Homepage highlights block — main heading under the label.
+  highlights_section_heading  String? @db.VarChar(255)
+  /// Quick Links CMS: Privacy Policy page.
+  privacy_page_title      String?  @db.VarChar(255)
+  privacy_page_subtitle   String?  @db.VarChar(500)
+  privacy_page_content    String?
+  /// Quick Links CMS: Terms & Conditions page.
+  terms_page_title        String?  @db.VarChar(255)
+  terms_page_subtitle     String?  @db.VarChar(500)
+  terms_page_content      String?
+  /// Quick Links CMS: Return & Cancellation page.
+  returns_page_title      String?  @db.VarChar(255)
+  returns_page_subtitle   String?  @db.VarChar(500)
+  returns_page_content    String?
+  /// Quick Links CMS: FAQ page.
+  faq_page_title          String?  @db.VarChar(255)
+  faq_page_subtitle       String?  @db.VarChar(500)
+  faq_page_content        String?
+  /// Quick Links CMS: Contact page.
+  contact_page_title      String?  @db.VarChar(255)
+  contact_page_subtitle   String?  @db.VarChar(500)
+  contact_page_content    String?
   /// Footer “Help & Support” block title
   help_support_title      String?  @db.VarChar(120)
   contact_address         String?

@@ -44,6 +44,53 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  if (body.highlights_section_eyebrow !== undefined) {
+    data.highlights_section_eyebrow = cleanOptionalText(body.highlights_section_eyebrow, 120);
+  }
+  if (body.highlights_section_heading !== undefined) {
+    data.highlights_section_heading = cleanOptionalText(body.highlights_section_heading, 255);
+  }
+  if (body.privacy_page_title !== undefined) data.privacy_page_title = cleanOptionalText(body.privacy_page_title, 255);
+  if (body.privacy_page_subtitle !== undefined) data.privacy_page_subtitle = cleanOptionalText(body.privacy_page_subtitle, 500);
+  if (body.privacy_page_content !== undefined) {
+    data.privacy_page_content =
+      body.privacy_page_content === null || body.privacy_page_content === ""
+        ? null
+        : cleanText(body.privacy_page_content, 50_000);
+  }
+  if (body.terms_page_title !== undefined) data.terms_page_title = cleanOptionalText(body.terms_page_title, 255);
+  if (body.terms_page_subtitle !== undefined) data.terms_page_subtitle = cleanOptionalText(body.terms_page_subtitle, 500);
+  if (body.terms_page_content !== undefined) {
+    data.terms_page_content =
+      body.terms_page_content === null || body.terms_page_content === ""
+        ? null
+        : cleanText(body.terms_page_content, 50_000);
+  }
+  if (body.returns_page_title !== undefined) data.returns_page_title = cleanOptionalText(body.returns_page_title, 255);
+  if (body.returns_page_subtitle !== undefined) data.returns_page_subtitle = cleanOptionalText(body.returns_page_subtitle, 500);
+  if (body.returns_page_content !== undefined) {
+    data.returns_page_content =
+      body.returns_page_content === null || body.returns_page_content === ""
+        ? null
+        : cleanText(body.returns_page_content, 50_000);
+  }
+  if (body.faq_page_title !== undefined) data.faq_page_title = cleanOptionalText(body.faq_page_title, 255);
+  if (body.faq_page_subtitle !== undefined) data.faq_page_subtitle = cleanOptionalText(body.faq_page_subtitle, 500);
+  if (body.faq_page_content !== undefined) {
+    data.faq_page_content =
+      body.faq_page_content === null || body.faq_page_content === ""
+        ? null
+        : cleanText(body.faq_page_content, 50_000);
+  }
+  if (body.contact_page_title !== undefined) data.contact_page_title = cleanOptionalText(body.contact_page_title, 255);
+  if (body.contact_page_subtitle !== undefined) data.contact_page_subtitle = cleanOptionalText(body.contact_page_subtitle, 500);
+  if (body.contact_page_content !== undefined) {
+    data.contact_page_content =
+      body.contact_page_content === null || body.contact_page_content === ""
+        ? null
+        : cleanText(body.contact_page_content, 50_000);
+  }
+
   if (body.help_support_title !== undefined) {
     data.help_support_title = cleanOptionalText(body.help_support_title, 120);
   }
@@ -81,6 +128,23 @@ export async function PATCH(req: NextRequest) {
   const baseCreate = {
     id: SITE_MARKETING_SETTINGS_ID,
     first_visit_coupon_code: null as string | null,
+    highlights_section_eyebrow: null as string | null,
+    highlights_section_heading: null as string | null,
+    privacy_page_title: null as string | null,
+    privacy_page_subtitle: null as string | null,
+    privacy_page_content: null as string | null,
+    terms_page_title: null as string | null,
+    terms_page_subtitle: null as string | null,
+    terms_page_content: null as string | null,
+    returns_page_title: null as string | null,
+    returns_page_subtitle: null as string | null,
+    returns_page_content: null as string | null,
+    faq_page_title: null as string | null,
+    faq_page_subtitle: null as string | null,
+    faq_page_content: null as string | null,
+    contact_page_title: null as string | null,
+    contact_page_subtitle: null as string | null,
+    contact_page_content: null as string | null,
     help_support_title: null as string | null,
     contact_address: null as string | null,
     contact_phone: null as string | null,

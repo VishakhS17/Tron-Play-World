@@ -38,6 +38,14 @@ export function phoneToTelHref(phone: string) {
   return compact.startsWith("+") ? `tel:${compact}` : `tel:${compact}`;
 }
 
+/** `wa.me` href from display phone string (keeps digits only). */
+export function phoneToWhatsAppHref(phone: string, message?: string) {
+  const digits = phone.replace(/\D+/g, "");
+  const target = digits || "919844716214";
+  const text = encodeURIComponent(message ?? "Hi! I have a question about an order / product.");
+  return `https://wa.me/${target}?text=${text}`;
+}
+
 export const getStoreContactDisplay = cache(async function getStoreContactDisplay(): Promise<StoreContactDisplay> {
   const row = await prisma.site_marketing_settings
     .findUnique({

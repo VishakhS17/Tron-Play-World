@@ -5,6 +5,7 @@ export type Product = {
   title: string;
   price: number;
   discountedPrice?: number | null;
+  shippingPerUnit?: number;
   slug: string;
   quantity: number;
   updatedAt: Date;
@@ -32,6 +33,7 @@ export type IProductByDetails = {
   id: string;
   title: string;
   shortDescription: string;
+  shippingPerUnit?: number;
   ageGroup?: string | null;
   diecastScale?: string | null;
   description: string | null;
