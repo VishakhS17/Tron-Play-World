@@ -198,7 +198,7 @@ export default async function ShopPage({ searchParams }: Props) {
             className="w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm outline-none focus:border-blue"
           />
         </div>
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Age groups</summary>
           <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
             {ageGroups.map((group) => (
@@ -212,7 +212,7 @@ export default async function ShopPage({ searchParams }: Props) {
           </ul>
         </details>
 
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Categories</summary>
           <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
             {allCategories.length > 0 ? (
@@ -238,7 +238,7 @@ export default async function ShopPage({ searchParams }: Props) {
           </ul>
         </details>
 
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Brands</summary>
           <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
             {shopBrands.map((b) => (
@@ -252,7 +252,7 @@ export default async function ShopPage({ searchParams }: Props) {
           </ul>
         </details>
 
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Product types</summary>
           <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
             {productTypes.map((t) => (
@@ -267,7 +267,7 @@ export default async function ShopPage({ searchParams }: Props) {
           </ul>
         </details>
 
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Subtypes</summary>
           <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
             {productSubtypes.map((s) => (
@@ -282,7 +282,7 @@ export default async function ShopPage({ searchParams }: Props) {
           </ul>
         </details>
 
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Collections</summary>
           <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
             {productCollections.map((c) => (
@@ -302,7 +302,7 @@ export default async function ShopPage({ searchParams }: Props) {
           </ul>
         </details>
 
-        <details className="rounded-lg border border-gray-3 p-3" open>
+        <details className="rounded-lg border border-gray-3 p-3">
           <summary className="cursor-pointer text-sm font-semibold text-dark">Discount</summary>
           <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
             {discountBuckets.map((d) => (
@@ -317,7 +317,7 @@ export default async function ShopPage({ searchParams }: Props) {
         </details>
 
         {showScales ? (
-          <details className="rounded-lg border border-gray-3 p-3" open>
+          <details className="rounded-lg border border-gray-3 p-3">
             <summary className="cursor-pointer text-sm font-semibold text-dark">Scales</summary>
             <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto">
               {diecastScales.map((s) => (
