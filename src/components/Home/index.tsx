@@ -41,6 +41,13 @@ export type HomeProductCard = {
 
 type HomeProps = {
   heroSlides?: HeroSlide[];
+  heroOverlay?: {
+    eyebrow?: string;
+    heading?: string;
+    subheading?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+  };
   /** Small label above the highlights carousel (defaults if omitted). */
   highlightsSectionEyebrow?: string;
   /** Main heading under the label (defaults if omitted). */
@@ -81,6 +88,7 @@ function isRemoteImage(url: string) {
 
 const Home = ({
   heroSlides,
+  heroOverlay,
   highlightsSectionEyebrow = "Highlights",
   highlightsSectionHeading = "Featured collections and picks.",
   highlights,
@@ -97,7 +105,7 @@ const Home = ({
   return (
     <main className="bg-white">
       <section className="relative overflow-hidden pt-32">
-        <HeroBannerCarousel slides={heroSlides} />
+        <HeroBannerCarousel slides={heroSlides} overlay={heroOverlay} />
       </section>
 
       <section className="border-b border-gray-3 bg-white">

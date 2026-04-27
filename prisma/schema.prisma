@@ -130,8 +130,58 @@ model categories {
   coupon_categories coupon_categories[]
   homepage_highlights homepage_highlights[]
   homepage_category_tiles homepage_category_tiles[]
+  product_types     product_types[]
 
   @@index([parent_id], map: "idx_categories_parent_id")
+}
+
+/// Per-category product type (e.g. "RC Car"). Slug is globally unique for simple URL params.
+model product_types {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category_id String  @db.Uuid
+  name       String   @db.VarChar(120)
+  slug       String   @unique @db.VarChar(160)
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  categories categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_subtypes product_subtypes[]
+  products   products[]
+
+  @@index([category_id], map: "idx_product_types_category_id")
+  @@index([is_active], map: "idx_product_types_is_active")
+}
+
+/// Subtype of a product type. Slug is globally unique.
+model product_subtypes {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_type_id String   @db.Uuid
+  name            String   @db.VarChar(120)
+  slug            String   @unique @db.VarChar(160)
+  is_active       Boolean  @default(true)
+  sort_order      Int      @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+  product_types   product_types @relation(fields: [product_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products        products[]
+
+  @@index([product_type_id], map: "idx_product_subtypes_type_id")
+  @@index([is_active], map: "idx_product_subtypes_is_active")
+}
+
+/// Optional merchandising collection (e.g. "Summer Sale"). Slug is globally unique.
+model product_collections {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String   @db.VarChar(120)
+  slug       String   @unique @db.VarChar(160)
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  products   products[]
+
+  @@index([is_active], map: "idx_product_collections_is_active")
 }
 
 model coupon_usages {
@@ -328,6 +378,9 @@ model products {
   hsn_code               String?                  @db.VarChar(32)
   diecast_scale_id       String?                  @db.Uuid
   category_id            String?                  @db.Uuid
+  type_id                String?                  @db.Uuid
+  subtype_id             String?                  @db.Uuid
+  collection_id          String?                  @db.Uuid
   brand_id               String?                  @db.Uuid
   is_active              Boolean                  @default(true)
   created_at             DateTime                 @default(now()) @db.Timestamptz(6)
@@ -342,6 +395,9 @@ model products {
   brands                 brands?                  @relation(fields: [brand_id], references: [id], onUpdate: NoAction)
   diecast_scales         diecast_scales?          @relation(fields: [diecast_scale_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   categories             categories?              @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  product_types          product_types?           @relation(fields: [type_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  product_subtypes       product_subtypes?         @relation(fields: [subtype_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  product_collections    product_collections?     @relation(fields: [collection_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   reviews                reviews[]
   wishlist_items         wishlist_items[]
   homepage_highlights    homepage_highlights[]
@@ -351,6 +407,9 @@ model products {
   @@index([brand_id], map: "idx_products_brand_id")
   @@index([diecast_scale_id], map: "idx_products_diecast_scale_id")
   @@index([category_id], map: "idx_products_category_id")
+  @@index([type_id], map: "idx_products_type_id")
+  @@index([subtype_id], map: "idx_products_subtype_id")
+  @@index([collection_id], map: "idx_products_collection_id")
   @@index([is_active], map: "idx_products_is_active")
   @@index([search_vector], map: "idx_products_search_vector", type: Gin)
 }
@@ -702,6 +761,16 @@ model flash_sale_products {
 model site_marketing_settings {
   id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   first_visit_coupon_code String?  @db.VarChar(80)
+  /// Homepage hero overlay eyebrow (small uppercase line).
+  hero_overlay_eyebrow    String?  @db.VarChar(120)
+  /// Homepage hero overlay main heading text.
+  hero_overlay_heading    String?  @db.VarChar(255)
+  /// Homepage hero overlay supporting subheading text.
+  hero_overlay_subheading String?
+  /// Homepage hero overlay CTA button label.
+  hero_overlay_cta_label  String?  @db.VarChar(120)
+  /// Homepage hero overlay CTA URL.
+  hero_overlay_cta_href   String?  @db.VarChar(500)
   /// Homepage highlights block — small label above the carousel (CSS may uppercase).
   highlights_section_eyebrow  String? @db.VarChar(120)
   /// Homepage highlights block — main heading under the label.

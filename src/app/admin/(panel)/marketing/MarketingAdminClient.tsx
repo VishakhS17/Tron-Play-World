@@ -8,6 +8,11 @@ import toast from "react-hot-toast";
 type SiteSettingsRow = {
   id?: string;
   first_visit_coupon_code?: string | null;
+  hero_overlay_eyebrow?: string | null;
+  hero_overlay_heading?: string | null;
+  hero_overlay_subheading?: string | null;
+  hero_overlay_cta_label?: string | null;
+  hero_overlay_cta_href?: string | null;
   highlights_section_eyebrow?: string | null;
   highlights_section_heading?: string | null;
   privacy_page_title?: string | null;
@@ -99,6 +104,11 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
   const [socialTwitter, setSocialTwitter] = useState(st0?.social_twitter_url ?? "");
   const [socialInstagram, setSocialInstagram] = useState(st0?.social_instagram_url ?? "");
   const [socialLinkedIn, setSocialLinkedIn] = useState(st0?.social_linkedin_url ?? "");
+  const [heroOverlayEyebrow, setHeroOverlayEyebrow] = useState(st0?.hero_overlay_eyebrow ?? "");
+  const [heroOverlayHeading, setHeroOverlayHeading] = useState(st0?.hero_overlay_heading ?? "");
+  const [heroOverlaySubheading, setHeroOverlaySubheading] = useState(st0?.hero_overlay_subheading ?? "");
+  const [heroOverlayCtaLabel, setHeroOverlayCtaLabel] = useState(st0?.hero_overlay_cta_label ?? "");
+  const [heroOverlayCtaHref, setHeroOverlayCtaHref] = useState(st0?.hero_overlay_cta_href ?? "");
   const [quickLinkPages, setQuickLinkPages] = useState<
     Record<QuickLinkPageAdminKey, { title: string; subtitle: string; content: string }>
   >({
@@ -136,6 +146,7 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
   const [highlightsHeading, setHighlightsHeading] = useState(st0?.highlights_section_heading ?? "");
   const [storefrontSaving, setStorefrontSaving] = useState(false);
   const [quickLinkSaving, setQuickLinkSaving] = useState(false);
+  const [heroOverlaySaving, setHeroOverlaySaving] = useState(false);
   const [highlightsSectionSaving, setHighlightsSectionSaving] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const [highlightUploading, setHighlightUploading] = useState(false);
@@ -313,6 +324,96 @@ export default function MarketingAdminClient({ initial }: { initial: Initial }) 
       {tab === "hero" ? (
         <section className="rounded-2xl border border-gray-3 bg-white p-6 space-y-4">
           <h2 className="text-lg font-semibold">Hero slides</h2>
+          <div className="rounded-xl border border-gray-3 bg-gray-1/40 p-4 space-y-3 max-w-2xl">
+            <h3 className="text-sm font-semibold text-dark">Hero overlay text (homepage)</h3>
+            <p className="text-xs text-meta-3">
+              This text stays over the moving hero images. Leave a field empty and save to use default text.
+            </p>
+            <label className="block">
+              <span className="text-sm font-medium">Eyebrow</span>
+              <input
+                value={heroOverlayEyebrow}
+                onChange={(e) => setHeroOverlayEyebrow(e.target.value)}
+                placeholder="Tron Play World"
+                className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Main heading</span>
+              <input
+                value={heroOverlayHeading}
+                onChange={(e) => setHeroOverlayHeading(e.target.value)}
+                placeholder="India's Ultimate Toy & RC Destination"
+                className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">Subheading</span>
+              <textarea
+                value={heroOverlaySubheading}
+                onChange={(e) => setHeroOverlaySubheading(e.target.value)}
+                rows={3}
+                placeholder="RC cars, anime figures, diecast models, board games, and more."
+                className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-medium">CTA label</span>
+                <input
+                  value={heroOverlayCtaLabel}
+                  onChange={(e) => setHeroOverlayCtaLabel(e.target.value)}
+                  placeholder="Shop Now"
+                  className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-sm font-medium">CTA link</span>
+                <input
+                  value={heroOverlayCtaHref}
+                  onChange={(e) => setHeroOverlayCtaHref(e.target.value)}
+                  placeholder="/shop"
+                  className="mt-1 w-full rounded-lg border border-gray-3 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={heroOverlaySaving}
+              className="rounded-lg bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              onClick={async () => {
+                try {
+                  setHeroOverlaySaving(true);
+                  const row = await j<SiteSettingsRow>(
+                    await fetch("/api/admin/marketing/settings", {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        hero_overlay_eyebrow: heroOverlayEyebrow.trim() || null,
+                        hero_overlay_heading: heroOverlayHeading.trim() || null,
+                        hero_overlay_subheading: heroOverlaySubheading.trim() || null,
+                        hero_overlay_cta_label: heroOverlayCtaLabel.trim() || null,
+                        hero_overlay_cta_href: heroOverlayCtaHref.trim() || null,
+                      }),
+                    })
+                  );
+                  setHeroOverlayEyebrow(row.hero_overlay_eyebrow ?? "");
+                  setHeroOverlayHeading(row.hero_overlay_heading ?? "");
+                  setHeroOverlaySubheading(row.hero_overlay_subheading ?? "");
+                  setHeroOverlayCtaLabel(row.hero_overlay_cta_label ?? "");
+                  setHeroOverlayCtaHref(row.hero_overlay_cta_href ?? "");
+                  toast.success("Hero overlay text saved");
+                  router.refresh();
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : "Failed");
+                } finally {
+                  setHeroOverlaySaving(false);
+                }
+              }}
+            >
+              {heroOverlaySaving ? "Saving…" : "Save hero overlay"}
+            </button>
+          </div>
           <ul className="divide-y divide-gray-3 text-sm">
             {slides.map((row: any) => (
               <li key={row.id} className="py-3 flex flex-wrap items-center justify-between gap-2">

@@ -15,6 +15,7 @@ const AGE_GROUPS = [
   "0-2 years", "2-4 years", "4-6 years", "6-8 years",
   "8-10 years", "10-12 years", "12+ years", "All ages",
 ];
+const DIECAST_ONLY_CATEGORY = "toy cars, trains & vehicles";
 
 export default function EditProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +28,11 @@ export default function EditProductPage() {
   const [categories, setCategories] = useState<Option[]>([]);
   const [brands, setBrands] = useState<Option[]>([]);
   const [diecastScales, setDiecastScales] = useState<Option[]>([]);
+  const [productTypes, setProductTypes] = useState<Option[]>([]);
+  const [productSubtypes, setProductSubtypes] = useState<Option[]>([]);
+  const [collections, setCollections] = useState<Option[]>([]);
+  const selectedCategory = categories.find((c) => c.id === form?.category_id);
+  const showDiecastScale = selectedCategory?.name?.trim().toLowerCase() === DIECAST_ONLY_CATEGORY;
 
   useEffect(() => {
     const readJsonSafe = async (res: Response) => {
@@ -41,24 +47,27 @@ export default function EditProductPage() {
 
     (async () => {
       try {
-        const [productRes, catRes, brandRes, scaleRes] = await Promise.all([
+        const [productRes, catRes, brandRes, scaleRes, colRes] = await Promise.all([
           fetch(`/api/admin/products/${id}`),
           fetch("/api/admin/categories"),
           fetch("/api/admin/brands"),
           fetch("/api/admin/diecast-scales"),
+          fetch("/api/admin/product-collections"),
         ]);
-        const [product, cats, brnds, scales] = await Promise.all([
+        const [product, cats, brnds, scales, cols] = await Promise.all([
           readJsonSafe(productRes),
           readJsonSafe(catRes),
           readJsonSafe(brandRes),
           readJsonSafe(scaleRes),
+          readJsonSafe(colRes),
         ]);
-        if (!catRes.ok || !brandRes.ok || !scaleRes.ok) {
+        if (!catRes.ok || !brandRes.ok || !scaleRes.ok || !colRes.ok) {
           const msg =
             (cats as { error?: string } | null)?.error ||
             (brnds as { error?: string } | null)?.error ||
             (scales as { error?: string } | null)?.error ||
-            "Failed to load categories/brands/scales";
+            (cols as { error?: string } | null)?.error ||
+            "Failed to load lists";
           throw new Error(msg);
         }
 
@@ -69,14 +78,52 @@ export default function EditProductPage() {
         setCategories(Array.isArray(cats) ? cats : []);
         setBrands(Array.isArray(brnds) ? brnds : []);
         setDiecastScales(Array.isArray(scales) ? scales : []);
+        setCollections(Array.isArray(cols) ? cols : []);
       } catch (err: unknown) {
         setCategories([]);
         setBrands([]);
         setDiecastScales([]);
+        setCollections([]);
         toast.error(err instanceof Error ? err.message : "Failed to load categories/brands/scales");
       }
     })();
   }, [id]);
+
+  useEffect(() => {
+    const catId = form?.category_id as string | undefined;
+    if (!catId) {
+      setProductTypes([]);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/product-types?category_id=${catId}`);
+        const data = await res.json();
+        if (res.ok) setProductTypes(Array.isArray(data) ? data : []);
+        else setProductTypes([]);
+      } catch {
+        setProductTypes([]);
+      }
+    })();
+  }, [form?.category_id]);
+
+  useEffect(() => {
+    const tid = form?.type_id as string | undefined;
+    if (!tid) {
+      setProductSubtypes([]);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/product-subtypes?type_id=${tid}`);
+        const data = await res.json();
+        if (res.ok) setProductSubtypes(Array.isArray(data) ? data : []);
+        else setProductSubtypes([]);
+      } catch {
+        setProductSubtypes([]);
+      }
+    })();
+  }, [form?.type_id]);
 
   async function save() {
     setLoading(true);
@@ -99,6 +146,10 @@ export default function EditProductPage() {
           available_quantity: Number(form.available_quantity),
           low_stock_threshold: Number(form.low_stock_threshold),
           diecast_scale_id: form.diecast_scale_id || null,
+          category_id: form.category_id || null,
+          type_id: form.type_id || null,
+          subtype_id: form.subtype_id || null,
+          collection_id: form.collection_id || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -386,10 +437,84 @@ export default function EditProductPage() {
           <SelectWithCreate
             label="Category"
             value={form.category_id ?? ""}
-            onChange={(val) => setForm((f: any) => ({ ...f, category_id: val }))}
+            onChange={(val) => {
+              const picked = categories.find((c) => c.id === val);
+              const allowScale = picked?.name?.trim().toLowerCase() === DIECAST_ONLY_CATEGORY;
+              setForm((f: any) => ({
+                ...f,
+                category_id: val,
+                type_id: "",
+                subtype_id: "",
+                diecast_scale_id: allowScale ? f.diecast_scale_id : "",
+              }));
+            }}
             options={categories}
             onCreated={(opt) => setCategories((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))}
+            onDeleted={(id) => {
+              setCategories((prev) => prev.filter((x) => x.id !== id));
+              setProductTypes([]);
+              setProductSubtypes([]);
+              setForm((f: any) => ({ ...f, category_id: "", type_id: "", subtype_id: "" }));
+            }}
             createEndpoint="/api/admin/categories"
+            deleteEndpointBase="/api/admin/categories"
+          />
+
+          <SelectWithCreate
+            label="Product type"
+            value={form.type_id ?? ""}
+            onChange={(val) => setForm((f: any) => ({ ...f, type_id: val, subtype_id: "" }))}
+            options={productTypes}
+            onCreated={(opt) =>
+              setProductTypes((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))
+            }
+            onDeleted={(id) => {
+              setProductTypes((prev) => prev.filter((x) => x.id !== id));
+              setProductSubtypes([]);
+              setForm((f: any) => ({ ...f, type_id: "", subtype_id: "" }));
+            }}
+            createEndpoint="/api/admin/product-types"
+            deleteEndpointBase="/api/admin/product-types"
+            placeholder={form.category_id ? "— None —" : "Select a category first"}
+            createBody={form.category_id ? { category_id: form.category_id } : undefined}
+            disableCreate={!form.category_id}
+            disableCreateReason="Select a category first"
+            disableSelect={!form.category_id}
+          />
+
+          <SelectWithCreate
+            label="Subtype"
+            value={form.subtype_id ?? ""}
+            onChange={(val) => setForm((f: any) => ({ ...f, subtype_id: val }))}
+            options={productSubtypes}
+            onCreated={(opt) =>
+              setProductSubtypes((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))
+            }
+            onDeleted={(id) => {
+              setProductSubtypes((prev) => prev.filter((x) => x.id !== id));
+              setForm((f: any) => ({ ...f, subtype_id: "" }));
+            }}
+            createEndpoint="/api/admin/product-subtypes"
+            deleteEndpointBase="/api/admin/product-subtypes"
+            placeholder={form.type_id ? "— None —" : "Select a type first"}
+            createBody={form.type_id ? { product_type_id: form.type_id } : undefined}
+            disableCreate={!form.type_id}
+            disableCreateReason="Select a product type first"
+            disableSelect={!form.type_id}
+          />
+
+          <SelectWithCreate
+            label="Collection"
+            value={form.collection_id ?? ""}
+            onChange={(val) => setForm((f: any) => ({ ...f, collection_id: val }))}
+            options={collections}
+            onCreated={(opt) => setCollections((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))}
+            onDeleted={(id) => {
+              setCollections((prev) => prev.filter((x) => x.id !== id));
+              setForm((f: any) => ({ ...f, collection_id: "" }));
+            }}
+            createEndpoint="/api/admin/product-collections"
+            deleteEndpointBase="/api/admin/product-collections"
           />
 
           <SelectWithCreate
@@ -398,7 +523,12 @@ export default function EditProductPage() {
             onChange={(val) => setForm((f: any) => ({ ...f, brand_id: val }))}
             options={brands}
             onCreated={(opt) => setBrands((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))}
+            onDeleted={(id) => {
+              setBrands((prev) => prev.filter((x) => x.id !== id));
+              setForm((f: any) => ({ ...f, brand_id: "" }));
+            }}
             createEndpoint="/api/admin/brands"
+            deleteEndpointBase="/api/admin/brands"
           />
 
           <label className="block">
@@ -413,16 +543,23 @@ export default function EditProductPage() {
             </select>
           </label>
 
-          <SelectWithCreate
-            label="Diecast scale"
-            value={form.diecast_scale_id ?? ""}
-            onChange={(scaleId) => setForm((f: any) => ({ ...f, diecast_scale_id: scaleId }))}
-            options={diecastScales}
-            onCreated={(opt) =>
-              setDiecastScales((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))
-            }
-            createEndpoint="/api/admin/diecast-scales"
-          />
+          {showDiecastScale ? (
+            <SelectWithCreate
+              label="Diecast scale"
+              value={form.diecast_scale_id ?? ""}
+              onChange={(scaleId) => setForm((f: any) => ({ ...f, diecast_scale_id: scaleId }))}
+              options={diecastScales}
+              onCreated={(opt) =>
+                setDiecastScales((prev) => [...prev, opt].sort((a, b) => a.name.localeCompare(b.name)))
+              }
+              createEndpoint="/api/admin/diecast-scales"
+              deleteEndpointBase="/api/admin/diecast-scales"
+              onDeleted={(id) => {
+                setDiecastScales((prev) => prev.filter((x) => x.id !== id));
+                setForm((f: any) => ({ ...f, diecast_scale_id: "" }));
+              }}
+            />
+          ) : null}
         </div>
       </section>
 

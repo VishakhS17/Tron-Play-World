@@ -91,7 +91,15 @@ export default async function HomePage() {
       prisma.site_marketing_settings
         .findUnique({
           where: { id: SITE_MARKETING_SETTINGS_ID },
-          select: { highlights_section_eyebrow: true, highlights_section_heading: true },
+          select: {
+            highlights_section_eyebrow: true,
+            highlights_section_heading: true,
+            hero_overlay_eyebrow: true,
+            hero_overlay_heading: true,
+            hero_overlay_subheading: true,
+            hero_overlay_cta_label: true,
+            hero_overlay_cta_href: true,
+          },
         })
         .catch(() => null),
     ]);
@@ -100,6 +108,17 @@ export default async function HomePage() {
     siteMarketingSettings?.highlights_section_eyebrow?.trim() || "Highlights";
   const highlightsSectionHeading =
     siteMarketingSettings?.highlights_section_heading?.trim() || "Featured collections and picks.";
+  const heroOverlay = {
+    eyebrow: siteMarketingSettings?.hero_overlay_eyebrow?.trim() || "Tron Play World",
+    heading:
+      siteMarketingSettings?.hero_overlay_heading?.trim() ||
+      "India's Ultimate Toy & RC Destination",
+    subheading:
+      siteMarketingSettings?.hero_overlay_subheading?.trim() ||
+      "RC cars, anime figures, diecast models, board games, and more.",
+    ctaLabel: siteMarketingSettings?.hero_overlay_cta_label?.trim() || "Shop Now",
+    ctaHref: siteMarketingSettings?.hero_overlay_cta_href?.trim() || "/shop",
+  };
 
   const heroSlides: HeroSlide[] = slidesRaw
     .filter((s) => isActiveInWindow(s.is_active, s.active_from, s.active_until, now))
@@ -200,6 +219,7 @@ export default async function HomePage() {
   return (
     <Home
       heroSlides={heroSlides}
+      heroOverlay={heroOverlay}
       highlightsSectionEyebrow={highlightsSectionEyebrow}
       highlightsSectionHeading={highlightsSectionHeading}
       highlights={highlights}

@@ -43,6 +43,24 @@ export async function PATCH(req: NextRequest) {
       data.first_visit_coupon_code = c || null;
     }
   }
+  if (body.hero_overlay_eyebrow !== undefined) {
+    data.hero_overlay_eyebrow = cleanOptionalText(body.hero_overlay_eyebrow, 120);
+  }
+  if (body.hero_overlay_heading !== undefined) {
+    data.hero_overlay_heading = cleanOptionalText(body.hero_overlay_heading, 255);
+  }
+  if (body.hero_overlay_subheading !== undefined) {
+    data.hero_overlay_subheading =
+      body.hero_overlay_subheading === null || body.hero_overlay_subheading === ""
+        ? null
+        : cleanText(body.hero_overlay_subheading, 5000);
+  }
+  if (body.hero_overlay_cta_label !== undefined) {
+    data.hero_overlay_cta_label = cleanOptionalText(body.hero_overlay_cta_label, 120);
+  }
+  if (body.hero_overlay_cta_href !== undefined) {
+    data.hero_overlay_cta_href = cleanOptionalText(body.hero_overlay_cta_href, 500);
+  }
 
   if (body.highlights_section_eyebrow !== undefined) {
     data.highlights_section_eyebrow = cleanOptionalText(body.highlights_section_eyebrow, 120);
@@ -128,6 +146,11 @@ export async function PATCH(req: NextRequest) {
   const baseCreate = {
     id: SITE_MARKETING_SETTINGS_ID,
     first_visit_coupon_code: null as string | null,
+    hero_overlay_eyebrow: null as string | null,
+    hero_overlay_heading: null as string | null,
+    hero_overlay_subheading: null as string | null,
+    hero_overlay_cta_label: null as string | null,
+    hero_overlay_cta_href: null as string | null,
     highlights_section_eyebrow: null as string | null,
     highlights_section_heading: null as string | null,
     privacy_page_title: null as string | null,

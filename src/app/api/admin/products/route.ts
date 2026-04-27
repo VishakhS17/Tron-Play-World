@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
+import { resolveProductTaxonomyForSave } from "@/lib/admin/productTaxonomy";
 
 function isAllowed(roles: string[]) {
   return roles.includes("SUPER_ADMIN") || roles.includes("MANAGER") || roles.includes("STAFF");
@@ -60,6 +61,9 @@ export async function POST(req: NextRequest) {
   const diecast_scale_id = cleanOptionalText(body.diecast_scale_id, 64);
   const category_id = cleanOptionalText(body.category_id, 64);
   const brand_id = cleanOptionalText(body.brand_id, 64);
+  const type_id_in = cleanOptionalText(body.type_id, 64);
+  const subtype_id_in = cleanOptionalText(body.subtype_id, 64);
+  const collection_id_in = cleanOptionalText(body.collection_id, 64);
   let hsn_code: string | null = null;
   if (body.hsn_code !== undefined && body.hsn_code !== null && body.hsn_code !== "") {
     if (typeof body.hsn_code !== "string") {
@@ -92,9 +96,22 @@ export async function POST(req: NextRequest) {
   if (
     (category_id && !isUuid(category_id)) ||
     (brand_id && !isUuid(brand_id)) ||
-    (diecast_scale_id && !isUuid(diecast_scale_id))
+    (diecast_scale_id && !isUuid(diecast_scale_id)) ||
+    (type_id_in && !isUuid(type_id_in)) ||
+    (subtype_id_in && !isUuid(subtype_id_in)) ||
+    (collection_id_in && !isUuid(collection_id_in))
   ) {
     return NextResponse.json({ error: "Invalid relations" }, { status: 400 });
+  }
+
+  const tax = await resolveProductTaxonomyForSave({
+    category_id: category_id ?? null,
+    type_id: type_id_in ?? null,
+    subtype_id: subtype_id_in ?? null,
+    collection_id: collection_id_in ?? null,
+  });
+  if ("error" in tax) {
+    return NextResponse.json({ error: tax.error }, { status: 400 });
   }
 
   const created = await prisma.products.create({
@@ -112,8 +129,11 @@ export async function POST(req: NextRequest) {
       short_description,
       is_active,
       age_group,
-      category_id,
+      category_id: tax.category_id,
       brand_id,
+      type_id: tax.type_id,
+      subtype_id: tax.subtype_id,
+      collection_id: tax.collection_id,
     },
     select: { id: true },
   });

@@ -28,6 +28,13 @@ function isRemoteUrl(url: string) {
 
 type Props = {
   slides?: HeroSlide[];
+  overlay?: {
+    eyebrow?: string;
+    heading?: string;
+    subheading?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+  };
 };
 
 const HERO_OVERLAY = {
@@ -38,8 +45,15 @@ const HERO_OVERLAY = {
   ctaHref: "/shop",
 } as const;
 
-const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
+const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
   const slides = slidesProp && slidesProp.length > 0 ? slidesProp : [];
+  const overlayCopy = {
+    eyebrow: overlay?.eyebrow?.trim() || HERO_OVERLAY.eyebrow,
+    heading: overlay?.heading?.trim() || HERO_OVERLAY.heading,
+    subheading: overlay?.subheading?.trim() || HERO_OVERLAY.subheading,
+    ctaLabel: overlay?.ctaLabel?.trim() || HERO_OVERLAY.ctaLabel,
+    ctaHref: overlay?.ctaHref?.trim() || HERO_OVERLAY.ctaHref,
+  };
   const slidesKey = useMemo(() => slides.map((s) => s.id).join("|"), [slides]);
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
@@ -160,20 +174,20 @@ const HeroBannerCarousel = ({ slides: slidesProp }: Props) => {
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-8 xl:px-0">
           <div className="max-w-xl text-white">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90 sm:text-xs">
-              {HERO_OVERLAY.eyebrow}
+              {overlayCopy.eyebrow}
             </p>
             <h1 className="text-3xl font-extrabold leading-[1.05] drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-4xl lg:text-6xl">
-              {HERO_OVERLAY.heading}
+              {overlayCopy.heading}
             </h1>
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/90 sm:text-base lg:text-lg">
-              {HERO_OVERLAY.subheading}
+              {overlayCopy.subheading}
             </p>
             <div className="pointer-events-auto mt-5">
               <Link
-                href={HERO_OVERLAY.ctaHref}
+                href={overlayCopy.ctaHref}
                 className="inline-flex items-center rounded-lg bg-red px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/25 transition hover:bg-red-dark sm:px-6 sm:py-3 sm:text-base"
               >
-                {HERO_OVERLAY.ctaLabel}
+                {overlayCopy.ctaLabel}
               </Link>
             </div>
           </div>

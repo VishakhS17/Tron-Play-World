@@ -6,6 +6,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { rateLimitStrict } from "@/lib/security/rateLimit";
 import { cleanOptionalText, cleanText, hasSuspiciousInput, isUuid, readJsonBody } from "@/lib/validation/input";
 import { syncLowStockAlertsByProductIds } from "@/lib/inventory/lowStockAlerts";
+import { resolveProductTaxonomyForSave } from "@/lib/admin/productTaxonomy";
 import { v2 as cloudinary } from "cloudinary";
 
 function parseShippingPerUnitIn(body: Record<string, unknown>): number | { error: string } | undefined {
@@ -73,6 +74,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       age_group: true,
       diecast_scale_id: true,
       category_id: true,
+      type_id: true,
+      subtype_id: true,
+      collection_id: true,
       brand_id: true,
       product_images: {
         orderBy: { sort_order: "asc" },
@@ -178,14 +182,67 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string 
       return bad();
     }
   }
-  if (body.category_id !== undefined) {
-    if (body.category_id === null || body.category_id === "") {
-      data.category_id = null;
-    } else if (typeof body.category_id === "string" && isUuid(cleanText(body.category_id, 64))) {
-      data.category_id = cleanText(body.category_id, 64);
-    } else {
-      return bad();
+  const bodyAny = body as {
+    category_id?: unknown;
+    type_id?: unknown;
+    subtype_id?: unknown;
+    collection_id?: unknown;
+  };
+  const hasTaxOrCat =
+    bodyAny.category_id !== undefined ||
+    bodyAny.type_id !== undefined ||
+    bodyAny.subtype_id !== undefined ||
+    bodyAny.collection_id !== undefined;
+  if (hasTaxOrCat) {
+    const current = await prisma.products.findUnique({
+      where: { id },
+      select: { category_id: true, type_id: true, subtype_id: true, collection_id: true },
+    });
+    if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const uuidOrNull = (v: unknown): { ok: true; value: string | null } | { ok: false } => {
+      if (v === null || v === "" || v === undefined) return { ok: true, value: null };
+      if (typeof v === "string" && isUuid(cleanText(v, 64))) {
+        return { ok: true, value: cleanText(v, 64) };
+      }
+      return { ok: false };
+    };
+    let nextCategory = current.category_id;
+    if (bodyAny.category_id !== undefined) {
+      const c = uuidOrNull(bodyAny.category_id);
+      if (!c.ok) return bad();
+      nextCategory = c.value;
     }
+    let nextType = current.type_id;
+    if (bodyAny.type_id !== undefined) {
+      const t = uuidOrNull(bodyAny.type_id);
+      if (!t.ok) return bad();
+      nextType = t.value;
+    }
+    let nextSubtype = current.subtype_id;
+    if (bodyAny.subtype_id !== undefined) {
+      const s = uuidOrNull(bodyAny.subtype_id);
+      if (!s.ok) return bad();
+      nextSubtype = s.value;
+    }
+    let nextCollection = current.collection_id;
+    if (bodyAny.collection_id !== undefined) {
+      const c = uuidOrNull(bodyAny.collection_id);
+      if (!c.ok) return bad();
+      nextCollection = c.value;
+    }
+    const resolved = await resolveProductTaxonomyForSave({
+      category_id: nextCategory,
+      type_id: nextType,
+      subtype_id: nextSubtype,
+      collection_id: nextCollection,
+    });
+    if ("error" in resolved) {
+      return NextResponse.json({ error: resolved.error }, { status: 400 });
+    }
+    data.category_id = resolved.category_id;
+    data.type_id = resolved.type_id;
+    data.subtype_id = resolved.subtype_id;
+    data.collection_id = resolved.collection_id;
   }
   if (body.brand_id !== undefined) {
     if (body.brand_id === null || body.brand_id === "") {

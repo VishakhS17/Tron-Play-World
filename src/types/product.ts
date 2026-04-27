@@ -14,6 +14,11 @@ export type Product = {
   ageGroup?: string | null;
   /** Diecast model scale, e.g. 1:64 */
   diecastScale?: string | null;
+  /** Optional catalog taxonomy (when loaded from API). */
+  category?: { name: string; slug: string } | null;
+  productType?: { name: string; slug: string } | null;
+  productSubtype?: { name: string; slug: string } | null;
+  collection?: { name: string; slug: string } | null;
   /** Cover image URL for thumbnails/cards (first product_image by sort_order). */
   image?: string;
   productVariants: {
