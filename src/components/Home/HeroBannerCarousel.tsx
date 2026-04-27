@@ -57,6 +57,8 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
   const slidesKey = useMemo(() => slides.map((s) => s.id).join("|"), [slides]);
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  const controlsHideTimerRef = useRef<number | null>(null);
+  const [mobileControlsActive, setMobileControlsActive] = useState(false);
 
   const goToNext = useCallback(() => {
     setActiveIndex((prev) =>
@@ -70,6 +72,17 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
     );
   }, [slides.length]);
 
+  const showMobileControlsTemporarily = useCallback(() => {
+    setMobileControlsActive(true);
+    if (controlsHideTimerRef.current) {
+      window.clearTimeout(controlsHideTimerRef.current);
+    }
+    controlsHideTimerRef.current = window.setTimeout(() => {
+      setMobileControlsActive(false);
+      controlsHideTimerRef.current = null;
+    }, 2200);
+  }, []);
+
   useEffect(() => {
     setActiveIndex(0);
   }, [slidesKey]);
@@ -82,7 +95,14 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
     return () => window.clearInterval(timer);
   }, [goToNext, slides.length]);
 
+  useEffect(() => {
+    return () => {
+      if (controlsHideTimerRef.current) window.clearTimeout(controlsHideTimerRef.current);
+    };
+  }, []);
+
   const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    showMobileControlsTemporarily();
     touchStartX.current = event.touches[0]?.clientX ?? null;
   };
 
@@ -104,7 +124,7 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
   if (slides.length === 0) {
     return (
       <div
-        className="relative flex w-full aspect-[3/2] lg:aspect-[3/1] items-center justify-center bg-gray-1 border-b border-gray-3"
+        className="relative flex w-full aspect-[3/2] lg:aspect-[2.7/1] items-center justify-center bg-gray-1 border-b border-gray-3"
         aria-label="Hero banner area"
       >
         <p className="max-w-md px-4 text-center text-sm leading-relaxed text-meta-3">
@@ -120,7 +140,7 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
 
   return (
     <div
-      className="relative w-full aspect-[3/2] lg:aspect-[3/1] touch-pan-y"
+      className="relative w-full aspect-[3/2] lg:aspect-[2.7/1] touch-pan-y"
       aria-roledescription="carousel"
       aria-label="Hero banner carousel"
       onTouchStart={handleTouchStart}
@@ -176,10 +196,10 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90 sm:text-xs">
               {overlayCopy.eyebrow}
             </p>
-            <h1 className="text-3xl font-extrabold leading-[1.05] drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] sm:text-4xl lg:text-6xl">
+            <h1 className="text-2xl font-semibold leading-[1.08] text-white/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.25)] sm:text-4xl sm:font-extrabold sm:drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)] lg:text-6xl">
               {overlayCopy.heading}
             </h1>
-            <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/90 sm:text-base lg:text-lg">
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-white/80 sm:text-base sm:text-white/90 lg:text-lg">
               {overlayCopy.subheading}
             </p>
             <div className="pointer-events-auto mt-5">
@@ -202,10 +222,13 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
               e.preventDefault();
               goToPrev();
             }}
-            className="absolute left-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/90 bg-dark text-white shadow-lg shadow-dark/40 transition hover:bg-blue sm:left-4 sm:h-11 sm:w-11"
+            className={`absolute left-2 top-1/2 z-20 -translate-y-1/2 text-white transition-opacity duration-200 ${
+              mobileControlsActive ? "opacity-95" : "opacity-30"
+            } sm:left-4 sm:flex sm:h-11 sm:w-11 sm:items-center sm:justify-center sm:rounded-full sm:border-2 sm:border-white/90 sm:bg-dark sm:opacity-100 sm:shadow-lg sm:shadow-dark/40 sm:hover:bg-blue`}
             aria-label="Previous banner"
+            onTouchStart={() => showMobileControlsTemporarily()}
           >
-            <ChevronLeftIcon className="size-6 text-white [&_path]:stroke-[2.5]" />
+            <ChevronLeftIcon className="size-7 text-white [&_path]:stroke-[2.5] sm:size-6" />
           </button>
           <button
             type="button"
@@ -213,10 +236,13 @@ const HeroBannerCarousel = ({ slides: slidesProp, overlay }: Props) => {
               e.preventDefault();
               goToNext();
             }}
-            className="absolute right-2 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white/90 bg-dark text-white shadow-lg shadow-dark/40 transition hover:bg-blue sm:right-4 sm:h-11 sm:w-11"
+            className={`absolute right-2 top-1/2 z-20 -translate-y-1/2 text-white transition-opacity duration-200 ${
+              mobileControlsActive ? "opacity-95" : "opacity-30"
+            } sm:right-4 sm:flex sm:h-11 sm:w-11 sm:items-center sm:justify-center sm:rounded-full sm:border-2 sm:border-white/90 sm:bg-dark sm:opacity-100 sm:shadow-lg sm:shadow-dark/40 sm:hover:bg-blue`}
             aria-label="Next banner"
+            onTouchStart={() => showMobileControlsTemporarily()}
           >
-            <ChevronRightIcon className="size-6 text-white [&_path]:stroke-[2.5]" />
+            <ChevronRightIcon className="size-7 text-white [&_path]:stroke-[2.5] sm:size-6" />
           </button>
         </>
       ) : null}
