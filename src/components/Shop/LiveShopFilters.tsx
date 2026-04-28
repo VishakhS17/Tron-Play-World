@@ -115,14 +115,6 @@ export default function LiveShopFilters({ formId }: Props) {
     const onInput = (e: Event) => {
       const t = e.target as HTMLInputElement | null;
       if (!t) return;
-      if (t.name === "brand" && t.type === "checkbox" && t.checked) {
-        const brandChecks = form.querySelectorAll(
-          'input[name="brand"][type="checkbox"]'
-        ) as NodeListOf<HTMLInputElement>;
-        for (const cb of Array.from(brandChecks)) {
-          if (cb !== t) cb.checked = false;
-        }
-      }
       if (t.name === "category") {
         handleCategoryDrivenReset();
       }
@@ -134,14 +126,6 @@ export default function LiveShopFilters({ formId }: Props) {
 
     const onChange = (e: Event) => {
       const t = e.target as HTMLInputElement | null;
-      if (t?.name === "brand" && t.type === "checkbox" && t.checked) {
-        const brandChecks = form.querySelectorAll(
-          'input[name="brand"][type="checkbox"]'
-        ) as NodeListOf<HTMLInputElement>;
-        for (const cb of Array.from(brandChecks)) {
-          if (cb !== t) cb.checked = false;
-        }
-      }
       if (t?.name === "category") {
         handleCategoryDrivenReset();
       }
