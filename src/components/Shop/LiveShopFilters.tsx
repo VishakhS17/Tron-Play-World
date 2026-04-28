@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 type Props = {
@@ -10,10 +11,40 @@ type Props = {
 export default function LiveShopFilters({ formId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const form = document.getElementById(formId) as HTMLFormElement | null;
     if (!form) return;
+
+    const syncFormFromQuery = () => {
+      const fields = Array.from(
+        form.querySelectorAll("input, select, textarea")
+      ) as Array<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
+
+      for (const field of fields) {
+        const name = field.name;
+        if (!name || name === "page") continue;
+
+        if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) {
+          const selected = new Set(
+            searchParams
+              .getAll(name)
+              .map((v) => v.trim())
+              .filter(Boolean)
+          );
+          field.checked = selected.has(String(field.value ?? "").trim());
+          continue;
+        }
+
+        const nextValue = searchParams.get(name) ?? "";
+        if (field.value !== nextValue) {
+          field.value = nextValue;
+        }
+      }
+    };
+
+    syncFormFromQuery();
 
     let debounceTimer: number | null = null;
     let prevCategorySignature = Array.from(
@@ -146,7 +177,7 @@ export default function LiveShopFilters({ formId }: Props) {
       form.removeEventListener("change", onChange);
       form.removeEventListener("submit", onSubmit);
     };
-  }, [formId, pathname, router]);
+  }, [formId, pathname, router, searchParams]);
 
   return null;
 }
