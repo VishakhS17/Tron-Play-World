@@ -52,19 +52,19 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const galleryImages = sortedImages.length > 0 ? sortedImages : variantImages.length > 0 ? variantImages : ["/images/products/placeholder.png"];
 
   return (
-    <section className="overflow-hidden py-6 pb-14 sm:py-10 sm:pb-20">
+    <section className="overflow-x-hidden overflow-y-visible py-6 pb-14 sm:py-10 sm:pb-20">
       <div className="w-full px-4 mx-auto max-w-7xl sm:px-8 xl:px-0">
         <Link href="/shop" className="text-sm font-medium text-blue hover:underline">
           Back to shop
         </Link>
 
-        <div className="mt-5 grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
+        <div className="mt-5 grid min-w-0 items-start gap-6 lg:grid-cols-2 lg:gap-8">
           <DemoProductGallery
             title={product.title}
             images={galleryImages}
           />
 
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-dark sm:text-3xl">{product.title}</h1>
             <div className="mt-2 flex items-baseline gap-3">
               {product.discountedPrice ? (

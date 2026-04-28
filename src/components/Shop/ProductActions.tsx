@@ -64,7 +64,7 @@ export default function ProductActions(props: ProductActionsProps) {
   }
 
   return (
-    <div className="mt-8 flex items-center gap-2.5">
+    <div className="mt-8 flex flex-wrap items-center gap-2.5">
       {currentQty > 0 ? (
         <div className="inline-flex items-center rounded-lg border border-gray-3 bg-white">
           <button

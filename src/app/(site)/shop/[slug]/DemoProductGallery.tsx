@@ -48,9 +48,9 @@ export default function DemoProductGallery({ title, images }: Props) {
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="w-full max-w-full space-y-3 overflow-x-hidden sm:space-y-4">
       <div
-        className="relative aspect-[4/3] sm:aspect-square overflow-hidden rounded-2xl border border-gray-3 bg-white touch-pan-y"
+        className="relative w-full aspect-[4/3] overflow-hidden rounded-2xl border border-gray-3 bg-white touch-pan-y sm:aspect-square"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -120,8 +120,8 @@ export default function DemoProductGallery({ title, images }: Props) {
             </svg>
           </button>
 
-          <div className="min-w-0 flex-1">
-            <div ref={thumbnailRailRef} className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+          <div className="min-w-0 flex-1 overflow-x-hidden">
+            <div ref={thumbnailRailRef} className="flex w-full max-w-full gap-3 overflow-x-auto pb-1 no-scrollbar">
               {images.map((thumbnail, index) => (
                 <button
                   key={`${thumbnail}-${index}`}
@@ -162,7 +162,7 @@ export default function DemoProductGallery({ title, images }: Props) {
           </button>
         </div>
       ) : (
-        <div ref={thumbnailRailRef} className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+        <div ref={thumbnailRailRef} className="flex w-full max-w-full gap-3 overflow-x-auto pb-1 no-scrollbar">
           {images.map((thumbnail, index) => (
             <button
               key={`${thumbnail}-${index}`}
