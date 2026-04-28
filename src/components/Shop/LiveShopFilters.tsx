@@ -17,15 +17,47 @@ export default function LiveShopFilters({ formId }: Props) {
 
     let debounceTimer: number | null = null;
 
+    const optionCountFromLabel = (el: Element): number | null => {
+      const label = el.closest("label");
+      const text = label?.textContent ?? "";
+      const m = text.match(/\((\d+)\)\s*$/);
+      if (!m) return null;
+      const n = Number(m[1]);
+      return Number.isFinite(n) ? n : null;
+    };
+
     const pushFromForm = (delayMs: number) => {
       if (debounceTimer) window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(() => {
-        const fd = new FormData(form);
         const usp = new URLSearchParams();
-        for (const [k, v] of fd.entries()) {
-          const value = String(v ?? "").trim();
+
+        const selectedCategoryCount = form.querySelectorAll('input[name="category"]:checked').length;
+        const inputs = Array.from(
+          form.querySelectorAll("input, select, textarea")
+        ) as Array<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
+
+        for (const field of inputs) {
+          const k = field.name;
+          if (!k || k === "page" || field.disabled) continue;
+
+          if (field instanceof HTMLInputElement && (field.type === "checkbox" || field.type === "radio")) {
+            if (!field.checked) continue;
+          }
+
+          const value = String(field.value ?? "").trim();
           if (!value) continue;
-          if (k === "page") continue;
+
+          // Category-dependent facets: avoid persisting stale selections that now show as (0)
+          if (
+            selectedCategoryCount > 0 &&
+            field instanceof HTMLInputElement &&
+            field.type === "checkbox" &&
+            (k === "brand" || k === "type" || k === "subtype" || k === "collection")
+          ) {
+            const count = optionCountFromLabel(field);
+            if (count === 0) continue;
+          }
+
           usp.append(k, value);
         }
         const q = usp.toString();
