@@ -16,6 +16,12 @@ export default function LiveShopFilters({ formId }: Props) {
     if (!form) return;
 
     let debounceTimer: number | null = null;
+    let prevCategorySignature = Array.from(
+      form.querySelectorAll('input[name="category"]:checked')
+    )
+      .map((n) => (n as HTMLInputElement).value)
+      .sort()
+      .join("|");
 
     const optionCountFromLabel = (el: Element): number | null => {
       const label = el.closest("label");
@@ -24,6 +30,47 @@ export default function LiveShopFilters({ formId }: Props) {
       if (!m) return null;
       const n = Number(m[1]);
       return Number.isFinite(n) ? n : null;
+    };
+
+    const clearAllNonCategorySelections = () => {
+      const fields = Array.from(
+        form.querySelectorAll("input, select, textarea")
+      ) as Array<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>;
+
+      for (const field of fields) {
+        const name = field.name;
+        if (!name || name === "category" || name === "page") continue;
+
+        if (field instanceof HTMLInputElement) {
+          if (field.type === "checkbox" || field.type === "radio") {
+            field.checked = false;
+            continue;
+          }
+          field.value = "";
+          continue;
+        }
+
+        if (field instanceof HTMLSelectElement) {
+          field.value = "";
+          continue;
+        }
+
+        field.value = "";
+      }
+    };
+
+    const handleCategoryDrivenReset = () => {
+      const currentSignature = Array.from(
+        form.querySelectorAll('input[name="category"]:checked')
+      )
+        .map((n) => (n as HTMLInputElement).value)
+        .sort()
+        .join("|");
+
+      if (currentSignature !== prevCategorySignature) {
+        clearAllNonCategorySelections();
+        prevCategorySignature = currentSignature;
+      }
     };
 
     const pushFromForm = (delayMs: number) => {
@@ -68,13 +115,22 @@ export default function LiveShopFilters({ formId }: Props) {
     const onInput = (e: Event) => {
       const t = e.target as HTMLInputElement | null;
       if (!t) return;
+      if (t.name === "category") {
+        handleCategoryDrivenReset();
+      }
       const isTextLike =
         t.tagName === "TEXTAREA" ||
         (t.tagName === "INPUT" && (t.type === "text" || t.type === "search" || t.type === "number"));
       pushFromForm(isTextLike ? 250 : 80);
     };
 
-    const onChange = () => pushFromForm(80);
+    const onChange = (e: Event) => {
+      const t = e.target as HTMLInputElement | null;
+      if (t?.name === "category") {
+        handleCategoryDrivenReset();
+      }
+      pushFromForm(80);
+    };
     const onSubmit = (e: Event) => {
       e.preventDefault();
       pushFromForm(0);
