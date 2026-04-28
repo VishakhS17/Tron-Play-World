@@ -1,9 +1,10 @@
 import type { HeaderNavData } from "@/lib/nav/headerNav";
 import type { MenuItem } from "./types";
 
-function shopBrandOnly(brandSlug: string) {
+function shopSingleSelection(params: { brandSlug?: string; categorySlug?: string }) {
   const u = new URLSearchParams();
-  u.set("brand", brandSlug);
+  if (params.categorySlug) u.set("category", params.categorySlug);
+  if (params.brandSlug) u.set("brand", params.brandSlug);
   return `/shop?${u.toString()}`;
 }
 
@@ -13,7 +14,7 @@ export function buildHeaderMenuData(nav: HeaderNavData): MenuItem[] {
 
   const carsItems: MenuItem[] = nav.carsBrands.map((b) => ({
     title: b.name,
-    path: shopBrandOnly(b.slug),
+    path: shopSingleSelection({ brandSlug: b.slug, categorySlug: diecastSlug ?? undefined }),
   }));
 
   const carsMenu: MenuItem =
@@ -25,7 +26,7 @@ export function buildHeaderMenuData(nav: HeaderNavData): MenuItem[] {
             {
               title: diecastSlug ? "Browse diecast" : "Browse shop",
               path: diecastSlug
-                ? `/shop?category=${encodeURIComponent(diecastSlug)}`
+                ? shopSingleSelection({ categorySlug: diecastSlug })
                 : "/shop",
             },
           ],
@@ -37,7 +38,7 @@ export function buildHeaderMenuData(nav: HeaderNavData): MenuItem[] {
           heading: g.categoryName,
           items: g.brands.map((b) => ({
             title: b.name,
-            path: shopBrandOnly(b.slug),
+            path: shopSingleSelection({ brandSlug: b.slug, categorySlug: g.categorySlug }),
           })),
         }))
       : [
