@@ -591,6 +591,17 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
   delete (wNoAge as { age_group?: unknown }).age_group;
   const wNoBrand: Prisma.productsWhereInput = { ...fw };
   delete (wNoBrand as { brand_id?: unknown }).brand_id;
+  const brandFacetWhere: Prisma.productsWhereInput =
+    categorySlugs.length > 0
+      ? {
+          is_active: true,
+          inventory: { some: { available_quantity: { gt: 0 } } },
+          ...(((where as { category_id?: unknown }).category_id && {
+            category_id: (where as { category_id?: unknown }).category_id,
+          }) ||
+            {}),
+        }
+      : wNoBrand;
   const wNoType: Prisma.productsWhereInput = { ...fw };
   const typeIdInWhere = (where as { type_id?: { in?: string[] } }).type_id?.in ?? [];
   const subtypeIdsInWhere = (where as { subtype_id?: { in?: string[] } }).subtype_id?.in ?? [];
@@ -642,7 +653,7 @@ export async function getShopListing(usp: URLSearchParams): Promise<ShopListingR
       }),
       prisma.products.groupBy({
         by: ["brand_id"],
-        where: { ...wNoBrand, brand_id: { not: null } } as never,
+        where: { ...brandFacetWhere, brand_id: { not: null } } as never,
         _count: { _all: true },
       }),
       prisma.products.findMany({
