@@ -48,9 +48,9 @@ export default function DemoProductGallery({ title, images }: Props) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div
-        className="relative aspect-square rounded-2xl border border-gray-3 overflow-hidden bg-white touch-pan-y"
+        className="relative aspect-[4/3] sm:aspect-square overflow-hidden rounded-2xl border border-gray-3 bg-white touch-pan-y"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -59,7 +59,7 @@ export default function DemoProductGallery({ title, images }: Props) {
             <button
               type="button"
               onClick={() => goTo(activeIndex - 1)}
-              className="absolute left-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-3 bg-white/95 text-dark shadow-sm transition hover:bg-white"
+              className="absolute left-2 top-1/2 z-10 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-3 bg-white/95 text-dark shadow-sm transition hover:bg-white sm:left-3 sm:h-10 sm:w-10"
               aria-label="Previous image"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -75,7 +75,7 @@ export default function DemoProductGallery({ title, images }: Props) {
             <button
               type="button"
               onClick={() => goTo(activeIndex + 1)}
-              className="absolute right-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-gray-3 bg-white/95 text-dark shadow-sm transition hover:bg-white"
+              className="absolute right-2 top-1/2 z-10 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-3 bg-white/95 text-dark shadow-sm transition hover:bg-white sm:right-3 sm:h-10 sm:w-10"
               aria-label="Next image"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -96,7 +96,7 @@ export default function DemoProductGallery({ title, images }: Props) {
           alt={`${title} image ${activeIndex + 1}`}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
-          className="object-contain p-4"
+          className="object-contain p-2 sm:p-4"
           priority
         />
       </div>
@@ -106,7 +106,7 @@ export default function DemoProductGallery({ title, images }: Props) {
           <button
             type="button"
             onClick={() => scrollThumbnails("left")}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-3 bg-white text-dark shadow-sm transition hover:bg-gray-1"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-3 bg-white text-dark shadow-sm transition hover:bg-gray-1 sm:inline-flex"
             aria-label="Scroll thumbnails left"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -127,7 +127,7 @@ export default function DemoProductGallery({ title, images }: Props) {
                   key={`${thumbnail}-${index}`}
                   type="button"
                   onClick={() => goTo(index)}
-                  className={`relative aspect-square h-24 w-24 shrink-0 overflow-hidden rounded-xl border bg-white ${
+                  className={`relative aspect-square h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-xl border bg-white sm:h-24 sm:w-24 ${
                     activeIndex === index ? "border-blue" : "border-gray-3"
                   }`}
                   aria-label={`Show image ${index + 1}`}
@@ -147,7 +147,7 @@ export default function DemoProductGallery({ title, images }: Props) {
           <button
             type="button"
             onClick={() => scrollThumbnails("right")}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-3 bg-white text-dark shadow-sm transition hover:bg-gray-1"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-3 bg-white text-dark shadow-sm transition hover:bg-gray-1 sm:inline-flex"
             aria-label="Scroll thumbnails right"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -168,7 +168,7 @@ export default function DemoProductGallery({ title, images }: Props) {
               key={`${thumbnail}-${index}`}
               type="button"
               onClick={() => goTo(index)}
-              className={`relative aspect-square h-24 w-24 shrink-0 overflow-hidden rounded-xl border bg-white ${
+              className={`relative aspect-square h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-xl border bg-white sm:h-24 sm:w-24 ${
                 activeIndex === index ? "border-blue" : "border-gray-3"
               }`}
               aria-label={`Show image ${index + 1}`}
