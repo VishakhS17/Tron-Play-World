@@ -97,9 +97,6 @@ const config = {
       },
     },
     screens: {
-      xsm: "375px",
-      lsm: "425px",
-      "3xl": "2000px",
       ...defaultTheme.screens,
     },
     extend: {
@@ -215,11 +212,6 @@ const config = {
         192.5: "48.125rem",
         203: "50.75rem",
         230: "57.5rem",
-      },
-      maxWidth: {
-        30: "7.5rem",
-        40: "10rem",
-        50: "12.5rem",
       },
       zIndex: {
         999999: "999999",

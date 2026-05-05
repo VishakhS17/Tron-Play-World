@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 // IMPORTANT: Do not hardcode database credentials in the repo.
 // The datasource URL must come from the environment (e.g. local `.env` / Vercel env var).

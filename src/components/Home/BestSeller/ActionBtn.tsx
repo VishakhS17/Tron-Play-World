@@ -1,11 +1,5 @@
 "use client";
-import {
-  CartIcon2,
-  EyeIcon,
-  HeartFilledIcon,
-  HeartIcon,
-  HeartSolid,
-} from "@/assets/icons";
+import { CartIcon2, EyeIcon, HeartIcon, HeartSolid } from "@/assets/icons";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 

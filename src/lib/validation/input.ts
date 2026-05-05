@@ -75,12 +75,6 @@ export function isUrlSlug(value: string) {
   return /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/i.test(value);
 }
 
-/** Short controlled labels like age_group in DB. */
-export function isSafeShortLabel(value: string, maxLen = 40) {
-  const s = cleanText(value, maxLen);
-  return s.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9\s._+\-]*$/.test(s);
-}
-
 const ORDER_STATUS_WHITELIST = new Set([
   "PENDING",
   "PAYMENT_FAILED",

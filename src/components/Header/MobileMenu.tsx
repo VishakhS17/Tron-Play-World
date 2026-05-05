@@ -6,6 +6,8 @@ import type { MenuItem } from "./types";
 import { CloseIcon } from "./icons";
 import Image from "next/image";
 
+const DEFAULT_HEADER_LOGO = "/images/logo/logo1-removebg-preview.png";
+
 interface MobileMenuProps {
   headerLogo: string | null;
   isOpen: boolean;
@@ -80,7 +82,7 @@ const MobileMenu = ({ isOpen, onClose, menuData, headerLogo }: MobileMenuProps) 
                 <Image
                   src={
                     headerLogo ||
-                    "/images/logo/site-logo.png"
+                    DEFAULT_HEADER_LOGO
                   }
                   alt="Site logo"
                   width={128}

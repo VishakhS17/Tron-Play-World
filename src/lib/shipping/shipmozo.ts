@@ -178,7 +178,6 @@ export async function bookShipmozoShipmentForOrder(orderId: string): Promise<voi
   const width = Number(process.env.SHIPMOZO_DEFAULT_WIDTH_CM ?? "10") || 10;
   const height = Number(process.env.SHIPMOZO_DEFAULT_HEIGHT_CM ?? "10") || 10;
 
-  const qtyTotal = order.order_items?.reduce((s, it) => s + (Number.isFinite(it.quantity) ? it.quantity : 0), 0) || 1;
   const total = Number(order.total_amount);
   const totalAmount = Number.isFinite(total) ? Number(total.toFixed(2)) : 0;
   const lineItems = (order.order_items ?? []).map((it) => ({

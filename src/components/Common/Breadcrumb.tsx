@@ -14,7 +14,6 @@ export interface BreadcrumbItem {
 
 interface BreadcrumbProps {
   items?: BreadcrumbItem[];
-  title?: string;
   homeLabel?: string;
   homeHref?: string;
   separator?: React.ReactNode;
@@ -22,7 +21,6 @@ interface BreadcrumbProps {
 
 const Breadcrumb = ({
   items,
-  title,
   homeLabel = "Home",
   homeHref = "/",
   separator = ">",
@@ -47,7 +45,7 @@ const Breadcrumb = ({
                   const isLast = index === breadcrumbItems.length - 1;
 
                   return (
-                    <li key={index} className="inline-flex items-center">
+                    <li key={item.href} className="inline-flex items-center">
                       {isLast ? (
                         <span
                           className="text-custom-sm font-medium leading-none text-blue"
@@ -81,70 +79,6 @@ const Breadcrumb = ({
 };
 
 export default Breadcrumb;
-
-export const AdminBreadcrumb = ({
-  items,
-  title,
-  homeLabel = "Admin",
-  homeHref = "/admin",
-  separator = ">",
-}: BreadcrumbProps) => {
-  const pathname = usePathname();
-
-  // If we're on the admin homepage, don't render the breadcrumb
-  if (pathname === "/admin") return null;
-
-  // If no items are provided, generate them from the current path
-  const breadcrumbItems =
-    items || generateBreadcrumbsFromPath(pathname, homeLabel, homeHref);
-
-  return (
-    <div className="overflow-hidden shadow-breadcrumb pt-[100px]">
-      <div className="border-t border-gray-3">
-        <div className="w-full px-4 py-5 mx-auto max-w-7xl sm:px-8 xl:px-0 xl:py-10">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <h2 className="text-xl font-semibold capitalize text-dark sm:text-2xl">
-              {title || breadcrumbItems[breadcrumbItems.length - 1]?.label}
-            </h2>
-
-            <nav aria-label="Breadcrumb">
-              <ol className="flex flex-wrap items-center gap-1">
-                {breadcrumbItems.map((item, index) => {
-                  const isLast = index === breadcrumbItems.length - 1;
-
-                  return (
-                    <li key={index} className="flex items-center">
-                      {isLast ? (
-                        <span
-                          className="font-medium text-custom-sm text-blue"
-                          aria-current="page"
-                        >
-                          {item.label}
-                        </span>
-                      ) : (
-                        <>
-                          <Link
-                            href={item.href}
-                            className="text-gray-600 transition-colors text-custom-sm hover:text-blue"
-                          >
-                            {item.label}
-                          </Link>
-                          <span className="flex items-center mx-1">
-                            {separator}
-                          </span>
-                        </>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </nav>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Helper function to generate breadcrumbs from the current path
 function generateBreadcrumbsFromPath(

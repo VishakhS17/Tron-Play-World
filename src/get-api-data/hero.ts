@@ -60,17 +60,3 @@ export const getHeroSliders = unstable_cache(
   },
   ['heroSliders'], { tags: ['heroSliders'] }
 );
-
-
-// single hero banner
-export const getSingleHeroBanner = async (id:number) => 
-  unstable_cache(
-    async () => {
-      return await prisma.heroBanner.findUnique({
-        where: {
-          id: id
-        }
-      });
-    },
-    ['single-hero-banner'], { tags: [`single-hero-banner-${id}`] }
-  )

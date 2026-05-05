@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prismaDB";
 import { unstable_cache } from "next/cache";
 
 // get all seo settings
@@ -23,32 +22,3 @@ export const getSeoSettings = unstable_cache(
   },
   ['seo-setting'], { tags: ['seo-setting'] }
 );
-
-export const getSiteName = unstable_cache(
-  async () => {
-    try {
-      return process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
-    } catch {
-      return process.env.SITE_NAME ? process.env.SITE_NAME : "i-Robox";
-    }
-  },
-  ['site-name'], { tags: ['site-name'] }
-);
-
-// get logo 
-export const getLogo = unstable_cache(
-  async () => {
-    // Step 3 DB schema does not include persisted header settings yet.
-    return "/images/logo/logo.svg";
-  },
-  ['header-logo'], { tags: ['header-logo'] }
-);
-
-// get email logo
-export const getEmailLogo = unstable_cache(
-  async () => {
-    return "/images/logo/logo.svg";
-  },
-  ['email-logo'], { tags: ['email-logo'] }
-);
-

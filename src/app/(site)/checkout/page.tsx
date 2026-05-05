@@ -30,12 +30,6 @@ export default function CheckoutPage() {
   const [isGift, setIsGift] = useState(false);
   const [giftMessage, setGiftMessage] = useState("");
   const [signedInLabel, setSignedInLabel] = useState<string | null>(null);
-  const [pricing, setPricing] = useState<{
-    subtotal: number;
-    discount: number;
-    shipping: number;
-    total: number;
-  } | null>(null);
 
   const deliveryCharge = useMemo(() => {
     return items.reduce((sum, item) => {
@@ -64,7 +58,6 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    setPricing(null);
     setCouponBreakdown(null);
   }, [items, couponCode]);
 
@@ -128,18 +121,6 @@ export default function CheckoutPage() {
       });
       const createData = await createRes.json().catch(() => ({}));
       if (!createRes.ok) throw new Error(createData?.error || "Could not initiate payment");
-
-      const p = createData?.pricing;
-      if (
-        p &&
-        typeof p === "object" &&
-        typeof p.subtotal === "number" &&
-        typeof p.discount === "number" &&
-        typeof p.shipping === "number" &&
-        typeof p.total === "number"
-      ) {
-        setPricing({ subtotal: p.subtotal, discount: p.discount, shipping: p.shipping, total: p.total });
-      }
 
       const rz = new window.Razorpay({
         key: createData.keyId,

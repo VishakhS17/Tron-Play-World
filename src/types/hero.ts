@@ -16,19 +16,3 @@ export type IHeroSlider = {
     shortDescription: string;
   }
 };
-
-export type IHeroBanner = {
-  id: number;
-  bannerName: string | null;
-  bannerImage: string;
-  slug: string;
-  productId: string;
-  createdAt: Date;  // Change from string to Date
-  updatedAt: Date;  // Change from string to Date
-  product: {
-    price: string;
-    discountedPrice?: string | null;
-    title: string;
-    slug: string;
-  }
-}

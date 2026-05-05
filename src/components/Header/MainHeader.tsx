@@ -23,6 +23,8 @@ export type SiteHeaderData = {
   headerLogo?: string | null;
 };
 
+const DEFAULT_HEADER_LOGO = "/images/logo/logo1-removebg-preview.png";
+
 export type UtilityAnnouncement = {
   body: string;
   linkUrl?: string | null;
@@ -329,7 +331,7 @@ const MainHeader = ({
               <div className="hidden items-center gap-8 xl:flex">
                 <Link className="block shrink-0 py-2" href="/">
                   <Image
-                    src={headerData?.headerLogo || "/images/logo/site-logo.png"}
+                    src={headerData?.headerLogo || DEFAULT_HEADER_LOGO}
                     alt="Site logo"
                     width={160}
                     height={160}
@@ -351,7 +353,7 @@ const MainHeader = ({
             <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center xl:hidden">
               <Link className="pointer-events-auto block py-1" href="/">
                 <Image
-                  src={headerData?.headerLogo || "/images/logo/site-logo.png"}
+                  src={headerData?.headerLogo || DEFAULT_HEADER_LOGO}
                   alt="Site logo"
                   width={160}
                   height={160}

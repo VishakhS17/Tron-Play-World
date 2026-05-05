@@ -1,4 +1,4 @@
-import { HeartFilledIcon, HeartIcon, HeartSolid } from "@/assets/icons";
+import { HeartIcon, HeartSolid } from "@/assets/icons";
 import { useAppSelector } from "@/redux/store";
 import { Product } from "@/types/product";
 import { useEffect, useState } from "react";
